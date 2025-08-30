@@ -1,0 +1,1 @@
+add_requires("d3d12-memory-allocator")
