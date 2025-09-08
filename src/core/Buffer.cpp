@@ -4,7 +4,7 @@
 
 Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
 {
-    Buffer buffer;
+    Buffer buffer{};
 
     auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(desc._bufferSize);
     D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{

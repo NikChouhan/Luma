@@ -3,20 +3,54 @@
 Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
 {
     Pipeline pipeline{};
-    // create an empty root signature
+    // create the root signature
+    /*
+     TODO: root signature should be separated from the pipeline creation,
+     it can be reused between multiple pipelines. Also, samplers should be per texture(?)
+     and not per pipeline xd
+	 */
     {
-        CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
-        rootSignatureDesc.Init(0, nullptr, 0, nullptr, 
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+        if (FAILED(gfxDevice._device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE,
+            &featureData, sizeof(featureData))))
+        {
+            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+        }
+        CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0,
+            0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+        CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+        rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+
+        D3D12_STATIC_SAMPLER_DESC sampler = {};
+        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 0;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MinLOD = 0.0f;
+        sampler.MaxLOD = D3D12_FLOAT32_MAX;
+        sampler.ShaderRegister = 0;
+        sampler.RegisterSpace = 0;
+        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
+            1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
-        DX_ASSERT(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-            &signature, &error));
-        DX_ASSERT(
-            gfxDevice._device->CreateRootSignature(0, signature->GetBufferPointer(), 
-                signature->GetBufferSize(),
-                IID_PPV_ARGS(&pipeline._rootSignature)));
+        DX_ASSERT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc,
+            featureData.HighestVersion, &signature, &error));
+        DX_ASSERT(gfxDevice._device->CreateRootSignature(0,
+            signature->GetBufferPointer(), signature->GetBufferSize(),
+            IID_PPV_ARGS(&pipeline._rootSignature)));
     }
     // define the vertex input layout
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -27,7 +61,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
             .InstanceDataStepRate = 0
         },
         {
-            .SemanticName = "COLOR", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32A32_FLOAT, .InputSlot = 0,
+            .SemanticName = "TEXCOORD", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32_FLOAT, .InputSlot = 0,
             .AlignedByteOffset = 12, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
             .InstanceDataStepRate = 0
         }

@@ -1,6 +1,8 @@
 #include "GfxDevice.h"
 #include <D3D12MemAlloc.h>
 
+#include "FrameSync.h"
+
 static void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
     IDXGIAdapter1** ppAdapter,
@@ -69,17 +71,6 @@ static void GetHardwareAdapter(
 GfxDevice CreateDevice(GfxDeviceDesc desc)
 {
     GfxDevice gfxDevice{};
-    
-    // viewport and scissor
-    gfxDevice._viewport.TopLeftX = 0;
-    gfxDevice._viewport.TopLeftY = 0;
-    gfxDevice._viewport.Height = static_cast<float>(desc._height);
-    gfxDevice._viewport.Width = static_cast<float>(desc._width);
-
-    gfxDevice._scissorRect.left = 0;
-    gfxDevice._scissorRect.top = 0;
-    gfxDevice._scissorRect.right = static_cast<LONG>(desc._width);
-    gfxDevice._scissorRect.bottom = static_cast<LONG>(desc._height);
 
     u32 dxgiFactoryFlags = 0;
 
@@ -121,12 +112,34 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
         gfxDevice._device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
             _commandAllocators[i])));
     }
-    gfxDevice._hwnd = desc._hwnd;
     
     return gfxDevice;
 }
 
 void DestroyDevice(GfxDevice& gfxDevice)
 {
-    
+		
+}
+
+ComPtr<ID3D12GraphicsCommandList1> CreateCommandList(GfxDevice& gfxDevice)
+{
+    ComPtr<ID3D12GraphicsCommandList1> commandList;
+
+    DX_ASSERT(gfxDevice._device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gfxDevice._commandAllocators->Get(),
+        nullptr,
+        IID_PPV_ARGS(&commandList)));
+
+    return commandList;
+}
+
+void ImmediateSubmit(GfxDevice& gfxDevice, FrameSync& frameSync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback)
+{
+	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
+
+    callback(commandList);
+    DX_ASSERT(commandList->Close());
+
+    ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+    gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    WaitForGPU(gfxDevice, frameSync);
 }

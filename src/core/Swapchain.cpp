@@ -3,16 +3,30 @@
 #include "Buffer.h"
 #include "FrameSync.h"
 #include "Pipeline.h"
+#include "Texture.h"
 
 Swapchain CreatSwapChain(GfxDevice& gfxDevice, SwapchainDesc desc)
 {
     Swapchain swapchain{};
 
+    swapchain._aspectRatio = desc._aspectRatio;
+    swapchain._hwnd = desc._hwnd;
+    // viewport and scissor
+    swapchain._viewport.TopLeftX = 0;
+    swapchain._viewport.TopLeftY = 0;
+    swapchain._viewport.Height = static_cast<float>(desc._height);
+    swapchain._viewport.Width = static_cast<float>(desc._width);
+
+    swapchain._scissorRect.left = 0;
+    swapchain._scissorRect.top = 0;
+    swapchain._scissorRect.right = static_cast<LONG>(desc._width);
+    swapchain._scissorRect.bottom = static_cast<LONG>(desc._height);
+
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = frameCount;
-    swapChainDesc.Width = static_cast<u32>(gfxDevice._viewport.Width);
-    swapChainDesc.Height = static_cast<u32>(gfxDevice._viewport.Height);
+    swapChainDesc.Width = static_cast<u32>(swapchain._viewport.Width);
+    swapChainDesc.Height = static_cast<u32>(swapchain._viewport.Height);
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -21,14 +35,14 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, SwapchainDesc desc)
     ComPtr<IDXGISwapChain1> swapChain;
     DX_ASSERT(gfxDevice._factory->CreateSwapChainForHwnd(
         gfxDevice._commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
-        gfxDevice._hwnd,
+        swapchain._hwnd,
         &swapChainDesc,
         nullptr,
         nullptr,
         &swapChain
     ));
 
-    DX_ASSERT(gfxDevice._factory->MakeWindowAssociation(gfxDevice._hwnd, DXGI_MWA_NO_ALT_ENTER));
+    DX_ASSERT(gfxDevice._factory->MakeWindowAssociation(swapchain._hwnd, DXGI_MWA_NO_ALT_ENTER));
     DX_ASSERT(swapChain.As(&swapchain._swapchain));
 
     // create descriptor heaps
@@ -59,21 +73,30 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, SwapchainDesc desc)
     return swapchain;
 }
 
+
 void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
-                      GfxDevice& gfxDevice,
-                      Swapchain& swapchain,
-                      FrameSync& frameSync,
-                      Pipeline& pipeline,
-                      Buffer& vertexBuffer)
+    GfxDevice& gfxDevice,
+    Swapchain& swapchain,
+    FrameSync& frameSync,
+    Pipeline& pipeline,
+    Buffer& vertexBuffer,
+    Texture& texture)
 {
     // record command list
     {
+        WaitForGPU(gfxDevice, frameSync);
         DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
             pipeline._pipelineState.Get()));
         commandList->SetGraphicsRootSignature(pipeline._rootSignature.Get());
-        commandList->RSSetViewports(1, &gfxDevice._viewport);
-        commandList->RSSetScissorRects(1, &gfxDevice._scissorRect);
+
+        ID3D12DescriptorHeap* ppHeaps[] = { texture._srvHeap.Get() };
+        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+        commandList->SetGraphicsRootDescriptorTable(0, texture._srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+        commandList->RSSetViewports(1, &swapchain._viewport);
+        commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
         // set the back buffer as render target
         auto rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),

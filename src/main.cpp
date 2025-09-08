@@ -3,15 +3,19 @@
 #include "Pipeline.h"
 #include "FrameSync.h"
 #include "Buffer.h"
+#include "Texture.h"
 
-struct FramePresent
-{
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-	Swapchain swapchain;
-	FrameSync frameSync;
-	Pipeline pipeline;
-	Buffer vertexBuffer;
-};
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+//struct FramePresent
+//{
+//	ComPtr<ID3D12GraphicsCommandList> commandList;
+//	Swapchain swapchain;
+//	FrameSync frameSync;
+//	Pipeline pipeline;
+//	Buffer vertexBuffer;
+//};
 
 static bool isOpen = true;
 
@@ -40,22 +44,37 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 		return 0;
 
 	ShowWindow(hwnd, cmdShow);
+
 	// create graphics device
-	const GfxDeviceDesc gfxDeviceDesc = { ._width = 1920, ._height = 1080, ._aspectRatio = 16. / 9., ._hwnd = hwnd };
+	const GfxDeviceDesc gfxDeviceDesc{};
 	GfxDevice gfxDevice= CreateDevice(gfxDeviceDesc);
+	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
 	// swapchain
 	Swapchain swapchain = CreatSwapChain(gfxDevice,
-		{._vsyncEnable = true});
+		{
+			._aspectRatio = 16./9.,
+			._height = 1080,
+			._width = 1920,
+			._vsyncEnable = true,
+			._hwnd = hwnd
+		});
+	int width, height, channels;
+	unsigned char* pTextureContents = stbi_load("../../../../assets/textures/cat.jpg",
+		&width, &height, &channels, STBI_rgb);
 
+	Texture texture = CreateTexture(gfxDevice, frameSync,
+		{
+		._texWidth = u32(width),
+		._texHeight = u32(height),
+		._texPixelSize = u32(channels),
+		._pContents = pTextureContents
+		});
 	// vertex buffer for triangle
 	Vertex triangleVertices[] =
 	{
-		{.position = { 0.0f, 0.25f * gfxDeviceDesc._aspectRatio, 0.0f },
-			.color = { 1.0f, 0.0f, 0.0f, 1.0f } },
-		{.position = { 0.25f, -0.25f * gfxDeviceDesc._aspectRatio, 0.0f },
-			.color = { 0.0f, 1.0f, 0.0f, 1.0f } },
-		{.position = { -0.25f, -0.25f * gfxDeviceDesc._aspectRatio, 0.0f },
-			.color = { 0.0f, 0.0f, 1.0f, 1.0f } }
+		{ { 0.0f, 0.25f * swapchain._aspectRatio, 0.0f }, { 0.5f, 0.0f } },
+		{ { 0.25f, -0.25f * swapchain._aspectRatio, 0.0f }, { 1.0f, 1.0f } },
+		{ { -0.25f, -0.25f * swapchain._aspectRatio, 0.0f }, { 0.0f, 1.0f } }
 	};
 	Buffer vertexBuffer = CreateBuffer(gfxDevice,
 		{
@@ -69,6 +88,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 		._pEntryPoint = "VSMain",
 		._pTarget = "vs_5_0",
 		._type = Type::VERTEX});
+
 	Shader pixelShader = CreateShader(gfxDevice,
 		{
 		._shaderPath = shaderPath,
@@ -81,28 +101,25 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 		._shaders = {vertexShader, pixelShader},
 		._enableDepthTest = false,
 		._enableStencilTest = false});
-	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
 	// wait for the assets to be uploaded before rendering the frame
 	WaitForGPU(gfxDevice, frameSync);
 
-	// create command list
-	ComPtr<ID3D12GraphicsCommandList> commandList{};
-	DX_ASSERT(gfxDevice._device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-		gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
-		pipeline._pipelineState.Get(), IID_PPV_ARGS(&commandList)));
+	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(commandList->Close());
 	
 	auto onRender = [&]()
 	{
 		SubmitandPresent(commandList, gfxDevice, swapchain,
-			frameSync, pipeline, vertexBuffer);
+			frameSync, pipeline, vertexBuffer, texture);
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
 
 	MSG msg{};
 	if (msg.message == WM_QUIT)
 	{
+		WaitForGPU(gfxDevice, frameSync);
 		DestroyDevice(gfxDevice);
+		PostQuitMessage(0);
 	}
 	while (WM_QUIT != msg.message)
 	{

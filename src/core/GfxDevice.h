@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+
+struct FrameSync;
+
 namespace D3D12MA
 {
 	class Allocator;
@@ -7,9 +11,6 @@ namespace D3D12MA
 
 struct GfxDevice
 {
-	CD3DX12_VIEWPORT _viewport;
-	CD3DX12_RECT _scissorRect;
-	HWND _hwnd;
 	ComPtr<IDXGIFactory2> _factory;
 	ComPtr<ID3D12Device14> _device;
 	ComPtr<ID3D12CommandAllocator> _commandAllocators[frameCount];
@@ -19,11 +20,10 @@ struct GfxDevice
 
 struct GfxDeviceDesc
 {
-	u32 _width;
-	u32 _height;
-	f32 _aspectRatio;
-	HWND _hwnd;
 };
 
 GfxDevice CreateDevice(GfxDeviceDesc desc);
 void DestroyDevice(GfxDevice& gfxDevice);
+
+ComPtr<ID3D12GraphicsCommandList1> CreateCommandList(GfxDevice& gfxDevice);
+void ImmediateSubmit(GfxDevice& gfxDevice, FrameSync& framesync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback);

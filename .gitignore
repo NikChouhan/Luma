@@ -6,5 +6,4 @@ build/
 .DS_Store
 
 vsxmake2022/
-assets/
 .vscode/

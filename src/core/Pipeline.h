@@ -13,6 +13,7 @@ struct PipelineDesc
     Shaders _shaders;
     bool _enableDepthTest;
     bool _enableStencilTest;
+
 };
 
 Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc);
