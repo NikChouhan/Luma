@@ -25,9 +25,18 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
     // don't want to unmap the pointer for future use
 
     // init the buffer view
-    buffer._bufferView.BufferLocation = buffer._resource->GetGPUVirtualAddress();
-    buffer._bufferView.StrideInBytes = sizeof(Vertex);
-    buffer._bufferView.SizeInBytes = desc._bufferSize;
+    if (desc._bufferType == BufferType::VERTEX)
+    {
+        buffer._vertexBufferView.BufferLocation = buffer._resource->GetGPUVirtualAddress();
+        buffer._vertexBufferView.StrideInBytes = sizeof(Vertex);
+        buffer._vertexBufferView.SizeInBytes = desc._bufferSize;
+    }
+    else if (desc._bufferType == BufferType::INDEX)
+    {
+        buffer._indexBufferView.BufferLocation = buffer._resource->GetGPUVirtualAddress();
+        buffer._indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+        buffer._indexBufferView.SizeInBytes = desc._bufferSize;
+    }
     
     return buffer;
 }

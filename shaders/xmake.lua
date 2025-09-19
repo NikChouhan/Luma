@@ -1,0 +1,5 @@
+target("Shaders")
+    set_kind("phony")
+    add_files("shaders/*.hlsl")
+    add_headerfiles("shaders/*.hlsl")
+target_end()

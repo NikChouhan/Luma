@@ -11,8 +11,8 @@ struct Pipeline
 struct PipelineDesc
 {
     Shaders _shaders;
-    bool _enableDepthTest;
-    bool _enableStencilTest;
+    BOOL _enableDepthTest;
+    BOOL _enableStencilTest;
 
 };
 

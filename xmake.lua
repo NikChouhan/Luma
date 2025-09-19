@@ -1,8 +1,13 @@
 set_xmakever("3.0.0")
+
+includes("scripts/packages.lua")
+includes("src/xmake.lua")
+includes("shaders/xmake.lua")
+
 add_rules("mode.debug", "mode.release")
 add_defines("UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "NOMINMAX")
 set_languages("cxx23", "c17")
-add_syslinks("user32.lib", "d3d12.lib", "dxgi.lib", "d3dcompiler.lib")
+add_syslinks("user32.lib", "kernel32.lib", "shell32.lib", "comctl32.lib", "d3d12.lib", "dxgi.lib")
 
 if (is_mode("debug")) then
     set_symbols("debug")
@@ -17,14 +22,13 @@ elseif(is_mode("release")) then
     set_policy("build.optimization.lto", true)
     set_runtimes("MD")
 end
-includes("scripts/packages.lua")
 
-add_includedirs("src", "src/core", "D3D12/include")
+add_includedirs("src", "src/core", "D3D12/include", "src/includes")
 
-target("Luma")
+target("game")
+    set_default(true)
     set_kind("binary")
-    set_pcxxheader("src/pch.h", {public = true})
-    add_headerfiles("src/*.h", "src/core/*.h")
-    add_files("src/*.cpp", "src/core/*.cpp")
-    add_packages("d3d12-memory-allocator", "stb", {public = true})
+    add_files("src/*.cpp")
+    add_headerfiles("src/*.h")
+    add_deps("Luma")
 target_end()

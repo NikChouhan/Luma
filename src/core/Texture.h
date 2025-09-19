@@ -5,7 +5,6 @@ struct GfxDevice;
 struct Texture
 {
 	ComPtr<ID3D12Resource> _resource{};
-	ComPtr<ID3D12DescriptorHeap> _srvHeap;
 };
 
 struct TextureDesc

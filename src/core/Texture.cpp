@@ -29,7 +29,7 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 			1,
 			0,
 			D3D12_RESOURCE_FLAG_NONE,
-			D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE);
+			D3D12_TEXTURE_LAYOUT_UNKNOWN);
 
 
 		D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC
@@ -78,24 +78,13 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 			desc._texWidth * desc._texPixelSize * desc._texHeight));
 		//memcpy(*pDataBegin, desc._pContents, bufferSize);
 
-		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc{};
-		srvHeapDesc.NumDescriptors = 1;
-		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&texture._srvHeap)));
 
-		/* do the srv tasks, then close the command list and then execute it.
+		/*
 		 Use the fence objects to ensure the upload tasks are done b4 it
 		 proceeds with the later commands in the current queue (direct queue here)
 		 i.e just use the WaitforGPU function
 		*/
 
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = textureDesc.Format;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		gfxDevice._device->CreateShaderResourceView(texture._resource.Get(), &srvDesc, texture._srvHeap->GetCPUDescriptorHandleForHeapStart());
 	}
 
 	ImmediateSubmit(gfxDevice, frameSync, [&](ComPtr<ID3D12GraphicsCommandList1> commandList)

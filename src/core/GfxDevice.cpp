@@ -35,7 +35,7 @@ static void GetHardwareAdapter(
 
             // Check to see whether the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_2,
                 _uuidof(ID3D12Device), nullptr)))
             {
                 break;
@@ -58,7 +58,7 @@ static void GetHardwareAdapter(
 
             // Check to see whether the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_2,
                 _uuidof(ID3D12Device), nullptr)))
             {
                 break;
@@ -87,7 +87,7 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
     ComPtr<IDXGIAdapter1> hwAdapter;
     GetHardwareAdapter(gfxDevice._factory.Get(), &hwAdapter, true);
 
-    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&gfxDevice._device)));
+    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice._device)));
 
     ComPtr<ID3D12DebugDevice2> debugDevice;
     DX_ASSERT(gfxDevice._device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
@@ -112,6 +112,10 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
         gfxDevice._device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
             _commandAllocators[i])));
     }
+
+    CD3DX12FeatureSupport features;
+    features.Init(gfxDevice._device.Get());
+    D3D_SHADER_MODEL shaderModel = features.HighestShaderModel();   // shader_model_6_7 for me
     
     return gfxDevice;
 }

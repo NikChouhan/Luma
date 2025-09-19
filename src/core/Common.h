@@ -6,14 +6,19 @@ using namespace Microsoft::WRL;
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
-#include <d3dcompiler.h>
-#include <DirectXMath.h>
 
+#include <DirectXMath.h>
+#include "SimpleMath.h"
 #include <d3dx12/d3dx12.h>
 
+#include "Log.h"
+using namespace Luma;
 #include <StandardTypes.h>
-#include <stdio.h>
 
+namespace SM = DirectX::SimpleMath;
+
+constexpr u32 frameCount = 2;
+#define MAX_TEXTURES 1024
 
 #define DX_ASSERT(call)                                                                                     \
     do                                                                                                      \

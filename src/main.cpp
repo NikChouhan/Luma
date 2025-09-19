@@ -4,9 +4,13 @@
 #include "FrameSync.h"
 #include "Buffer.h"
 #include "Texture.h"
+#include "Log.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#include "Camera.h"
+#include "Model.h"
 
 //struct FramePresent
 //{
@@ -21,7 +25,7 @@ static bool isOpen = true;
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine, int cmdShow)
+static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine, int cmdShow)
 {
 	constexpr wchar_t className[] = L"D3D12 Triangle";
 
@@ -45,12 +49,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 
 	ShowWindow(hwnd, cmdShow);
 
+	Luma::Log::Init();
+
+	Camera camera = CreatePerspectiveCamera(
+	{
+	._angle = 1.4,
+	._aspectRatio = 16.f/9.f,
+	._near = 0.1f,
+	._far = 1000.f});
+
 	// create graphics device
-	const GfxDeviceDesc gfxDeviceDesc{};
+	constexpr GfxDeviceDesc gfxDeviceDesc{};
 	GfxDevice gfxDevice= CreateDevice(gfxDeviceDesc);
 	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
 	// swapchain
-	Swapchain swapchain = CreatSwapChain(gfxDevice,
+	Swapchain swapchain = CreatSwapChain(gfxDevice, frameSync,
 		{
 			._aspectRatio = 16./9.,
 			._height = 1080,
@@ -58,49 +71,33 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
-	int width, height, channels;
-	unsigned char* pTextureContents = stbi_load("../../../../assets/textures/cat.jpg",
-		&width, &height, &channels, STBI_rgb);
 
-	Texture texture = CreateTexture(gfxDevice, frameSync,
+	Model model = LoadModel(gfxDevice, frameSync,
 		{
-		._texWidth = u32(width),
-		._texHeight = u32(height),
-		._texPixelSize = u32(channels),
-		._pContents = pTextureContents
-		});
-	// vertex buffer for triangle
-	Vertex triangleVertices[] =
-	{
-		{ { 0.0f, 0.25f * swapchain._aspectRatio, 0.0f }, { 0.5f, 0.0f } },
-		{ { 0.25f, -0.25f * swapchain._aspectRatio, 0.0f }, { 1.0f, 1.0f } },
-		{ { -0.25f, -0.25f * swapchain._aspectRatio, 0.0f }, { 0.0f, 1.0f } }
-	};
-	Buffer vertexBuffer = CreateBuffer(gfxDevice,
-		{
-		._bufferSize = sizeof(triangleVertices),
-		._pContents = triangleVertices,});
-	// shaders
-	constexpr wchar_t shaderPath[] = L"../../../../shaders/triangle.hlsl";
-	Shader vertexShader = CreateShader(gfxDevice,
+		._path = "../../../../assets/models/sponza2/sponza2.gltf"});
+
+
+	DXCRes dxcRes = ShaderCompiler();
+	wchar_t shaderPath[] = L"../../../../shaders/shaders/triangle.hlsl";
+	Shader vertexShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = shaderPath,
-		._pEntryPoint = "VSMain",
-		._pTarget = "vs_5_0",
+		._pEntryPoint = L"VSMain",
+		._pTarget = L"vs_6_6",
 		._type = Type::VERTEX});
 
-	Shader pixelShader = CreateShader(gfxDevice,
+	Shader pixelShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = shaderPath,
-		._pEntryPoint = "PSMain",
-		._pTarget = "ps_5_0",
+		._pEntryPoint = L"PSMain",
+		._pTarget = L"ps_6_6",
 		._type = Type::PIXEL});
 	// PSO
 	Pipeline pipeline = CreatePipeline(gfxDevice,
 		{
 		._shaders = {vertexShader, pixelShader},
-		._enableDepthTest = false,
-		._enableStencilTest = false});
+		._enableDepthTest = TRUE,
+		._enableStencilTest = FALSE});
 	// wait for the assets to be uploaded before rendering the frame
 	WaitForGPU(gfxDevice, frameSync);
 
@@ -110,9 +107,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 	auto onRender = [&]()
 	{
 		SubmitandPresent(commandList, gfxDevice, swapchain,
-			frameSync, pipeline, vertexBuffer, texture);
+			frameSync, camera, pipeline, model);
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
+
+	auto updateCamera = [&]()
+		{
+
+		};
 
 	MSG msg{};
 	if (msg.message == WM_QUIT)
@@ -131,6 +133,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine,
 		else
 		{
 			onRender();
+			updateCamera();
 		}
 	}
 	return 0;

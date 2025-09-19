@@ -1,4 +1,7 @@
 #pragma once
+#include <dxcapi.h>
+#include <d3d12shader.h>
+
 #include "GfxDevice.h"
 
 enum class Type : u32
@@ -8,9 +11,19 @@ enum class Type : u32
     MESH
 };
 
+struct DXCRes
+{
+    ComPtr<IDxcUtils> _pUtils;
+    ComPtr<IDxcCompiler3> _pCompiler;
+    ComPtr<IDxcIncludeHandler> _pIncludeHandler;
+};
+
 struct Shader
 {
-    ComPtr<ID3DBlob> _pBlob;
+    ComPtr<IDxcBlobEncoding> _pBlobEnc;
+    ComPtr<IDxcBlob> _pBlob;
+    DxcBuffer _source;
+    ComPtr<IDxcResult> _result;
     Type _type{};
 };
 
@@ -18,11 +31,12 @@ typedef std::initializer_list<Shader> Shaders;
 
 struct ShaderDesc
 {
-    const wchar_t* _shaderPath;
-    const char* _pEntryPoint;
-    const char* _pTarget;
+    wchar_t* _shaderPath;
+    const wchar_t* _pEntryPoint;
+    const wchar_t* _pTarget;
     Type _type{};
 };
 
-Shader CreateShader(GfxDevice& gfxDevice, const ShaderDesc& shaderDesc);
-void DestroyShader(GfxDevice& gfxDevice, Shader& shader);
+DXCRes ShaderCompiler();
+Shader CreateShader(GfxDevice& gfxDevice, DXCRes& dxcRes, const ShaderDesc& shaderDesc);
+void DestroyShader(GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader);
