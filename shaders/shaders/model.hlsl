@@ -22,25 +22,23 @@ PSInput VSMain(float3 position : POSITION, float2 uv : TEXCOORD, float3 normal :
     PSInput result;
 
     result.position = mul(float4(position, 1.0f), constBuffer.worldViewProjMatrix);
-    result.normal = mul(float4(normal, 0.0f), constBuffer.worldMatrix).xyz;
+    result.normal = mul(constBuffer.worldMatrix, float4(normal, 0.0f)).xyz;
     result.uv = uv;
     return result;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    float3 normal = normalize(input.normal);
-    float3 lightDir = normalize(float3(0.0f, 1.0f, 1.0f));
-    float diffuse = max(dot(normal, lightDir), 0.0f);
+    // uv test (pass)
+    //return float4(input.uv.x, input.uv.y, 0.0f, 1.0f);
+
+    // normals test (pass)
+    //float3 normal = normalize(input.normal);
+    //float3 outputNormal = normal * 0.5f + 0.5f;
+    //return float4(outputNormal, 1.0f);
 
     Texture2D<float4> tex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer.materialIndex)];
     float4 texColor = tex.Sample(Sampler, input.uv);
-
-    float ambientIntensity = 0.1;
-
-    float3 ambient = texColor.rgb * ambientIntensity;
-    float3 diffuseColor = texColor.rgb * diffuse;
-    float3 finalColor = ambient + diffuseColor;
     
-    return float4(finalColor, texColor.a);
+    return float4(texColor);
 }

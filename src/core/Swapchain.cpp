@@ -18,6 +18,8 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     swapchain._viewport.TopLeftY = 0;
     swapchain._viewport.Height = static_cast<float>(desc._height);
     swapchain._viewport.Width = static_cast<float>(desc._width);
+    swapchain._viewport.MinDepth = 0.0f;  // Add this
+    swapchain._viewport.MaxDepth = 1.0f;
 
     swapchain._scissorRect.left = 0;
     swapchain._scissorRect.top = 0;
@@ -155,16 +157,16 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
             frameSync._frameIndex, swapchain._rtvDescriptorSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart(),
-            0, swapchain._dsvDescriptorSize);
-        commandList->OMSetRenderTargets(1, &rtvHandle,
-            FALSE,&dsvHandle);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
         // record commands
         const float clearColor[4] = {0.1f, 0.2f, 0.4f, 1.0f};
         commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, &swapchain._scissorRect);
+        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+        commandList->OMSetRenderTargets(1, &rtvHandle,
+            FALSE, &dsvHandle);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer._vertexBufferView);
@@ -177,6 +179,9 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
         {
             Material& currentMaterial = model._materials[mesh._materialIndex];
             XMMATRIX world = mesh._transform._matrix;
+
+            //world = XMMatrixRotationX(DirectX::XM_PI) * world;
+
             XMMATRIX view = camera._view;
             XMMATRIX proj = camera._projection;
 
@@ -184,7 +189,7 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
             ConstBuffer pushConstants{};
             pushConstants._materialIndex = currentMaterial._albedoIndex;    
             pushConstants._worldViewProj = worldViewProj;
-            pushConstants._worldMatrix = world;
+            pushConstants._worldMatrix = (world);
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
 
 			commandList->DrawIndexedInstanced(mesh._indexCount,
@@ -206,21 +211,8 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
     gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // present the Frame
-    DX_ASSERT(swapchain._swapchain->Present(1,0));
+    DX_ASSERT(swapchain._swapchain->Present(0,0));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

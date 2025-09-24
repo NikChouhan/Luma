@@ -1,8 +1,9 @@
 #include "Pipeline.h"
 
 #include "Buffer.h"
+#include "Swapchain.h"
 
-Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
+Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc)
 {
     Pipeline pipeline{};
     // create the root signature
@@ -29,8 +30,8 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
         //texture2DRange.RegisterSpace = 0;
         //texture2DRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
 
-        CD3DX12_DESCRIPTOR_RANGE cbvTable;
-        cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+        /*CD3DX12_DESCRIPTOR_RANGE cbvTable;
+        cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);*/
 
         D3D12_ROOT_PARAMETER1 rootParameters[1] {};
 
@@ -48,9 +49,9 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
 
         D3D12_STATIC_SAMPLER_DESC sampler = {};
         sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         sampler.MipLODBias = 0;
         sampler.MaxAnisotropy = 0;
         sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
@@ -118,16 +119,18 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc)
     }
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     //psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    //psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;
-    psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; // pass the swapchain object possibly to get the data from dsv resource directly
+    psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // same as above, pass the swapchain object for rtv format
+    psoDesc.RTVFormats[0] = swapChain._renderTargets[0]->GetDesc().Format;
     psoDesc.SampleDesc.Count = 1;
     DX_ASSERT(gfxDevice._device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
 

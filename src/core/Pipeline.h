@@ -2,6 +2,8 @@
 #include "GfxDevice.h"
 #include <Shader.h>
 
+struct Swapchain;
+
 struct Pipeline
 {
     ComPtr<ID3D12PipelineState> _pipelineState;
@@ -16,5 +18,5 @@ struct PipelineDesc
 
 };
 
-Pipeline CreatePipeline(GfxDevice& gfxDevice, PipelineDesc pipelineDesc);
+Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc);
 void DestroyPipeline(GfxDevice& gfxDevice, Pipeline& pipeline);

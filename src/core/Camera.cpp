@@ -2,7 +2,7 @@
 
 static void InitViewMatrix(Camera& camera)
 {
-	camera._view = DirectX::XMMatrixLookAtLH(camera._pos, camera._target, camera._up);
+	camera._view = DirectX::XMMatrixLookToLH(camera._pos, camera._target, camera._up);
 }
 
 Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc)
@@ -12,9 +12,10 @@ Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc)
 	//camera._up = camera._target.Cross(SM::Vector3(1.,0.,0.));
 	//camera._up.Normalize();
 
-	camera._pos = SM::Vector3(0.f, 10.f, -20.f); //
+	camera._pos = SM::Vector3(0.f, 10.f, -20.f);
 
-	camera._target = SM::Vector3(0.f, 0.f, 0.f);
+	SM::Vector3 lookAtPoint = SM::Vector3(0.f, 0.f, 0.f);
+	camera._target = lookAtPoint - camera._pos;
 
 	camera._up = SM::Vector3(0.f, 1.f, 0.f);
 		
@@ -31,4 +32,9 @@ Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc)
 	return camera;
 }
 
+void Translate(Camera& camera, SM::Vector3 direction)
+{
+	camera._pos += direction;
+	InitViewMatrix(camera);
+}
 

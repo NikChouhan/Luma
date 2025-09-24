@@ -1,3 +1,5 @@
+#include <pch.h>
+
 #include "GfxDevice.h"
 #include "Swapchain.h"
 #include "Pipeline.h"
@@ -22,12 +24,19 @@
 //};
 
 static bool isOpen = true;
+static u32 keyState {};
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+void HandleCamera(Camera& camera, f32 deltaTime);
 
-static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pCmdLine, int cmdShow)
+int WINAPI wWinMain(
+	_In_ HINSTANCE hInstance,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR lpCmdLine,
+	_In_ int cmdShow
+)
 {
-	constexpr wchar_t className[] = L"D3D12 Triangle";
+	constexpr wchar_t className[] = L"Luma";
 
 	WNDCLASSW wc{};
 	wc.lpfnWndProc = WindowProc;
@@ -37,7 +46,7 @@ static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pC
 	RegisterClassW(&wc);
 
 	HWND hwnd = CreateWindowExW(
-		0, className, L"D3D12 Triangle", WS_OVERLAPPEDWINDOW,
+		0, className, L"Luma", WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 		nullptr,
 		nullptr,
@@ -53,7 +62,7 @@ static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pC
 
 	Camera camera = CreatePerspectiveCamera(
 	{
-	._angle = 1.4,
+	._angle = 1.3,
 	._aspectRatio = 16.f/9.f,
 	._near = 0.1f,
 	._far = 1000.f});
@@ -71,29 +80,28 @@ static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pC
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
-
+	stbi_set_flip_vertically_on_load(true);
 	Model model = LoadModel(gfxDevice, frameSync,
 		{
-		._path = "../../../../assets/models/sponza2/sponza2.gltf"});
-
+		._path = "../../../../assets/models/bistro2/bistro2.gltf"});
 
 	DXCRes dxcRes = ShaderCompiler();
-	wchar_t shaderPath[] = L"../../../../shaders/shaders/triangle.hlsl";
+	wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
 	Shader vertexShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = shaderPath,
 		._pEntryPoint = L"VSMain",
-		._pTarget = L"vs_6_6",
+		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX});
 
 	Shader pixelShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = shaderPath,
 		._pEntryPoint = L"PSMain",
-		._pTarget = L"ps_6_6",
+		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL});
 	// PSO
-	Pipeline pipeline = CreatePipeline(gfxDevice,
+	Pipeline pipeline = CreatePipeline(gfxDevice, swapchain,
 		{
 		._shaders = {vertexShader, pixelShader},
 		._enableDepthTest = TRUE,
@@ -104,17 +112,12 @@ static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pC
 	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(commandList->Close());
 	
-	auto onRender = [&]()
+	auto on_render = [&]()
 	{
 		SubmitandPresent(commandList, gfxDevice, swapchain,
 			frameSync, camera, pipeline, model);
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
-
-	auto updateCamera = [&]()
-		{
-
-		};
 
 	MSG msg{};
 	if (msg.message == WM_QUIT)
@@ -132,8 +135,22 @@ static int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PWSTR pC
 		}
 		else
 		{
-			onRender();
-			updateCamera();
+			static f32 lastFrameTime = 0.f;
+			static u64 lastTitleUpdate = 0;
+
+			on_render();
+			u64 currentTime = GetTickCount64();
+			f32 currentFrameTime = static_cast<float>(currentTime);
+			f32 deltaTime = currentFrameTime - lastFrameTime;
+			lastFrameTime = currentFrameTime;
+			HandleCamera(camera, deltaTime);
+
+			if (currentTime - lastTitleUpdate >= 1000) { // 1000ms = 1 second
+				wchar_t titleBuffer[64];
+				swprintf_s(titleBuffer, L"Luma frametime: %.3f", deltaTime / 1000.0f);
+				SetWindowTextW(hwnd, titleBuffer);
+				lastTitleUpdate = currentTime;
+			}
 		}
 	}
 	return 0;
@@ -147,7 +164,53 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		isOpen = false;
 		PostQuitMessage(0);
 		return 0;
+	case WM_KEYDOWN:
+		printl(Log::LogLevel::Info, "Key: {}", wParam);
+		keyState = wParam;
+		return 0;
+	case WM_KEYUP:
+		keyState = NULL;
 	default:
 		return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 	}
+}
+
+void HandleCamera(Camera& camera, f32 deltaTime)
+{
+	constexpr float moveSpeed = 0.01;
+	SM::Vector3 forward = camera._target - camera._pos;
+	forward.Normalize();
+
+	SM::Vector3 up = camera._up;
+	up.Normalize();
+
+	SM::Vector3 right = forward.Cross(up);
+	right.Normalize();
+
+	SM::Vector3 movement(0.0f, 0.0f, 0.0f);
+	if (keyState == 87) // W
+	{
+		movement += forward * moveSpeed * deltaTime;
+	}
+	if (keyState == 65) // A
+	{
+		movement += right * moveSpeed * deltaTime;
+	}
+	if (keyState == 83) // S
+	{
+		movement -= forward * moveSpeed * deltaTime;
+	}
+	if (keyState == 68) // D
+	{
+		movement -= right * moveSpeed * deltaTime;
+	}
+	if (keyState == 81) // Q
+	{
+		movement -= up * moveSpeed * deltaTime;
+	}
+	if (keyState == 69) // E
+	{
+		movement += up * moveSpeed * deltaTime;
+	}
+	Translate(camera, movement);
 }

@@ -12,8 +12,6 @@ using namespace Microsoft::WRL;
 #include <d3dx12/d3dx12.h>
 
 #include <StandardTypes.h>
-#include <stdio.h>
-
 
 #define DX_ASSERT(call)                                                                                     \
     do                                                                                                      \
