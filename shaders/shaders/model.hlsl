@@ -33,12 +33,12 @@ float4 PSMain(PSInput input) : SV_TARGET
     //return float4(input.uv.x, input.uv.y, 0.0f, 1.0f);
 
     // normals test (pass)
-    //float3 normal = normalize(input.normal);
-    //float3 outputNormal = normal * 0.5f + 0.5f;
-    //return float4(outputNormal, 1.0f);
+    float3 normal = normalize(input.normal);
+    float3 outputNormal = normal * 0.5f + 0.5f;
+    return float4(outputNormal, 1.0f);
 
-    Texture2D<float4> tex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer.materialIndex)];
-    float4 texColor = tex.Sample(Sampler, input.uv);
+    //Texture2D<float4> tex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer.materialIndex)];
+    //float4 texColor = tex.Sample(Sampler, input.uv);
     
-    return float4(texColor);
+    //return float4(texColor);
 }

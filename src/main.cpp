@@ -24,7 +24,7 @@
 //};
 
 static bool isOpen = true;
-static u32 keyState {};
+static bool keys[256] = {};
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void HandleCamera(Camera& camera, f32 deltaTime);
@@ -118,6 +118,12 @@ int WINAPI wWinMain(
 			frameSync, camera, pipeline, model);
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
+	// high resolution time
+	LARGE_INTEGER perfFrequency;
+	QueryPerformanceFrequency(&perfFrequency);
+
+	LARGE_INTEGER lastFrameTime;
+	QueryPerformanceCounter(&lastFrameTime);
 
 	MSG msg{};
 	if (msg.message == WM_QUIT)
@@ -135,21 +141,25 @@ int WINAPI wWinMain(
 		}
 		else
 		{
-			static f32 lastFrameTime = 0.f;
-			static u64 lastTitleUpdate = 0;
-
 			on_render();
-			u64 currentTime = GetTickCount64();
-			f32 currentFrameTime = static_cast<float>(currentTime);
-			f32 deltaTime = currentFrameTime - lastFrameTime;
+
+			LARGE_INTEGER currentFrameTime;
+			QueryPerformanceCounter(&currentFrameTime);
+
+			f32 deltaTime = static_cast<f32>(currentFrameTime.QuadPart - lastFrameTime.QuadPart) / static_cast<f32>(perfFrequency.QuadPart);
+
 			lastFrameTime = currentFrameTime;
+
 			HandleCamera(camera, deltaTime);
 
-			if (currentTime - lastTitleUpdate >= 1000) { // 1000ms = 1 second
+			static f32 timeSinceLastUpdate = 0.f;
+			timeSinceLastUpdate += deltaTime;
+			if (timeSinceLastUpdate >= 1.0f)
+			{
 				wchar_t titleBuffer[64];
-				swprintf_s(titleBuffer, L"Luma frametime: %.3f", deltaTime / 1000.0f);
+				swprintf_s(titleBuffer, L"Luma frametime: %.3f ms", deltaTime * 1000.0f);
 				SetWindowTextW(hwnd, titleBuffer);
-				lastTitleUpdate = currentTime;
+				timeSinceLastUpdate = 0.f;
 			}
 		}
 	}
@@ -165,11 +175,11 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		return 0;
 	case WM_KEYDOWN:
-		printl(Log::LogLevel::Info, "Key: {}", wParam);
-		keyState = wParam;
+		if (wParam < 256) keys[wParam] = true;
 		return 0;
 	case WM_KEYUP:
-		keyState = NULL;
+		if (wParam < 256) keys[wParam] = false;
+		return 0;
 	default:
 		return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 	}
@@ -177,7 +187,7 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void HandleCamera(Camera& camera, f32 deltaTime)
 {
-	constexpr float moveSpeed = 0.01;
+	constexpr float moveSpeed = 8;
 	SM::Vector3 forward = camera._target - camera._pos;
 	forward.Normalize();
 
@@ -188,29 +198,12 @@ void HandleCamera(Camera& camera, f32 deltaTime)
 	right.Normalize();
 
 	SM::Vector3 movement(0.0f, 0.0f, 0.0f);
-	if (keyState == 87) // W
-	{
-		movement += forward * moveSpeed * deltaTime;
-	}
-	if (keyState == 65) // A
-	{
-		movement += right * moveSpeed * deltaTime;
-	}
-	if (keyState == 83) // S
-	{
-		movement -= forward * moveSpeed * deltaTime;
-	}
-	if (keyState == 68) // D
-	{
-		movement -= right * moveSpeed * deltaTime;
-	}
-	if (keyState == 81) // Q
-	{
-		movement -= up * moveSpeed * deltaTime;
-	}
-	if (keyState == 69) // E
-	{
-		movement += up * moveSpeed * deltaTime;
-	}
+	if (keys['W']) movement += forward * moveSpeed * deltaTime;
+	if (keys['A']) movement += right * moveSpeed * deltaTime;
+	if (keys['S']) movement -= forward * moveSpeed * deltaTime;
+	if (keys['D']) movement -= right * moveSpeed * deltaTime;
+	if (keys['Q']) movement -= up * moveSpeed * deltaTime;
+	if (keys['E']) movement += up * moveSpeed * deltaTime;
+	
 	Translate(camera, movement);
 }

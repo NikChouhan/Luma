@@ -19,15 +19,17 @@ namespace SM = DirectX::SimpleMath;
 
 constexpr u32 frameCount = 2;
 #define MAX_TEXTURES 1024
-
 #define DX_ASSERT(call)                                                                                     \
     do                                                                                                      \
     {                                                                                                       \
-        HRESULT result = call;                                                                           \
-        if (result != S_OK)                                                                 \
+        HRESULT result = call;                                                                              \
+        if (result != S_OK)                                                                                 \
         {                                                                                                   \
-            fprintf(stderr, "D3D12 error %d at %s:%d\n", static_cast<int>(result), __FILE__, __LINE__);    \
-			abort();                                                                                        \
+            char buffer[512];                                                                               \
+            snprintf(buffer, sizeof(buffer), "D3D12 error 0x%08X at %s:%d",                                \
+                     static_cast<int>(result), __FILE__, __LINE__);                                         \
+            MessageBoxA(NULL, buffer, "DirectX Error", MB_OK | MB_ICONERROR);                              \
+            abort();                                                                                        \
         }                                                                                                   \
     } while (0)
 

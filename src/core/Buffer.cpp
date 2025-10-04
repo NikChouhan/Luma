@@ -13,7 +13,7 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
 
     D3D12MA::Allocation* bufferAllocation{};
     DX_ASSERT(gfxDevice._allocator->CreateResource(&allocDesc, &bufferDesc, 
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr, &bufferAllocation, IID_NULL, nullptr));
     buffer._resource = bufferAllocation->GetResource();
     bufferAllocation->Release();
