@@ -29,6 +29,7 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = frameCount;
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
     swapChainDesc.Width = static_cast<u32>(swapchain._viewport.Width);
     swapChainDesc.Height = static_cast<u32>(swapchain._viewport.Height);
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -142,8 +143,8 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
             pipeline._pipelineState.Get()));
 
-        ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
-        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        //ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
+        //commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
         commandList->SetGraphicsRootSignature(pipeline._rootSignature.Get());
 
@@ -177,7 +178,7 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 
         for (auto& mesh : model)
         {
-            Material& currentMaterial = model._materials[mesh._materialIndex];
+            /*Material& currentMaterial = model._materials[mesh._materialIndex];*/
             XMMATRIX world = mesh._transform._matrix;
 
             //world = XMMatrixRotationX(DirectX::XM_PI) * world;
@@ -187,7 +188,7 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 
             XMMATRIX worldViewProj = world * view * proj;
             ConstBuffer pushConstants{};
-            pushConstants._materialIndex = currentMaterial._albedoIndex;    
+            //pushConstants._materialIndex = currentMaterial._albedoIndex;    
             pushConstants._worldViewProj = worldViewProj;
             pushConstants._worldMatrix = (world);
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
@@ -211,32 +212,5 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
     gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // present the Frame
-    DX_ASSERT(swapchain._swapchain->Present(0,0));
+    DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

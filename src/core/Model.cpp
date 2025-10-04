@@ -195,99 +195,99 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
 
     // material
 
-    cgltf_material* material = primitive->material;
-    if (!model._materialLookup.contains(material)) // if the hash table doesn't have the material hash
-    {
-        Material mat;
+    //cgltf_material* material = primitive->material;
+    //if (!model._materialLookup.contains(material)) // if the hash table doesn't have the material hash
+    //{
+    //    Material mat;
 
-        HRESULT hr = E_FAIL;
+    //    HRESULT hr = E_FAIL;
 
-        // map texture types to their respective textures
-        std::unordered_map<TextureType, cgltf_texture_view*> textureMap;
+    //    // map texture types to their respective textures
+    //    std::unordered_map<TextureType, cgltf_texture_view*> textureMap;
 
-        // the following code for materials is very much unoptimised.
-        // It should only look for materials once, make a texture, sampler and save it in a map, not per primitive
-        // TODO -- RESOLVED
+    //    // the following code for materials is very much unoptimised.
+    //    // It should only look for materials once, make a texture, sampler and save it in a map, not per primitive
+    //    // TODO -- RESOLVED
 
-        // it still is prolly unoptimised due to too much use of hashmaps and string ops everywhere
-        // need to find a better solution (nvtt3?)
+    //    // it still is prolly unoptimised due to too much use of hashmaps and string ops everywhere
+    //    // need to find a better solution (nvtt3?)
 
-        if (material->has_pbr_metallic_roughness)
-        {
-            cgltf_pbr_metallic_roughness* pbr = &material->pbr_metallic_roughness;
-            // Map base color texture (albedo)
-            if (pbr->base_color_texture.texture)
-            {
-                textureMap[TextureType::ALBEDO] = &pbr->base_color_texture;
-            }
-            if (pbr->metallic_roughness_texture.texture)
-            {
-                // Map metallic-roughness texture
-                textureMap[TextureType::METALLIC_ROUGHNESS] = &pbr->metallic_roughness_texture;
-                //mat.MaterialName = 
-            }
-        }
+    //    if (material->has_pbr_metallic_roughness)
+    //    {
+    //        cgltf_pbr_metallic_roughness* pbr = &material->pbr_metallic_roughness;
+    //        // Map base color texture (albedo)
+    //        if (pbr->base_color_texture.texture)
+    //        {
+    //            textureMap[TextureType::ALBEDO] = &pbr->base_color_texture;
+    //        }
+    //        if (pbr->metallic_roughness_texture.texture)
+    //        {
+    //            // Map metallic-roughness texture
+    //            textureMap[TextureType::METALLIC_ROUGHNESS] = &pbr->metallic_roughness_texture;
+    //            //mat.MaterialName = 
+    //        }
+    //    }
 
-        if (material->normal_texture.texture)
-        {
-            // Map normal texture
-            textureMap[TextureType::NORMAL] = &material->normal_texture;
-        }
-        if (material->emissive_texture.texture)
-        {
-            // Map emissive texture
-            textureMap[TextureType::EMISSIVE] = &material->emissive_texture;
-        }
-        if (material->has_pbr_specular_glossiness)
-        {
-            cgltf_pbr_specular_glossiness* pbr = &material->pbr_specular_glossiness;
-            if (pbr->specular_glossiness_texture.texture)
-            {
-                //textureMap[TextureType::SPECULAR_GLOSSINESS] = &material->tex
-            }
-        }
+    //    if (material->normal_texture.texture)
+    //    {
+    //        // Map normal texture
+    //        textureMap[TextureType::NORMAL] = &material->normal_texture;
+    //    }
+    //    if (material->emissive_texture.texture)
+    //    {
+    //        // Map emissive texture
+    //        textureMap[TextureType::EMISSIVE] = &material->emissive_texture;
+    //    }
+    //    if (material->has_pbr_specular_glossiness)
+    //    {
+    //        cgltf_pbr_specular_glossiness* pbr = &material->pbr_specular_glossiness;
+    //        if (pbr->specular_glossiness_texture.texture)
+    //        {
+    //            //textureMap[TextureType::SPECULAR_GLOSSINESS] = &material->tex
+    //        }
+    //    }
 
-        // Load all textures from the map if they haven't been loaded before
-        for (const auto& [type, view] : textureMap)
-        {
-            std::string imageName = view->texture->image->uri;
-            u32 textureIndex = -1;
+    //    // Load all textures from the map if they haven't been loaded before
+    //    for (const auto& [type, view] : textureMap)
+    //    {
+    //        std::string imageName = view->texture->image->uri;
+    //        u32 textureIndex = -1;
 
-            if (!model._loadedTextures.contains(imageName)) // If texture file is new
-            {
-                textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, mat, view, type);
+    //        if (!model._loadedTextures.contains(imageName)) // If texture file is new
+    //        {
+    //            textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, mat, view, type);
 
-                // Cache the index for this image file
-                model._loadedTextures.insert(imageName);
-                model._textureIndexLookup[imageName] = textureIndex;
-                printl(Log::LogLevel::Info, "[Texture] Loaded texture {} with index {}", imageName, textureIndex);
-            }
-            else
-            {
-                textureIndex = model._textureIndexLookup[imageName];
-                printl(Log::LogLevel::Warn, "[Texture] Reusing texture {} with index {}", imageName, textureIndex);
+    //            // Cache the index for this image file
+    //            model._loadedTextures.insert(imageName);
+    //            model._textureIndexLookup[imageName] = textureIndex;
+    //            printl(Log::LogLevel::Info, "[Texture] Loaded texture {} with index {}", imageName, textureIndex);
+    //        }
+    //        else
+    //        {
+    //            textureIndex = model._textureIndexLookup[imageName];
+    //            printl(Log::LogLevel::Warn, "[Texture] Reusing texture {} with index {}", imageName, textureIndex);
 
-                // there is no image view at model side, SRV is created with heap in d3d12, so leave it alone here
+    //            // there is no image view at model side, SRV is created with heap in d3d12, so leave it alone here
 
-                //Texture& existingTex = model._modelTextures[textureIndex];
-                //if (type == TextureType::ALBEDO) mat._AlbedoView = existingTex._imageView;
-                //if (type == TextureType::NORMAL) mat.NormalView = existingTex._imageView;
-                //if (type == TextureType::METALLIC_ROUGHNESS) mat.MetallicRoughnessView = existingTex._imageView;
-                //if (type == TextureType::EMISSIVE) mat.EmissiveView = existingTex._imageView;
-                // ... rest types TODO
-            }
+    //            //Texture& existingTex = model._modelTextures[textureIndex];
+    //            //if (type == TextureType::ALBEDO) mat._AlbedoView = existingTex._imageView;
+    //            //if (type == TextureType::NORMAL) mat.NormalView = existingTex._imageView;
+    //            //if (type == TextureType::METALLIC_ROUGHNESS) mat.MetallicRoughnessView = existingTex._imageView;
+    //            //if (type == TextureType::EMISSIVE) mat.EmissiveView = existingTex._imageView;
+    //            // ... rest types TODO
+    //        }
 
-            if (type == TextureType::ALBEDO) mat._albedoIndex = textureIndex;
-            if (type == TextureType::NORMAL) mat._normalIndex = textureIndex;
-            if (type == TextureType::METALLIC_ROUGHNESS) mat._metallicIndex = textureIndex;
-            if (type == TextureType::EMISSIVE) mat._emmisiveIndex = textureIndex;
-            // ... rest types TODO
-        }
+    //        if (type == TextureType::ALBEDO) mat._albedoIndex = textureIndex;
+    //        if (type == TextureType::NORMAL) mat._normalIndex = textureIndex;
+    //        if (type == TextureType::METALLIC_ROUGHNESS) mat._metallicIndex = textureIndex;
+    //        if (type == TextureType::EMISSIVE) mat._emmisiveIndex = textureIndex;
+    //        // ... rest types TODO
+    //    }
 
-        model._materials.push_back(mat);
-        model._materialLookup[material] = model._materials.size() - 1;
-    }
-    meshInfo._materialIndex = static_cast<u32>(model._materialLookup[material]);
+    //    model._materials.push_back(mat);
+    //    model._materialLookup[material] = model._materials.size() - 1;
+    //}
+    //meshInfo._materialIndex = static_cast<u32>(model._materialLookup[material]);
     meshInfo._transform = parentTransform;
     meshInfo._startIndex = indexOffset;
     meshInfo._startVertex = vertexOffset;
@@ -301,10 +301,10 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
     mesh._indexCount = static_cast<u32>(indexCount);
 
     // for non optimised meshes
-    for (int i = 0; i < tempVertices.size(); i++) model._vertices.push_back(tempVertices[i]);
-    for (int i = 0; i < tempIndices.size(); i++) model._indices.push_back(tempIndices[i]);
+    /*for (int i = 0; i < tempVertices.size(); i++) model._vertices.push_back(tempVertices[i]);
+    for (int i = 0; i < tempIndices.size(); i++) model._indices.push_back(tempIndices[i]);*/
 
-    //OptimiseMesh(model, meshInfo, mesh);
+    OptimiseMesh(model, meshInfo, mesh);
 #if MESH_SHADING
     ProcessMeshlets(mesh);
 #endif
@@ -371,7 +371,7 @@ static void SetResources(GfxDevice& gfxDevice, Model& model)
 		._bufferType = BufferType::INDEX,
         ._pContents = model._indices.data() });
 
-    const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+   /* const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(model._modelHeap->GetCPUDescriptorHandleForHeapStart());
 
     for (auto& texture : model._modelTextures)
@@ -384,7 +384,7 @@ static void SetResources(GfxDevice& gfxDevice, Model& model)
 
         gfxDevice._device->CreateShaderResourceView(texture._resource.Get(), &srvDesc, srvHandle);
         srvHandle.Offset(descriptorSize);
-    }
+    }*/
 }
 
 static void ValidateResources()
@@ -406,7 +406,7 @@ Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc)
 	Model model{};
 
     // allocate srv heap for textures
-    SetTextureHeap(gfxDevice, model);
+    //SetTextureHeap(gfxDevice, model);
 
 	cgltf_options options{};
 	cgltf_data* data = nullptr;
