@@ -143,8 +143,8 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
             pipeline._pipelineState.Get()));
 
-        //ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
-        //commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
+        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
         commandList->SetGraphicsRootSignature(pipeline._rootSignature.Get());
 
@@ -178,7 +178,7 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 
         for (auto& mesh : model)
         {
-            /*Material& currentMaterial = model._materials[mesh._materialIndex];*/
+            Material& currentMaterial = model._materials[mesh._materialIndex];
             XMMATRIX world = mesh._transform._matrix;
 
             //world = XMMatrixRotationX(DirectX::XM_PI) * world;
@@ -188,7 +188,7 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 
             XMMATRIX worldViewProj = world * view * proj;
             ConstBuffer pushConstants{};
-            //pushConstants._materialIndex = currentMaterial._albedoIndex;    
+            pushConstants._materialIndex = currentMaterial._albedoIndex;
             pushConstants._worldViewProj = worldViewProj;
             pushConstants._worldMatrix = (world);
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);

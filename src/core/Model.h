@@ -10,6 +10,7 @@
 
 struct Texture;
 struct Vertex;
+struct Buffer;
 using namespace DirectX;
 namespace SM = DirectX::SimpleMath;
 
@@ -35,39 +36,39 @@ struct Transformation
     SM::Vector3 _scale = SM::Vector3();
 };
 
-struct MaterialConstants
-{
-    XMFLOAT4 _ambientColor;
-    XMFLOAT4 _diffuseColor;
-    XMFLOAT4 _specularColor;
-    float _specularPower;
-};
-
 struct Material
 {
-    bool _hasAlbedo = false;
-    bool _hasNormal = false;
-    bool _hasMetallicRoughness = false;
-    bool _hasEmissive = false;
-    bool _hasAo = false;
+    XMFLOAT4 _globalAmbientColor;
+
+    float _opacity;
+    float _specularPower;
+    float _indexOfRefraction;
+    BOOL  _hasAmbientTexture = FALSE;
+
+    BOOL _hasEmissive = FALSE;
+    BOOL _hasAlbedo = FALSE;
+    BOOL _hasSpecular = FALSE;
+    BOOL _hasSpecularPower = FALSE;
+
+    BOOL _hasNormal = FALSE;
+    BOOL _hasBump = FALSE;
+    BOOL _hasOpacity = FALSE;
+    float _bumpIntensity;
 
     u32 _albedoIndex = -1;
     u32 _normalIndex = -1;
     u32 _emmisiveIndex = -1;
     u32 _metallicIndex = -1;
 
-    std::string _albedoPath;
-    std::string _normalPath;
-    std::string _metallicRoughnessPath;
-    std::string _emissivePath;
-    std::string _aoPath;
+    BOOL _hasAo = FALSE;
+    float _specularScale;
+    float _alphaThreshold;
+    float _padding;
 
     // no texture views unlike in vulkan
     // cuz the views are created with
     // the texture heaps and aren't separate.
     // can be accessed with cpudescriptorhandle
-
-    DirectX::XMFLOAT3 _flatColor;
 };
 
 struct Mesh

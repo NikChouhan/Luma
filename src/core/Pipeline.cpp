@@ -48,14 +48,14 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         //rootParameters[1].DescriptorTable.pDescriptorRanges = &texture2DRange;
 
         D3D12_STATIC_SAMPLER_DESC sampler = {};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler.Filter = D3D12_FILTER_ANISOTROPIC;
+        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
         sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 0;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sampler.MaxAnisotropy = 8;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER;
+        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
         sampler.MinLOD = 0.0f;
         sampler.MaxLOD = D3D12_FLOAT32_MAX;
         sampler.ShaderRegister = 0;
@@ -117,12 +117,27 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
             psoDesc.PS = bytecode;
         }
     }
+
+   /* D3D12_RASTERIZER_DESC rasterizer
+	{
+        .FillMode = D3D12_FILL_MODE_SOLID,
+        .CullMode = D3D12_CULL_MODE_NONE,
+        .FrontCounterClockwise = TRUE,
+        .DepthBias = FALSE,
+        .DepthBiasClamp = 0,
+        .SlopeScaledDepthBias = 0,
+        .DepthClipEnable = TRUE,
+        .MultisampleEnable = FALSE,
+        .AntialiasedLineEnable = TRUE,
+        .ForcedSampleCount = 0,
+        .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
+    };*/
+
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    //psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-    //psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    psoDesc.RasterizerState.FrontCounterClockwise = true;
     psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
     psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;

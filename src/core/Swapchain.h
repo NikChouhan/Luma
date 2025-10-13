@@ -7,7 +7,6 @@ struct Model;
 struct Texture;
 struct Pipeline;
 struct FrameSync;
-struct Buffer;
 
 struct Swapchain
 {
