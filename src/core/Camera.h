@@ -34,4 +34,5 @@ struct PersCameraDesc
 Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc);
 Camera CreateOrthographicCamera(OrtCameraDesc);
 
+void InitViewMatrix(Camera& camera);
 void Translate(Camera& camera, SM::Vector3 direction);

@@ -1,6 +1,6 @@
 #include "Camera.h"
 
-static void InitViewMatrix(Camera& camera)
+void InitViewMatrix(Camera& camera)
 {
 	camera._view = DirectX::XMMatrixLookToLH(camera._pos, camera._target, camera._up);
 }
@@ -35,6 +35,7 @@ Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc)
 void Translate(Camera& camera, SM::Vector3 direction)
 {
 	camera._pos += direction;
+	camera._target += direction;
 	InitViewMatrix(camera);
 }
 

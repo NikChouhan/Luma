@@ -1,5 +1,6 @@
 #include <pch.h>
 
+#include <windowsx.h>
 #include "GfxDevice.h"
 #include "Swapchain.h"
 #include "Pipeline.h"
@@ -25,6 +26,12 @@
 
 static bool isOpen = true;
 static bool keys[256] = {};
+int lastMouseX = 0;
+int lastMouseY = 0;
+int currentMouseX = 0;
+int currentMouseY = 0;
+
+bool isMouseCaptured = false;
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void HandleCamera(Camera& camera, f32 deltaTime);
@@ -62,7 +69,7 @@ int WINAPI wWinMain(
 
 	Camera camera = CreatePerspectiveCamera(
 	{
-	._angle = 1.3,
+	._angle = 1.1,
 	._aspectRatio = 16.f/9.f,
 	._near = 0.1f,
 	._far = 1000.f});
@@ -141,8 +148,6 @@ int WINAPI wWinMain(
 		}
 		else
 		{
-			on_render();
-
 			LARGE_INTEGER currentFrameTime;
 			QueryPerformanceCounter(&currentFrameTime);
 
@@ -151,6 +156,8 @@ int WINAPI wWinMain(
 			lastFrameTime = currentFrameTime;
 
 			HandleCamera(camera, deltaTime);
+
+			on_render();
 
 			static f32 timeSinceLastUpdate = 0.f;
 			timeSinceLastUpdate += deltaTime;
@@ -179,15 +186,86 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_KEYUP:
 		if (wParam < 256) keys[wParam] = false;
+		if (wParam == 'M')
+		{
+			isMouseCaptured = !isMouseCaptured;
+			ShowCursor(!isMouseCaptured);
+
+			RECT rect;
+			GetClientRect(hwnd, &rect);
+			ClientToScreen(hwnd, (POINT*)&rect.left);
+			ClientToScreen(hwnd, (POINT*)&rect.right);
+
+			if (isMouseCaptured)
+			{
+				ClipCursor(&rect);
+			}
+			else
+			{
+				ClipCursor(NULL);
+			}
+
+			POINT center = { rect.right / 2, rect.bottom / 2 };
+			SetCursorPos(center.x, center.y);
+			lastMouseX = currentMouseX = center.x;
+			lastMouseY = currentMouseY = center.y;
+		}
 		return 0;
+	case WM_MOUSEMOVE:
+		lastMouseX = currentMouseX;
+		lastMouseY = currentMouseY;
+		currentMouseX = GET_X_LPARAM(lParam);
+		currentMouseY = GET_Y_LPARAM(lParam);
+		return 0;
+	//case WM_LBUTTONDOWN:
+	//	return 0;
+	//case WM_RBUTTONDOWN:
+	//	return 0;
+	//case WM_MOUSEWHEEL:
+	//	return 0;
 	default:
 		return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 	}
 }
 
+
 void HandleCamera(Camera& camera, f32 deltaTime)
 {
-	constexpr float moveSpeed = 8;
+	if (isMouseCaptured)
+	{
+		constexpr float lookSensitivity = 0.1f;
+		int deltaX = currentMouseX - lastMouseX;
+		int deltaY = currentMouseY - lastMouseY;
+
+		if (deltaX != 0 || deltaY != 0)
+		{
+			float yaw = static_cast<float>(deltaX) * lookSensitivity * (XM_PI / 180.0f);
+			float pitch = static_cast<float>(deltaY) * -lookSensitivity * (XM_PI / 180.0f);
+
+			SM::Vector3 forward = camera._target - camera._pos;
+			SM::Vector3 right = forward.Cross(camera._up);
+			right.Normalize();
+
+			SM::Matrix yawRotation = SM::Matrix::CreateFromAxisAngle(SM::Vector3::UnitY, yaw);
+			SM::Matrix pitchRotation = SM::Matrix::CreateFromAxisAngle(right, pitch);
+
+			forward = XMVector3TransformNormal(forward, yawRotation);
+			forward = XMVector3TransformNormal(forward, pitchRotation);
+
+			camera._target = camera._pos + forward;
+
+			right = forward.Cross(SM::Vector3::UnitY);
+			camera._up = right.Cross(forward);
+
+			lastMouseX = currentMouseX;
+			lastMouseY = currentMouseY;
+
+			InitViewMatrix(camera);
+		}
+	}
+
+	constexpr float moveSpeed = 8.f;
+
 	SM::Vector3 forward = camera._target - camera._pos;
 	forward.Normalize();
 
