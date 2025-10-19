@@ -10,3 +10,5 @@ vsxmake2022/
 assets/models/bistro2
 assets/models/sponza
 tempData
+.cache
+compile_commands.json
