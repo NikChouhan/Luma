@@ -12,7 +12,7 @@
 #include "Log.h"
 
 
-static u32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model,
+static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model,
     Material& mat, const cgltf_texture_view* textureView, TextureType type)
 {
     if (textureView && textureView->texture && textureView->texture->image)
@@ -24,16 +24,24 @@ static u32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
         unsigned char* imgData = stbi_load(path.c_str(), &width, &height,
             &channels, STBI_rgb_alpha);
 
+        if (imgData == nullptr)
+        {
+            printl(Log::LogLevel::Warn, "[Texture] FAILED to load texture: {}", path);
+            return -1;
+        }
+
         Texture texture = CreateTexture(gfxDevice, frameSync,
             {
             ._texWidth = u32(width),
             ._texHeight = u32(height),
-            ._texPixelSize = u32(channels),
+            ._texPixelSize = u32(4),
             ._pContents = imgData
             });
+
+        stbi_image_free(imgData);
         // Push the texture and return its new index
         model._modelTextures.push_back(texture);
-        u32 newIndex = model._modelTextures.size() - 1;
+        i32 newIndex = model._modelTextures.size() - 1;
 
         // in d3d12 heap is used to create the heap, and handled by the texture class,
         // and not model
@@ -54,7 +62,7 @@ static u32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
     }
     // Handle missing texture or image
     printl(Log::LogLevel::Warn, "[Texture] Texture or image not found for material : {}", std::to_string(static_cast<int>(type)));
-    return 1;
+    return -1;
 }
 
 static void OptimiseMesh(Model& model, MeshInfo& meshInfo, Mesh& mesh)
@@ -251,11 +259,16 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
         for (const auto& [type, view] : textureMap)
         {
             std::string imageName = view->texture->image->uri;
-            u32 textureIndex = -1;
+            i32 textureIndex = -1;
 
             if (!model._loadedTextures.contains(imageName)) // If texture file is new
             {
                 textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, mat, view, type);
+
+                if (textureIndex == -1)
+                {
+                    printl(Log::LogLevel::Error, "[Texture] FAILED to load texture: {}", imageName, textureIndex);
+                }
 
                 // Cache the index for this image file
                 model._loadedTextures.insert(imageName);
@@ -392,13 +405,19 @@ static void ValidateResources()
 	
 }
 
-static void SetTextureHeap(const GfxDevice& gfxDevice, Model& model)
+static void SetHeaps(const GfxDevice& gfxDevice, Model& model)
 {
     D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc{};
     srvHeapDesc.NumDescriptors = MAX_TEXTURES;
     srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&model._modelHeap)));
+
+    D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc{};
+    samplerHeapDesc.NumDescriptors = 1;
+    samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+    samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&model._samplerHeap)));
 }
 
 Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc)
@@ -406,7 +425,7 @@ Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc)
 	Model model{};
 
     // allocate srv heap for textures
-    SetTextureHeap(gfxDevice, model);
+    SetHeaps(gfxDevice, model);
 
 	cgltf_options options{};
 	cgltf_data* data = nullptr;
