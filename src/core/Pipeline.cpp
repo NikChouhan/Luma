@@ -47,14 +47,23 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         //rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
         //rootParameters[1].DescriptorTable.pDescriptorRanges = &texture2DRange;
 
+        D3D12_TEXTURE_ADDRESS_MODE addressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+
         D3D12_STATIC_SAMPLER_DESC sampler = {};
+        /*sampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+        sampler.AddressU = addressMode;
+        sampler.AddressV = addressMode;
+        sampler.AddressW = addressMode;
+        sampler.MipLODBias = 0;
+        sampler.MaxAnisotropy = 1;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;*/
         sampler.Filter = D3D12_FILTER_ANISOTROPIC;
         sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
         sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
         sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
         sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 8;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_GREATER;
+        sampler.MaxAnisotropy = 16;
+        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
         sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
         sampler.MinLOD = 0.0f;
         sampler.MaxLOD = D3D12_FLOAT32_MAX;
@@ -65,8 +74,9 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
             1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-            | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-            D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
+            | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED /*|
+            D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED*/ /* for samplers set with heaps. I
+            am baking it inside the root descriptors, so I don't need it*/);
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
@@ -134,12 +144,15 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
     };*/
 
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
     psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     psoDesc.RasterizerState.FrontCounterClockwise = true;
+    psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
     psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
-    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;
     psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
     psoDesc.SampleMask = UINT_MAX;

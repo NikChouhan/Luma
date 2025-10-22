@@ -35,7 +35,7 @@ static void GetHardwareAdapter(
 
             // Check to see whether the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
                 _uuidof(ID3D12Device), nullptr)))
             {
                 break;
@@ -58,7 +58,7 @@ static void GetHardwareAdapter(
 
             // Check to see whether the adapter supports Direct3D 12, but don't create the
             // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
                 _uuidof(ID3D12Device), nullptr)))
             {
                 break;
@@ -67,6 +67,17 @@ static void GetHardwareAdapter(
     }
     *ppAdapter = adapter.Detach();
 }
+
+static void IsDirectXRayTracingSuppported(ID3D12Device14* device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+
+	DX_ASSERT(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData,
+            sizeof(featureSupportData)));
+    if (featureSupportData.RaytracingTier < D3D12_RAYTRACING_TIER_1_0)
+        throw std::runtime_error("Raytracing not supported on device");
+}
+
 
 GfxDevice CreateDevice(GfxDeviceDesc desc)
 {
@@ -87,7 +98,9 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
     ComPtr<IDXGIAdapter1> hwAdapter;
     GetHardwareAdapter(gfxDevice._factory.Get(), &hwAdapter, true);
 
-    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&gfxDevice._device)));
+    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice._device)));
+    // ray tracing stuff
+    IsDirectXRayTracingSuppported(gfxDevice._device.Get());
 
     ComPtr<ID3D12DebugDevice2> debugDevice;
     DX_ASSERT(gfxDevice._device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
@@ -125,9 +138,9 @@ void DestroyDevice(GfxDevice& gfxDevice)
 		
 }
 
-ComPtr<ID3D12GraphicsCommandList1> CreateCommandList(GfxDevice& gfxDevice)
+ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(GfxDevice& gfxDevice)
 {
-    ComPtr<ID3D12GraphicsCommandList1> commandList;
+    ComPtr<ID3D12GraphicsCommandList10> commandList;
 
     DX_ASSERT(gfxDevice._device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gfxDevice._commandAllocators->Get(),
         nullptr,

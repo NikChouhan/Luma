@@ -25,7 +25,7 @@ Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc)
 	camera._far = cameraDesc._far;
 
 	camera._projection = DirectX::XMMatrixPerspectiveFovLH(camera._angle,
-		camera._aspectRatio, camera._near, camera._far);
+		camera._aspectRatio, camera._far, camera._near);
 
 	InitViewMatrix(camera);
 

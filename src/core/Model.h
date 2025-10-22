@@ -103,6 +103,7 @@ struct Model
 
     std::vector<Texture> _modelTextures;
     ComPtr<ID3D12DescriptorHeap> _modelHeap;
+    ComPtr<ID3D12DescriptorHeap> _samplerHeap;
 
     std::unordered_set<std::string> _loadedTextures; // To track loaded textures
     std::unordered_map<cgltf_material*, size_t> _materialLookup;

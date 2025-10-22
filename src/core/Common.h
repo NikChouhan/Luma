@@ -35,3 +35,5 @@ constexpr u32 frameCount = 2;
 
 // function pointer thingy
 #define LAMBDA(...) std::function<void(__VA_ARGS__)> const&
+
+//#define ARRAY_SIZE(var) {sizeof(var) / sizeof(var[0]) }

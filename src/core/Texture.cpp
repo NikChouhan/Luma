@@ -99,6 +99,9 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 
 	// Create the texture.
 	// Describe and create a Texture2D.
+
+	UINT mipLevels = (UINT)(floor(log2(std::max(desc._texWidth, desc._texHeight)))) + 1;
+
 	D3D12_RESOURCE_DESC textureDesc = {};
 	textureDesc.MipLevels = 1;
 	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -140,7 +143,7 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 	textureData.RowPitch = desc._texWidth * desc._texPixelSize;
 	textureData.SlicePitch = textureData.RowPitch * desc._texHeight;
 
-	ImmediateSubmit(gfxDevice, frameSync, [&](ComPtr<ID3D12GraphicsCommandList1> commandList)
+	ImmediateSubmit(gfxDevice, frameSync, [&](const ComPtr<ID3D12GraphicsCommandList1>& commandList)
 		{
 			UpdateSubresources(commandList.Get(), texture._resource.Get(),
 				textureUploadHeap.Get(), 0, 0, 1, &textureData);

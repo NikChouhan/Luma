@@ -14,7 +14,7 @@ struct PipelineDesc
 {
     Shaders _shaders;
     BOOL _enableDepthTest;
-    BOOL _enableStencilTest;
+    BOOL _enableStencilTest = FALSE;
 
 };
 

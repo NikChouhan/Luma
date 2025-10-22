@@ -16,10 +16,10 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     // viewport and scissor
     swapchain._viewport.TopLeftX = 0;
     swapchain._viewport.TopLeftY = 0;
-    swapchain._viewport.Height = static_cast<float>(desc._height);
-    swapchain._viewport.Width = static_cast<float>(desc._width);
-    swapchain._viewport.MinDepth = 0.0f;  // Add this
-    swapchain._viewport.MaxDepth = 1.0f;
+    swapchain._viewport.Height = desc._height;
+    swapchain._viewport.Width = desc._width;
+    swapchain._viewport.MinDepth = 1.0f;
+    swapchain._viewport.MaxDepth = 0.0f;
 
     swapchain._scissorRect.left = 0;
     swapchain._scissorRect.top = 0;
@@ -161,17 +161,17 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
         // record commands
-        const float clearColor[4] = {0.1f, 0.2f, 0.4f, 1.0f};
+        const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
         commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
         commandList->OMSetRenderTargets(1, &rtvHandle,
             FALSE, &dsvHandle);
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer._vertexBufferView);
-    	commandList->IASetIndexBuffer(&model._indexBuffer._indexBufferView);
+        commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer.vertex_buffer_view);
+    	commandList->IASetIndexBuffer(&model._indexBuffer.index_buffer_view);
 
         /*CD3DX12_GPU_DESCRIPTOR_HANDLE texGPUHandle(model._modelHeap->GetGPUDescriptorHandleForHeapStart());
         commandList->SetGraphicsRootDescriptorTable(1, texGPUHandle);*/

@@ -3,6 +3,11 @@
 #include "Common.h"
 #include "GfxDevice.h"
 
+namespace D3D12MA
+{
+	class Allocation;
+}
+
 using namespace DirectX;
 
 enum class BufferType
@@ -30,8 +35,12 @@ struct Vertex
 struct Buffer
 {
     ComPtr<ID3D12Resource> _resource;
-    D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
-    D3D12_INDEX_BUFFER_VIEW _indexBufferView;
+    D3D12MA::Allocation* _allocation;
+    union
+	{
+        D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view;
+        D3D12_INDEX_BUFFER_VIEW index_buffer_view;
+    };
 };
 
 struct BufferDesc

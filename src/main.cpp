@@ -87,13 +87,17 @@ int WINAPI wWinMain(
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
-	stbi_set_flip_vertically_on_load(true);
+
+	//std::string modelPath = "../../../../assets/models/bistro2/bistro2.gltf";
+	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
 	Model model = LoadModel(gfxDevice, frameSync,
 		{
-		._path = "../../../../assets/models/bistro2/bistro2.gltf"});
+		._path = modelPath});
 
 	DXCRes dxcRes = ShaderCompiler();
+	// raster path
 	wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
+
 	Shader vertexShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = shaderPath,
@@ -107,20 +111,38 @@ int WINAPI wWinMain(
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL});
-	// PSO
+	//// PSO
 	Pipeline pipeline = CreatePipeline(gfxDevice, swapchain,
 		{
 		._shaders = {vertexShader, pixelShader},
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE});
+
+	// initially I was going with the all ray traced ("path traced") image
+	// to be denoised later but it's kinda stupid. I am happy with the
+	// texture mapping through raster while lights/shadows/AO done with
+	// Ray tracing. I would have liked the compute shader way (hw agnostic) but
+	// DXR is fine for now. Custom BVH, etc will be too time costly too early
+
+	// ray tracing path
+	//Shader shadow = CreateShader(gfxDevice, dxcRes,
+	//	{
+	//	._shaderPath = ,
+	//	._pEntryPoint = ,
+	//	._pTarget = ,
+	//	._type = });
+
+	//Pipeline rayTracing 
 	// wait for the assets to be uploaded before rendering the frame
+
 	WaitForGPU(gfxDevice, frameSync);
 
-	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
+	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(commandList->Close());
 	
 	auto on_render = [&]()
 	{
+		// raster path
 		SubmitandPresent(commandList, gfxDevice, swapchain,
 			frameSync, camera, pipeline, model);
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
