@@ -19,6 +19,8 @@ namespace SM = DirectX::SimpleMath;
 
 constexpr u32 frameCount = 2;
 #define MAX_TEXTURES 1024
+#define REBAR 0
+
 #define DX_ASSERT(call)                                                                                     \
     do                                                                                                      \
     {                                                                                                       \
@@ -26,9 +28,9 @@ constexpr u32 frameCount = 2;
         if (result != S_OK)                                                                                 \
         {                                                                                                   \
             char buffer[512];                                                                               \
-            snprintf(buffer, sizeof(buffer), "D3D12 error 0x%08X at %s:%d",                                \
+            snprintf(buffer, sizeof(buffer), "D3D12 error 0x%08X at %s:%d",                                 \
                      static_cast<int>(result), __FILE__, __LINE__);                                         \
-            MessageBoxA(NULL, buffer, "DirectX Error", MB_OK | MB_ICONERROR);                              \
+            MessageBoxA(NULL, buffer, "DirectX Error", MB_OK | MB_ICONERROR);                               \
             abort();                                                                                        \
         }                                                                                                   \
     } while (0)

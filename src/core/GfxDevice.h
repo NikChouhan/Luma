@@ -3,6 +3,7 @@
 #include "Common.h"
 #include <functional>
 
+struct Pipeline;
 struct FrameSync;
 
 namespace D3D12MA
@@ -17,7 +18,7 @@ struct GfxDevice
 	ComPtr<ID3D12CommandAllocator> _commandAllocators[frameCount];
 	ComPtr<ID3D12CommandQueue> _commandQueue;
 	D3D12MA::Allocator* _allocator;
-};
+};	
 
 struct GfxDeviceDesc
 {

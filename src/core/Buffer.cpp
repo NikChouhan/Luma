@@ -7,6 +7,7 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
     // REBAR path, stupid doesn't work
     Buffer buffer{};
 
+#ifndef REBAR
     auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(desc._bufferSize);
     D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
         D3D12_HEAP_TYPE_GPU_UPLOAD,
@@ -44,8 +45,7 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
     return buffer;
 
     // non REBAR path (will be pre-checked at start later)
-
-    /*Buffer buffer{};
+#else
     auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(desc._bufferSize);
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -81,6 +81,6 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
         buffer.index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
         buffer.index_buffer_view.SizeInBytes = desc._bufferSize;
     }
-
-    return buffer;*/
+#endif
+    return buffer;
 }

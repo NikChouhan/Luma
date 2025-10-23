@@ -7,6 +7,8 @@
 #include "Texture.h"
 #include "Camera.h"
 
+#define IF_DEPTH 1
+
 Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc)
 {
     Swapchain swapchain{};
@@ -128,25 +130,77 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
 }
 
 
-void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
+void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
     GfxDevice& gfxDevice,
     Swapchain& swapchain,
     FrameSync& frameSync,
     Camera& camera,
-    Pipeline& pipeline,
+    Pipeline& depthPassPipeline,
+    Pipeline& rasterPipeline,
     Model& model)
 {
-    // record command list
+#ifdef IF_DEPTH
+    // depth pre-pass
+	{
+        WaitForGPU(gfxDevice, frameSync);
+        DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
+        DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(), 
+            depthPassPipeline._pipelineState.Get()));
+
+        commandList->SetGraphicsRootSignature(depthPassPipeline._rootSignature.Get());
+
+        commandList->RSSetViewports(1, &swapchain._viewport);
+        commandList->RSSetScissorRects(1, &swapchain._scissorRect);
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	    // record commands
+	    const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
+
+	    commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+
+	    commandList->OMSetRenderTargets(0, nullptr,
+	       FALSE, &dsvHandle);
+	    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	    commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer.vertex_buffer_view);
+		commandList->IASetIndexBuffer(&model._indexBuffer.index_buffer_view);
+
+        for (auto& mesh : model)
+        {
+            XMMATRIX world = mesh._transform._matrix;
+
+            //world = XMMatrixRotationX(DirectX::XM_PI) * world;
+
+            XMMATRIX view = camera._view;
+            XMMATRIX proj = camera._projection;
+
+            XMMATRIX worldViewProj = world * view * proj;
+            DepthPPBuffer pushConstants{};
+            pushConstants._worldViewProj = worldViewProj;
+            pushConstants._worldMatrix = (world);
+            commandList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPPBuffer) / 4, &pushConstants, 0);
+
+            commandList->DrawIndexedInstanced(mesh._indexCount,
+                1, mesh._startIndex, mesh._startVertex, 0);
+        }
+        DX_ASSERT(commandList->Close());
+
+        // execute the command list
+        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    }
+#else
     {
         WaitForGPU(gfxDevice, frameSync);
         DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
-            pipeline._pipelineState.Get()));
+            rasterPipeline._pipelineState.Get()));
 
         ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
         commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-        commandList->SetGraphicsRootSignature(pipeline._rootSignature.Get());
+        commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
@@ -196,21 +250,17 @@ void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList,
 			commandList->DrawIndexedInstanced(mesh._indexCount,
                 1, mesh._startIndex, mesh._startVertex, 0);
         }
-        
 
         // transition the render target to present format
         rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
         commandList->ResourceBarrier(1, &rBarrier);
 
-
         DX_ASSERT(commandList->Close());
+
+        // execute the command list
+        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
     }
-
-    // execute the command list
-    ID3D12CommandList* ppCommandLists[] = {commandList.Get()};
-    gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    // present the Frame
-    DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
+#endif
 }

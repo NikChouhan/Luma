@@ -12,3 +12,4 @@ assets/models/sponza
 tempData
 .cache
 compile_commands.json
+.zed

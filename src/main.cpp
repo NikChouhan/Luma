@@ -14,6 +14,7 @@
 
 #include "Camera.h"
 #include "Model.h"
+#include "RootSignature.h"
 
 //struct FramePresent
 //{
@@ -24,17 +25,23 @@
 //	Buffer vertexBuffer;
 //};
 
+// initially I was going with the all ray traced ("path traced") image
+// to be denoised later but it's kinda stupid. I am happy with the
+// texture mapping through raster while lights/shadows/AO done with
+// Ray tracing. I would have liked the compute shader way (hw agnostic) but
+// DXR is fine for now. Custom BVH, etc will be too time costly too early
+
 static bool isOpen = true;
 static bool keys[256] = {};
-int lastMouseX = 0;
-int lastMouseY = 0;
-int currentMouseX = 0;
-int currentMouseY = 0;
+static int lastMouseX = 0;
+static int lastMouseY = 0;
+static int currentMouseX = 0;
+static int currentMouseY = 0;
 
-bool isMouseCaptured = false;
+static bool isMouseCaptured = false;
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-void HandleCamera(Camera& camera, f32 deltaTime);
+static void HandleCamera(Camera& camera, f32 deltaTime);
 
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -65,7 +72,7 @@ int WINAPI wWinMain(
 
 	ShowWindow(hwnd, cmdShow);
 
-	Luma::Log::Init();
+	Log::Init();
 
 	Camera camera = CreatePerspectiveCamera(
 	{
@@ -95,7 +102,24 @@ int WINAPI wWinMain(
 		._path = modelPath});
 
 	DXCRes dxcRes = ShaderCompiler();
-	// raster path
+
+	// depth pipeline
+	wchar_t depthPPShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
+	Shader depthPrePassShader = CreateShader(gfxDevice, dxcRes,
+		{
+		._shaderPath = depthPPShaderPath,
+		._pEntryPoint = L"DepthVS",
+		._pTarget = L"vs_6_7",
+		._type = Type::VERTEX });
+	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, 
+	{
+	._shaders = {depthPrePassShader},
+	._enableDepthTest = TRUE,
+	._enableStencilTest = FALSE,
+	._enableRasterizer = FALSE,
+	._isDepthPrePass = true });
+
+	// 	raster pipeline
 	wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
 
 	Shader vertexShader = CreateShader(gfxDevice, dxcRes,
@@ -111,30 +135,17 @@ int WINAPI wWinMain(
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL});
-	//// PSO
-	Pipeline pipeline = CreatePipeline(gfxDevice, swapchain,
+
+	RootSign rootSignMain = CreateRootSignature(gfxDevice, { ._isDepthPrePass = false });
+	Pipeline graphicsPipeline = CreatePipeline(gfxDevice, swapchain,
 		{
 		._shaders = {vertexShader, pixelShader},
 		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE});
+		._enableStencilTest = FALSE,
+		._enableRasterizer = TRUE,
+		._isDepthPrePass = false });
 
-	// initially I was going with the all ray traced ("path traced") image
-	// to be denoised later but it's kinda stupid. I am happy with the
-	// texture mapping through raster while lights/shadows/AO done with
-	// Ray tracing. I would have liked the compute shader way (hw agnostic) but
-	// DXR is fine for now. Custom BVH, etc will be too time costly too early
-
-	// ray tracing path
-	//Shader shadow = CreateShader(gfxDevice, dxcRes,
-	//	{
-	//	._shaderPath = ,
-	//	._pEntryPoint = ,
-	//	._pTarget = ,
-	//	._type = });
-
-	//Pipeline rayTracing 
 	// wait for the assets to be uploaded before rendering the frame
-
 	WaitForGPU(gfxDevice, frameSync);
 
 	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
@@ -142,9 +153,12 @@ int WINAPI wWinMain(
 	
 	auto on_render = [&]()
 	{
-		// raster path
-		SubmitandPresent(commandList, gfxDevice, swapchain,
-			frameSync, camera, pipeline, model);
+		// depth prepass
+		SubmitPass(commandList, gfxDevice, swapchain, frameSync, 
+			camera, depthPrePass, graphicsPipeline, model);
+
+		// present the Frame
+		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
 	// high resolution time
@@ -188,6 +202,10 @@ int WINAPI wWinMain(
 				wchar_t titleBuffer[64];
 				swprintf_s(titleBuffer, L"Luma frametime: %.3f ms", deltaTime * 1000.0f);
 				SetWindowTextW(hwnd, titleBuffer);
+
+				printl(Log::LogLevel::Info, "[Camera] Camera position: x: {}, y: {}, z: {}", 
+				   camera._pos.x, camera._pos.y, camera._pos.z);
+
 				timeSinceLastUpdate = 0.f;
 			}
 		}

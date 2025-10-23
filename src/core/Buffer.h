@@ -25,6 +25,12 @@ struct ConstBuffer
     XMMATRIX _worldMatrix;
 };
 
+struct DepthPPBuffer
+{
+    XMMATRIX _worldViewProj;
+    XMMATRIX _worldMatrix;
+};
+
 struct Vertex
 {
     XMFLOAT3 _position;

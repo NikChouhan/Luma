@@ -37,5 +37,5 @@ struct SwapchainDesc
 Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc);
 void DestroySwapChain(Swapchain& swapchain);
 
-void SubmitandPresent(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
-    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& pipeline, Model& model);
+void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
+    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& depthPipeline, Pipeline& rasterPipeline, Model& model);

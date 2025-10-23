@@ -2,6 +2,7 @@
 #include "GfxDevice.h"
 #include <Shader.h>
 
+struct RootSign;
 struct Swapchain;
 
 struct Pipeline
@@ -15,7 +16,8 @@ struct PipelineDesc
     Shaders _shaders;
     BOOL _enableDepthTest;
     BOOL _enableStencilTest = FALSE;
-
+    BOOL _enableRasterizer = FALSE;
+    bool _isDepthPrePass = false;
 };
 
 Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc);
