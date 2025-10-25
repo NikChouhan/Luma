@@ -8,7 +8,8 @@ enum class Type : u32
 {
     VERTEX,
     PIXEL,
-    MESH
+    MESH,
+    COMPUTE
 };
 
 struct DXCRes

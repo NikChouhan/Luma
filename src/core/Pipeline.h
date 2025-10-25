@@ -5,6 +5,13 @@
 struct RootSign;
 struct Swapchain;
 
+enum PipelineType : u8
+{
+	GRAPHICS,
+    COMPUTE
+};
+
+
 struct Pipeline
 {
     ComPtr<ID3D12PipelineState> _pipelineState;
@@ -13,11 +20,11 @@ struct Pipeline
 
 struct PipelineDesc
 {
+    PipelineType _pipelineType{};
     Shaders _shaders;
     BOOL _enableDepthTest;
-    BOOL _enableStencilTest = FALSE;
-    BOOL _enableRasterizer = FALSE;
-    bool _isDepthPrePass = false;
+    BOOL _enableStencilTest{};
+    BOOL _isDepthPrePass = false;
 };
 
 Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc);

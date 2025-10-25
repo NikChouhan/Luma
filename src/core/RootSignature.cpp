@@ -16,7 +16,7 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
     }
 
-    if (desc._isDepthPrePass == false)
+    if (desc._type == RootSignDesc::RASTER)
     {
 
         D3D12_ROOT_PARAMETER1 rootParameters[1]{};
@@ -58,7 +58,7 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
             signature->GetBufferPointer(), signature->GetBufferSize(),
             IID_PPV_ARGS(&rootSign._rootSignature)));
     }
-    else
+    else if (desc._type == RootSignDesc::DEPTH_PRE_PASS)
     {
         D3D12_ROOT_PARAMETER1 rootParameters[1]{};
 
@@ -66,11 +66,35 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
         rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParameters[0].Constants.RegisterSpace = 0;
         rootParameters[0].Constants.ShaderRegister = 0;
-        rootParameters[0].Constants.Num32BitValues = sizeof(ConstBuffer) / 4;
+        rootParameters[0].Constants.Num32BitValues = sizeof(DepthPPBuffer) / 4;
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
             0,nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ComPtr<ID3DBlob> signature;
+        ComPtr<ID3DBlob> error;
+        DX_ASSERT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc,
+            featureData.HighestVersion, &signature, &error));
+        DX_ASSERT(gfxDevice._device->CreateRootSignature(0,
+            signature->GetBufferPointer(), signature->GetBufferSize(),
+            IID_PPV_ARGS(&rootSign._rootSignature)));
+    }
+    else if (desc._type == RootSignDesc::RT_LIGHT)
+    {
+	    // set the descriptors for the ray tracing pipeline
+        D3D12_ROOT_PARAMETER1 rootParameters[1]{};
+
+        rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameters[0].Constants.RegisterSpace = 0;
+        rootParameters[0].Constants.ShaderRegister = 0;
+        rootParameters[0].Constants.Num32BitValues = sizeof(RTBuffer) / 4;
+
+        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
+            0, nullptr, 
+            D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;

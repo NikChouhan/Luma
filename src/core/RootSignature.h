@@ -10,7 +10,8 @@ struct RootSign
 
 struct RootSignDesc
 {
-	bool _isDepthPrePass = false;
+    enum RSType { DEPTH_PRE_PASS, RT_LIGHT, RASTER };
+    RSType _type;
 };
 
 RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc);

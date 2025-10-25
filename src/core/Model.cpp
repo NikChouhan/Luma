@@ -35,7 +35,8 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
             ._texWidth = u32(width),
             ._texHeight = u32(height),
             ._texPixelSize = u32(4),
-            ._pContents = imgData
+            ._pContents = imgData,
+            ._textureType = TextureResourceType::SAMPLE
             });
 
         stbi_image_free(imgData);
@@ -370,7 +371,7 @@ static void ProcessNode(GfxDevice& gfxDevice, FrameSync& frameSync, cgltf_node* 
     }
 }
 
-static void SetResources(GfxDevice& gfxDevice, Model& model)
+static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model)
 {
     model._vertexBuffer = CreateBuffer(gfxDevice,
         {
@@ -383,20 +384,42 @@ static void SetResources(GfxDevice& gfxDevice, Model& model)
         ._bufferSize = u32(sizeof(model._indices[0]) * model._indices.size()),
 		._bufferType = BufferType::INDEX,
         ._pContents = model._indices.data() });
+    // uav buffer
+    model._uavTracedTextureResource = CreateTexture(gfxDevice, frameSync,
+        {
+        ._texWidth = 1920,
+        ._texHeight = 1080,
+        ._texPixelSize = 0,
+        ._pContents = nullptr,
+        ._textureType = TextureResourceType::UAV })._resource;
 
-    const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(model._modelHeap->GetCPUDescriptorHandleForHeapStart());
-
-    for (auto& texture : model._modelTextures)
+    // texture srv
     {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Format = texture._resource->GetDesc().Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = texture._resource->GetDesc().MipLevels;
+        const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(model._modelHeap->GetCPUDescriptorHandleForHeapStart());
 
-        gfxDevice._device->CreateShaderResourceView(texture._resource.Get(), &srvDesc, srvHandle);
-        srvHandle.Offset(descriptorSize);
+        for (auto& texture : model._modelTextures)
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Format = texture._resource->GetDesc().Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MipLevels = texture._resource->GetDesc().MipLevels;
+
+            gfxDevice._device->CreateShaderResourceView(texture._resource.Get(), &srvDesc, srvHandle);
+            srvHandle.Offset(descriptorSize);
+        }
+    }
+    // Ray tracing UAV resource
+    {
+        const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(model.uavHeapRT->GetCPUDescriptorHandleForHeapStart());
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+        uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+        gfxDevice._device->CreateUnorderedAccessView(model._uavTracedTextureResource.Get(),
+            nullptr, &uavDesc, uavHandle);
     }
 }
 
@@ -407,17 +430,25 @@ static void ValidateResources()
 
 static void SetHeaps(const GfxDevice& gfxDevice, Model& model)
 {
-    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc{};
-    srvHeapDesc.NumDescriptors = MAX_TEXTURES;
-    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&model._modelHeap)));
+    D3D12_DESCRIPTOR_HEAP_DESC srvTextureHeap{};
+    srvTextureHeap.NumDescriptors = MAX_TEXTURES;
+    srvTextureHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    srvTextureHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvTextureHeap, IID_PPV_ARGS(&model._modelHeap)));
 
-    D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc{};
-    samplerHeapDesc.NumDescriptors = 1;
-    samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-    samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&model._samplerHeap)));
+    // Don't need it, since the sampler is being shared
+
+    //D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc{};
+    //samplerHeapDesc.NumDescriptors = 1;
+    //samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+    //samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    //DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&model._samplerHeap)));
+
+    D3D12_DESCRIPTOR_HEAP_DESC uavTracedBuffer{};
+    uavTracedBuffer.NumDescriptors = 1;
+    uavTracedBuffer.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    uavTracedBuffer.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&uavTracedBuffer, IID_PPV_ARGS(&model.uavHeapRT)));
 }
 
 Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc)
@@ -467,7 +498,7 @@ Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc)
         // no of nodes
         printl(Log::LogLevel::InfoDebug, "[CGLTF] No of nodes in the scene: {} ", scene->nodes_count);
 
-        SetResources(gfxDevice, model);
+        SetResources(gfxDevice, frameSync, model);
 
         printl(Log::LogLevel::Info, "[CGLTF] Successfully loaded gltf file");
     }

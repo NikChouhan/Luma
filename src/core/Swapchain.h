@@ -18,9 +18,11 @@ struct Swapchain
     ComPtr<ID3D12Resource> _renderTargets[frameCount];
     u32 _rtvDescriptorSize{0};
     // dsv resources
-    ComPtr<ID3D12DescriptorHeap> _dsvHeap;
+    ComPtr<ID3D12DescriptorHeap> _dsvDepthHeap;
+    ComPtr<ID3D12DescriptorHeap> _srvDepthHeap;
     ComPtr<ID3D12Resource> _depthStencil;
-    u32 _dsvDescriptorSize{0};
+	u32 _dsvDescriptorSize{0};
+
     HWND _hwnd;
     float _aspectRatio{};
     
@@ -38,4 +40,4 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
 void DestroySwapChain(Swapchain& swapchain);
 
 void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
-    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& depthPipeline, Pipeline& rasterPipeline, Model& model);
+    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& depthPipeline, Pipeline& rtPipeline, Model& model);

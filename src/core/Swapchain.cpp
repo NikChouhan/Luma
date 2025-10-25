@@ -1,4 +1,4 @@
-#include "Swapchain.h"
+﻿#include "Swapchain.h"
 
 #include "Buffer.h"
 #include "FrameSync.h"
@@ -63,15 +63,19 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
 
 	    swapchain._rtvDescriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
 		    D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	    // depth stencil heap
+	    // depth buffer DSV heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
         dsvHeapDesc.NumDescriptors = 1;
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
         dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&swapchain._dsvHeap)));
+        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&swapchain._dsvDepthHeap)));
 
-        swapchain._dsvDescriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
-            D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+        D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        srvHeapDesc.NumDescriptors = 1;
+        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+        gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&swapchain._srvDepthHeap));
     }
 
     // create frame resources
@@ -112,7 +116,16 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
             IID_PPV_ARGS(&swapchain._depthStencil)));
 
         gfxDevice._device->CreateDepthStencilView(swapchain._depthStencil.Get(), &depthStencilViewDesc,
-            swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
+            swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
+        depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
+        depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        depthSRV.Texture2D.MipLevels = 1;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle =  swapchain._srvDepthHeap->GetCPUDescriptorHandleForHeapStart();
+        gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, srvHandle);
 
 
         // resource state change can be done like shown below, but I avoid it here, since depth stencil is already
@@ -136,7 +149,7 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
     FrameSync& frameSync,
     Camera& camera,
     Pipeline& depthPassPipeline,
-    Pipeline& rasterPipeline,
+    Pipeline& rtPipeline,
     Model& model)
 {
 #ifdef IF_DEPTH
@@ -152,7 +165,7 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
 
 	    // record commands
 	    const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
@@ -190,77 +203,102 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
         ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
         gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
     }
-#else
-    {
+
+    // ray tracing lights compute pass
+	{
         WaitForGPU(gfxDevice, frameSync);
-        DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
-            rasterPipeline._pipelineState.Get()));
+            rtPipeline._pipelineState.Get()));
 
-        ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
-        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        ID3D12DescriptorHeap* ppHeaps[] = { swapchain._srvDepthHeap.Get(), {model.uavHeapRT.Get()} };
 
-        commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
+		commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+		commandList->SetComputeRootSignature(rtPipeline._rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
-        // set the back buffer as render target
-        auto rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        commandList->ResourceBarrier(1, &rBarrier);
+        auto rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._depthStencil.Get(),
+            D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
-            frameSync._frameIndex, swapchain._rtvDescriptorSize);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        RTBuffer pushConstants{};
+        commandList->SetComputeRoot32BitConstants(0, sizeof(RTBuffer) / 4, &pushConstants, 0);
 
-        // record commands
-        const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
-        commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        uint32_t dispatchX = (2560 + 7) / 8;
+        uint32_t dispatchY = (1440 + 7) / 8;
+        commandList->Dispatch(dispatchX, dispatchY, 1);
+	}
 
-        commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+   // {
+   //     WaitForGPU(gfxDevice, frameSync);
+   //     DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
+   //     DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
+   //         rasterPipeline._pipelineState.Get()));
 
-        commandList->OMSetRenderTargets(1, &rtvHandle,
-            FALSE, &dsvHandle);
-        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+   //     ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
+   //     commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-        commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer.vertex_buffer_view);
-    	commandList->IASetIndexBuffer(&model._indexBuffer.index_buffer_view);
+   //     commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
 
-        /*CD3DX12_GPU_DESCRIPTOR_HANDLE texGPUHandle(model._modelHeap->GetGPUDescriptorHandleForHeapStart());
-        commandList->SetGraphicsRootDescriptorTable(1, texGPUHandle);*/
+   //     commandList->RSSetViewports(1, &swapchain._viewport);
+   //     commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
-        for (auto& mesh : model)
-        {
-            Material& currentMaterial = model._materials[mesh._materialIndex];
-            XMMATRIX world = mesh._transform._matrix;
+   //     // set the back buffer as render target
+   //     auto rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+   //         D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+   //     commandList->ResourceBarrier(1, &rBarrier);
 
-            //world = XMMatrixRotationX(DirectX::XM_PI) * world;
+   //     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+   //         frameSync._frameIndex, swapchain._rtvDescriptorSize);
+   //     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
-            XMMATRIX view = camera._view;
-            XMMATRIX proj = camera._projection;
+   //     // record commands
+   //     const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
+   //     commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-            XMMATRIX worldViewProj = world * view * proj;
-            ConstBuffer pushConstants{};
-            pushConstants._materialIndex = currentMaterial._albedoIndex;
-            pushConstants._worldViewProj = worldViewProj;
-            pushConstants._worldMatrix = (world);
-            commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
+   //     commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
-			commandList->DrawIndexedInstanced(mesh._indexCount,
-                1, mesh._startIndex, mesh._startVertex, 0);
-        }
+   //     commandList->OMSetRenderTargets(1, &rtvHandle,
+   //         FALSE, &dsvHandle);
+   //     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        // transition the render target to present format
-        rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        commandList->ResourceBarrier(1, &rBarrier);
+   //     commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer.vertex_buffer_view);
+   // 	commandList->IASetIndexBuffer(&model._indexBuffer.index_buffer_view);
 
-        DX_ASSERT(commandList->Close());
+   //     /*CD3DX12_GPU_DESCRIPTOR_HANDLE texGPUHandle(model._modelHeap->GetGPUDescriptorHandleForHeapStart());
+   //     commandList->SetGraphicsRootDescriptorTable(1, texGPUHandle);*/
 
-        // execute the command list
-        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-    }
+   //     for (auto& mesh : model)
+   //     {
+   //         Material& currentMaterial = model._materials[mesh._materialIndex];
+   //         XMMATRIX world = mesh._transform._matrix;
+
+   //         //world = XMMatrixRotationX(DirectX::XM_PI) * world;
+
+   //         XMMATRIX view = camera._view;
+   //         XMMATRIX proj = camera._projection;
+
+   //         XMMATRIX worldViewProj = world * view * proj;
+   //         ConstBuffer pushConstants{};
+   //         pushConstants._materialIndex = currentMaterial._albedoIndex;
+   //         pushConstants._worldViewProj = worldViewProj;
+   //         pushConstants._worldMatrix = (world);
+   //         commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
+
+			//commandList->DrawIndexedInstanced(mesh._indexCount,
+   //             1, mesh._startIndex, mesh._startVertex, 0);
+   //     }
+
+   //     // transition the render target to present format
+   //     rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+   //         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+   //     commandList->ResourceBarrier(1, &rBarrier);
+
+   //     DX_ASSERT(commandList->Close());
+
+   //     // execute the command list
+   //     ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+   //     gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+   // }
 #endif
 }

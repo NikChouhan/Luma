@@ -13,8 +13,7 @@ using namespace DirectX;
 enum class BufferType
 {
 	VERTEX,
-    INDEX,
-    CONSTANT
+    INDEX
 };
 
 struct ConstBuffer
@@ -29,6 +28,10 @@ struct DepthPPBuffer
 {
     XMMATRIX _worldViewProj;
     XMMATRIX _worldMatrix;
+};
+struct RTBuffer
+{
+	
 };
 
 struct Vertex

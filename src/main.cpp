@@ -31,12 +31,12 @@
 // Ray tracing. I would have liked the compute shader way (hw agnostic) but
 // DXR is fine for now. Custom BVH, etc will be too time costly too early
 
-static bool isOpen = true;
-static bool keys[256] = {};
-static int lastMouseX = 0;
-static int lastMouseY = 0;
-static int currentMouseX = 0;
-static int currentMouseY = 0;
+bool isOpen = true;
+bool keys[256] = {};
+int lastMouseX = 0;
+int lastMouseY = 0;
+int currentMouseX = 0;
+int currentMouseY = 0;
 
 static bool isMouseCaptured = false;
 
@@ -76,7 +76,7 @@ int WINAPI wWinMain(
 
 	Camera camera = CreatePerspectiveCamera(
 	{
-	._angle = 1.1,
+	._angle = 1.3,
 	._aspectRatio = 16.f/9.f,
 	._near = 0.1f,
 	._far = 1000.f});
@@ -111,39 +111,56 @@ int WINAPI wWinMain(
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX });
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, 
-	{
-	._shaders = {depthPrePassShader},
-	._enableDepthTest = TRUE,
-	._enableStencilTest = FALSE,
-	._enableRasterizer = FALSE,
-	._isDepthPrePass = true });
 
-	// 	raster pipeline
-	wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
-
-	Shader vertexShader = CreateShader(gfxDevice, dxcRes,
+	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain,
 		{
-		._shaderPath = shaderPath,
-		._pEntryPoint = L"VSMain",
-		._pTarget = L"vs_6_7",
-		._type = Type::VERTEX});
-
-	Shader pixelShader = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = shaderPath,
-		._pEntryPoint = L"PSMain",
-		._pTarget = L"ps_6_7",
-		._type = Type::PIXEL});
-
-	RootSign rootSignMain = CreateRootSignature(gfxDevice, { ._isDepthPrePass = false });
-	Pipeline graphicsPipeline = CreatePipeline(gfxDevice, swapchain,
-		{
-		._shaders = {vertexShader, pixelShader},
+		._pipelineType = PipelineType::GRAPHICS,
+		._shaders = {depthPrePassShader} ,
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
-		._enableRasterizer = TRUE,
-		._isDepthPrePass = false });
+		._isDepthPrePass = FALSE });
+	
+
+	//// 	raster pipeline
+	//wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
+	//Shader vertexShader = CreateShader(gfxDevice, dxcRes,
+	//	{
+	//	._shaderPath = shaderPath,
+	//	._pEntryPoint = L"VSMain",
+	//	._pTarget = L"vs_6_7",
+	//	._type = Type::VERTEX});
+
+	//Shader pixelShader = CreateShader(gfxDevice, dxcRes,
+	//	{
+	//	._shaderPath = shaderPath,
+	//	._pEntryPoint = L"PSMain",
+	//	._pTarget = L"ps_6_7",
+	//	._type = Type::PIXEL});
+
+	//Pipeline graphicsPipeline = CreatePipeline(gfxDevice, swapchain,
+	//	{
+	//	._shaders = {vertexShader, pixelShader},
+	//	._enableDepthTest = TRUE,
+	//	._enableStencilTest = FALSE,
+	//	._enableRasterizer = TRUE,
+	//	._isDepthPrePass = false });
+
+	// ray tracing pipeline
+	wchar_t RTshaderPath[] = L"../../../../shaders/shaders/RayTracing/ray_tracing.hlsl";
+	Shader rtShader = CreateShader(gfxDevice, dxcRes,
+		{
+		._shaderPath = RTshaderPath,
+		._pEntryPoint = L"RTComputeShader",
+		._pTarget = L"cs_6_7",
+		._type = Type::COMPUTE });
+	Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain,
+		{
+		._pipelineType = COMPUTE,
+		._shaders = {rtShader},
+		._enableDepthTest = FALSE,
+		._enableStencilTest = FALSE,
+		._isDepthPrePass = FALSE });
+
 
 	// wait for the assets to be uploaded before rendering the frame
 	WaitForGPU(gfxDevice, frameSync);
@@ -155,7 +172,7 @@ int WINAPI wWinMain(
 	{
 		// depth prepass
 		SubmitPass(commandList, gfxDevice, swapchain, frameSync, 
-			camera, depthPrePass, graphicsPipeline, model);
+			camera, depthPrePass, rtPipeline, model);
 
 		// present the Frame
 		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));

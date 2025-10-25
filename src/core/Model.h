@@ -104,6 +104,9 @@ struct Model
     std::vector<Texture> _modelTextures;
     ComPtr<ID3D12DescriptorHeap> _modelHeap;
     ComPtr<ID3D12DescriptorHeap> _samplerHeap;
+    // rt shadow resource and heap
+    ComPtr<ID3D12DescriptorHeap> uavHeapRT;
+    ComPtr<ID3D12Resource> _uavTracedTextureResource;
 
     std::unordered_set<std::string> _loadedTextures; // To track loaded textures
     std::unordered_map<cgltf_material*, size_t> _materialLookup;

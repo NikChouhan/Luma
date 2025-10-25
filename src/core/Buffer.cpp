@@ -46,12 +46,12 @@ Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc)
 
     // non REBAR path (will be pre-checked at start later)
 #else
+
     auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(desc._bufferSize);
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-
     DX_ASSERT(gfxDevice._allocator->CreateResource(
         &allocDesc,
         &bufferDesc,
