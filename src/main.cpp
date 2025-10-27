@@ -94,20 +94,21 @@ int WINAPI wWinMain(
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
-
+	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
+	DX_ASSERT(commandList->Close());
 	//std::string modelPath = "../../../../assets/models/bistro2/bistro2.gltf";
 	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
-	Model model = LoadModel(gfxDevice, frameSync,
+	Model model = LoadModel(gfxDevice, frameSync, commandList.Get(),
 		{
 		._path = modelPath});
 
 	DXCRes dxcRes = ShaderCompiler();
 
 	// depth pipeline
-	wchar_t depthPPShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
-	Shader depthPrePassShader = CreateShader(gfxDevice, dxcRes,
+	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
+	Shader depthPrePassVS= CreateShader(gfxDevice, dxcRes,
 		{
-		._shaderPath = depthPPShaderPath,
+		._shaderPath = depthPPVertexShaderPath,
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX });
@@ -115,38 +116,37 @@ int WINAPI wWinMain(
 	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain,
 		{
 		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {depthPrePassShader} ,
+		._shaders = {depthPrePassVS} ,
+		._enableDepthTest = TRUE,
+		._enableStencilTest = FALSE,
+		._isDepthPrePass = TRUE });
+
+	// inline ray tracing pass
+	wchar_t inlineRayTracingVertexShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
+	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, dxcRes,
+		{
+		._shaderPath = inlineRayTracingVertexShaderPath,
+		._pEntryPoint = L"VSMain",
+		._pTarget = L"vs_6_7",
+		._type = Type::VERTEX });
+	wchar_t inlineRayTracingPixelShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
+	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, dxcRes,
+		{
+		._shaderPath = inlineRayTracingPixelShaderPath,
+		._pEntryPoint = L"PSMain",
+		._pTarget = L"ps_6_7",
+		._type = Type::PIXEL });
+	Pipeline rasterPipeline = CreatePipeline(gfxDevice, swapchain,
+		{
+		._pipelineType = PipelineType::GRAPHICS,
+		._shaders = {inlineRayTracingVertexShader, inlineRayTracingPixelShader},
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE });
-	
 
-	//// 	raster pipeline
-	//wchar_t shaderPath[] = L"../../../../shaders/shaders/model.hlsl";
-	//Shader vertexShader = CreateShader(gfxDevice, dxcRes,
-	//	{
-	//	._shaderPath = shaderPath,
-	//	._pEntryPoint = L"VSMain",
-	//	._pTarget = L"vs_6_7",
-	//	._type = Type::VERTEX});
 
-	//Shader pixelShader = CreateShader(gfxDevice, dxcRes,
-	//	{
-	//	._shaderPath = shaderPath,
-	//	._pEntryPoint = L"PSMain",
-	//	._pTarget = L"ps_6_7",
-	//	._type = Type::PIXEL});
-
-	//Pipeline graphicsPipeline = CreatePipeline(gfxDevice, swapchain,
-	//	{
-	//	._shaders = {vertexShader, pixelShader},
-	//	._enableDepthTest = TRUE,
-	//	._enableStencilTest = FALSE,
-	//	._enableRasterizer = TRUE,
-	//	._isDepthPrePass = false });
-
-	// ray tracing pipeline
-	wchar_t RTshaderPath[] = L"../../../../shaders/shaders/RayTracing/ray_tracing.hlsl";
+	// ray tracing pipeline (redundant with forward renderer)
+	/*wchar_t RTshaderPath[] = L"../../../../shaders/shaders/RayTracing/ray_tracing.hlsl";
 	Shader rtShader = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = RTshaderPath,
@@ -155,24 +155,21 @@ int WINAPI wWinMain(
 		._type = Type::COMPUTE });
 	Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain,
 		{
-		._pipelineType = COMPUTE,
+		._pipelineType = PipelineType::COMPUTE,
 		._shaders = {rtShader},
 		._enableDepthTest = FALSE,
 		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE });
-
+		._isDepthPrePass = FALSE });*/
 
 	// wait for the assets to be uploaded before rendering the frame
 	WaitForGPU(gfxDevice, frameSync);
 
-	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
-	DX_ASSERT(commandList->Close());
 	
 	auto on_render = [&]()
 	{
 		// depth prepass
 		SubmitPass(commandList, gfxDevice, swapchain, frameSync, 
-			camera, depthPrePass, rtPipeline, model);
+			camera, depthPrePass, rasterPipeline, model);
 
 		// present the Frame
 		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));

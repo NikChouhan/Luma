@@ -126,17 +126,6 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
 
         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle =  swapchain._srvDepthHeap->GetCPUDescriptorHandleForHeapStart();
         gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, srvHandle);
-
-
-        // resource state change can be done like shown below, but I avoid it here, since depth stencil is already
-        // init in depth write state
-
-        /*ImmediateSubmit(gfxDevice, frameSync, [&](ComPtr<ID3D12GraphicsCommandList1> commandList)
-            {
-                CD3DX12_RESOURCE_BARRIER pRBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._depthStencil.Get(),
-                    D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-                commandList->ResourceBarrier(1, &pRBarrier);
-            });*/
     }
 
     return swapchain;
@@ -149,7 +138,7 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
     FrameSync& frameSync,
     Camera& camera,
     Pipeline& depthPassPipeline,
-    Pipeline& rtPipeline,
+    Pipeline& rasterPipeline,
     Model& model)
 {
 #ifdef IF_DEPTH
@@ -197,15 +186,10 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
             commandList->DrawIndexedInstanced(mesh._indexCount,
                 1, mesh._startIndex, mesh._startVertex, 0);
         }
-        DX_ASSERT(commandList->Close());
-
-        // execute the command list
-        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
     }
 
-    // ray tracing lights compute pass
-	{
+    // ray tracing lights compute pass (delegated, going full forward with two stage - depth pre pass and then full pipeline
+	/*{
         WaitForGPU(gfxDevice, frameSync);
         DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
             rtPipeline._pipelineState.Get()));
@@ -227,78 +211,69 @@ void SubmitPass(ComPtr<ID3D12GraphicsCommandList> commandList,
         uint32_t dispatchX = (2560 + 7) / 8;
         uint32_t dispatchY = (1440 + 7) / 8;
         commandList->Dispatch(dispatchX, dispatchY, 1);
-	}
+	}*/
+    // forward RT path
+    {
+        commandList->SetPipelineState(rasterPipeline._pipelineState.Get());
 
-   // {
-   //     WaitForGPU(gfxDevice, frameSync);
-   //     DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
-   //     DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
-   //         rasterPipeline._pipelineState.Get()));
+        ID3D12DescriptorHeap* ppHeaps[] = { model._commonHeap.Get() };
+        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-   //     ID3D12DescriptorHeap* ppHeaps[] = { model._modelHeap.Get() };
-   //     commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
 
-   //     commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
+        commandList->RSSetViewports(1, &swapchain._viewport);
+        commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
-   //     commandList->RSSetViewports(1, &swapchain._viewport);
-   //     commandList->RSSetScissorRects(1, &swapchain._scissorRect);
+        // set the back buffer as render target
+        CD3DX12_RESOURCE_BARRIER rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET)
+        };
+        commandList->ResourceBarrier(1, rBarriers);
 
-   //     // set the back buffer as render target
-   //     auto rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-   //         D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-   //     commandList->ResourceBarrier(1, &rBarrier);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+            frameSync._frameIndex, swapchain._rtvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
 
-   //     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
-   //         frameSync._frameIndex, swapchain._rtvDescriptorSize);
-   //     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        // record commands
+        const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
+        commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-   //     // record commands
-   //     const float clearColor[4] = {0.f, 0., 1.f, 1.0f};
-   //     commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        commandList->OMSetRenderTargets(1, &rtvHandle,
+            FALSE, &dsvHandle);
 
-   //     commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+        for (auto& mesh : model)
+        {
+            Material& currentMaterial = model._materials[mesh._materialIndex];
+            XMMATRIX world = mesh._transform._matrix;
 
-   //     commandList->OMSetRenderTargets(1, &rtvHandle,
-   //         FALSE, &dsvHandle);
-   //     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            //world = XMMatrixRotationX(DirectX::XM_PI) * world;
 
-   //     commandList->IASetVertexBuffers(0, 1, &model._vertexBuffer.vertex_buffer_view);
-   // 	commandList->IASetIndexBuffer(&model._indexBuffer.index_buffer_view);
+            XMMATRIX view = camera._view;
+            XMMATRIX proj = camera._projection;
 
-   //     /*CD3DX12_GPU_DESCRIPTOR_HANDLE texGPUHandle(model._modelHeap->GetGPUDescriptorHandleForHeapStart());
-   //     commandList->SetGraphicsRootDescriptorTable(1, texGPUHandle);*/
+            XMMATRIX worldViewProj = world * view * proj;
+            ConstBuffer pushConstants{};
+            pushConstants._albedoIndex = currentMaterial._albedoIndex;
+            pushConstants._normalIndex = currentMaterial._normalIndex;
+            pushConstants._accelerationStructureIndex = model._modelTextures.size();
+            pushConstants._worldViewProj = worldViewProj;
+            pushConstants._worldMatrix = (world);
+            pushConstants._lightDir = camera._pos;
+            pushConstants._cameraPos = camera._pos;
+            commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
 
-   //     for (auto& mesh : model)
-   //     {
-   //         Material& currentMaterial = model._materials[mesh._materialIndex];
-   //         XMMATRIX world = mesh._transform._matrix;
+			commandList->DrawIndexedInstanced(mesh._indexCount,
+                1, mesh._startIndex, mesh._startVertex, 0);
+        }
 
-   //         //world = XMMatrixRotationX(DirectX::XM_PI) * world;
+        // transition the render target to present format
+        rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT) };
+        commandList->ResourceBarrier(1, rBarriers);
 
-   //         XMMATRIX view = camera._view;
-   //         XMMATRIX proj = camera._projection;
-
-   //         XMMATRIX worldViewProj = world * view * proj;
-   //         ConstBuffer pushConstants{};
-   //         pushConstants._materialIndex = currentMaterial._albedoIndex;
-   //         pushConstants._worldViewProj = worldViewProj;
-   //         pushConstants._worldMatrix = (world);
-   //         commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
-
-			//commandList->DrawIndexedInstanced(mesh._indexCount,
-   //             1, mesh._startIndex, mesh._startVertex, 0);
-   //     }
-
-   //     // transition the render target to present format
-   //     rBarrier = CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-   //         D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-   //     commandList->ResourceBarrier(1, &rBarrier);
-
-   //     DX_ASSERT(commandList->Close());
-
-   //     // execute the command list
-   //     ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-   //     gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-   // }
+        DX_ASSERT(commandList->Close());
+        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    }
 #endif
 }

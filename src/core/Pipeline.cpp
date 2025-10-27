@@ -9,7 +9,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
 {
     Pipeline pipeline{};
 
-    if (pipelineDesc._pipelineType == GRAPHICS)
+    if (pipelineDesc._pipelineType == PipelineType::GRAPHICS)
     {
         // define the vertex input layout
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -28,7 +28,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
                 .SemanticName = "NORMAL", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0,
                 .AlignedByteOffset = 20, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
                 .InstanceDataStepRate = 0
-            }
+            },
         };
 
         if (pipelineDesc._isDepthPrePass == TRUE)
@@ -72,16 +72,24 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
              .ForcedSampleCount = 0,
              .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
          };*/
-
-        if (pipelineDesc._isDepthPrePass == FALSE)
+        //  Will be replacing with proper resources provided directly
+        //  in the CreatePipeline call. For now, this should work
+        if (pipelineDesc._isDepthPrePass == TRUE)
         {
-            psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = swapChain._renderTargets[0]->GetDesc().Format;
-        }
+            psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+            psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+            psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
+            psoDesc.NumRenderTargets = 0;
+        }
         else
         {
-            psoDesc.NumRenderTargets = 0;
+            psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+            psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+            psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = swapChain._renderTargets[0]->GetDesc().Format;
         }
 
         psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -91,8 +99,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
 
         psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
-        psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-        psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        
         psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
         psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;
         psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
@@ -104,7 +111,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         return pipeline;
     }
 
-    if (pipelineDesc._pipelineType == COMPUTE)
+    if (pipelineDesc._pipelineType == PipelineType::COMPUTE)
     {
         D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
         assert(pipelineDesc._shaders.begin()->_type == Type::COMPUTE && pipelineDesc._shaders.size() == 1);
@@ -121,6 +128,5 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         csoDesc.NodeMask = 0;
         csoDesc.pRootSignature = pipeline._rootSignature.Get();
         DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
-        
     }
 }

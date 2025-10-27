@@ -102,11 +102,18 @@ struct Model
     Buffer _indexBuffer;
 
     std::vector<Texture> _modelTextures;
-    ComPtr<ID3D12DescriptorHeap> _modelHeap;
+    ComPtr<ID3D12DescriptorHeap> _commonHeap;
     ComPtr<ID3D12DescriptorHeap> _samplerHeap;
-    // rt shadow resource and heap
-    ComPtr<ID3D12DescriptorHeap> uavHeapRT;
+    // rt shadow resource
     ComPtr<ID3D12Resource> _uavTracedTextureResource;
+
+    // acceleration structures
+    ComPtr<ID3D12Resource> _bottomLevelAccelerationStructure;
+    ComPtr<ID3D12Resource> _topLevelAccelerationStructure;
+
+    // normal buffer resource and separate heap
+    ComPtr<ID3D12Resource> _normalRenderTarget;
+    ComPtr<ID3D12DescriptorHeap> _normalRenderTargetHeap;
 
     std::unordered_set<std::string> _loadedTextures; // To track loaded textures
     std::unordered_map<cgltf_material*, size_t> _materialLookup;
@@ -116,5 +123,5 @@ struct Model
     auto end() { return _meshes.end(); }
 };
 
-Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ModelDesc desc);
+Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12GraphicsCommandList10 *commandList, ModelDesc desc);
 void DestroyModel(GfxDevice& gfxDevice, Model& model);

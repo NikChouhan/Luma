@@ -28,24 +28,39 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
         rootParameters[0].Constants.Num32BitValues = sizeof(ConstBuffer) / 4;
 
 
-        D3D12_STATIC_SAMPLER_DESC sampler = {};
-        sampler.Filter = D3D12_FILTER_ANISOTROPIC;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 16;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        sampler.MinLOD = 0.0f;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.RegisterSpace = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        D3D12_STATIC_SAMPLER_DESC samplers[2] = {};
+        samplers[0].Filter = D3D12_FILTER_ANISOTROPIC;
+        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].MipLODBias = 0;
+        samplers[0].MaxAnisotropy = 16;
+        samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        samplers[0].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        samplers[0].MinLOD = 0.0f;
+        samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+        samplers[0].ShaderRegister = 0;
+        samplers[0].RegisterSpace = 0;
+        samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // normal map sampling
+        samplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        samplers[1].MipLODBias = 0.0f;
+        samplers[1].MaxAnisotropy = 16;
+        samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK;
+        samplers[1].MinLOD = 0.0f;
+        samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+        samplers[1].ShaderRegister = 1;
+        samplers[1].RegisterSpace = 0;
+        samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
-            1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+            _countof(samplers), samplers, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
             | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED /*|
             D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED*/ /* for samplers set with heaps. I
             am baking it inside the root descriptors, so I don't need it*/);

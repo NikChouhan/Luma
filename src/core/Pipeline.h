@@ -5,7 +5,7 @@
 struct RootSign;
 struct Swapchain;
 
-enum PipelineType : u8
+enum class PipelineType : u8
 {
 	GRAPHICS,
     COMPUTE
