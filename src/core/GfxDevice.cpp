@@ -101,9 +101,10 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
     DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice._device)));
     // ray tracing stuff
     IsDirectXRayTracingSuppported(gfxDevice._device.Get());
-
+#ifdef DEBUG
     ComPtr<ID3D12DebugDevice2> debugDevice;
     DX_ASSERT(gfxDevice._device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
+#endif
 
     // create d3d12 memory allocator
     D3D12MA::ALLOCATOR_DESC allocatorDesc{};

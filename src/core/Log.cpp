@@ -7,16 +7,36 @@
 #include "common.h"
 #include <print>
 
+static void LogToFile(const char* msg) {
+    FILE* f = fopen("../../../../Logs/game_log.txt", "a");
+    if (f) {
+        fprintf(f, "%s\n", msg);
+        fclose(f);
+    }
+}
+
+static void ClearLogFile()
+{
+    FILE* f = fopen("../../../../Logs/game_log.txt", "w");
+    if (f)
+    {
+        fprintf(f, "Log cleared!\n");
+        fclose(f);
+    }
+}
+
 namespace Luma
 {
     bool Log::m_initialized = false;
     static constexpr u32 bufferSize = 1024 * 1024;
     static char logBuffer[bufferSize];
 
+
     void Log::Init()
     {
         m_initialized = true;
         std::println("\033[32mLogger Init!\033[0m");
+        ClearLogFile();
     }
 
     void Log::Shutdown()
@@ -76,5 +96,6 @@ namespace Luma
             (int)formatted_msg.size(), &wstr[0], sizeNeeded);
 
         OutputDebugStringW(wstr.c_str());
+        LogToFile(msg);
     }
 }

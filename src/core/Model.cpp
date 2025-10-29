@@ -12,8 +12,7 @@
 #include "Log.h"
 
 
-static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model,
-    Material& mat, const cgltf_texture_view* textureView, TextureType type)
+static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model, const cgltf_texture_view* textureView, TextureType type)
 {
     if (textureView && textureView->texture && textureView->texture->image)
     {
@@ -23,6 +22,9 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
         int width, height, channels;
         unsigned char* imgData = stbi_load(path.c_str(), &width, &height,
             &channels, STBI_rgb_alpha);
+
+        if (type == TextureType::NORMAL) channels = 3;
+        else channels = 4;
 
         if (imgData == nullptr)
         {
@@ -34,7 +36,7 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
             {
             ._texWidth = u32(width),
             ._texHeight = u32(height),
-            ._texPixelSize = u32(4),
+            ._texPixelSize = u32(channels),
             ._pContents = imgData,
             ._textureType = TextureResourceType::SAMPLE
             });
@@ -142,6 +144,7 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
         return;
     }
 
+
     MeshInfo meshInfo;
 
     meshInfo._transform = parentTransform;
@@ -170,7 +173,7 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
     if (!pos_attribute || !tex_attribute || !norm_attribute)
     {
         printl(Log::LogLevel::Warn, "[CGLTF] Missing attributes in primitive");
-        return;
+        //return;
     }
 
     size_t vertexCount = pos_attribute->data->count;
@@ -233,7 +236,6 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
             {
                 // Map metallic-roughness texture
                 textureMap[TextureType::METALLIC_ROUGHNESS] = &pbr->metallic_roughness_texture;
-                //mat.MaterialName = 
             }
         }
 
@@ -264,7 +266,7 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
 
             if (!model._loadedTextures.contains(imageName)) // If texture file is new
             {
-                textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, mat, view, type);
+                textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, view, type);
 
                 if (textureIndex == -1)
                 {
@@ -280,22 +282,15 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
             {
                 textureIndex = model._textureIndexLookup[imageName];
                 printl(Log::LogLevel::Warn, "[Texture] Reusing texture {} with index {}", imageName, textureIndex);
-
-                // there is no image view at model side, SRV is created with heap in d3d12, so leave it alone here
-
-                //Texture& existingTex = model._modelTextures[textureIndex];
-                //if (type == TextureType::ALBEDO) mat._AlbedoView = existingTex._imageView;
-                //if (type == TextureType::NORMAL) mat.NormalView = existingTex._imageView;
-                //if (type == TextureType::METALLIC_ROUGHNESS) mat.MetallicRoughnessView = existingTex._imageView;
-                //if (type == TextureType::EMISSIVE) mat.EmissiveView = existingTex._imageView;
-                // ... rest types TODO
             }
 
             if (type == TextureType::ALBEDO) mat._albedoIndex = textureIndex;
             if (type == TextureType::NORMAL) mat._normalIndex = textureIndex;
-            if (type == TextureType::METALLIC_ROUGHNESS) mat._metallicIndex = textureIndex;
+            if (type == TextureType::METALLIC_ROUGHNESS)
+            {
+                mat._metallicRoughnessIndex = textureIndex;
+            }
             if (type == TextureType::EMISSIVE) mat._emmisiveIndex = textureIndex;
-            // ... rest types TODO
         }
 
         model._materials.push_back(mat);

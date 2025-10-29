@@ -58,12 +58,12 @@ struct Material
     u32 _albedoIndex = -1;
     u32 _normalIndex = -1;
     u32 _emmisiveIndex = -1;
-    u32 _metallicIndex = -1;
+    u32 _metallicRoughnessIndex = -1;
 
+    u32 _roughnessIndex = -1;
     BOOL _hasAo = FALSE;
     float _specularScale;
     float _alphaThreshold;
-    float _padding;
 
     // no texture views unlike in vulkan
     // cuz the views are created with

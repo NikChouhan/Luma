@@ -3,12 +3,14 @@
 #include "Common.h"
 #include "GfxDevice.h"
 
+typedef u32 Index;
+using namespace DirectX;
+
 namespace D3D12MA
 {
 	class Allocation;
 }
 
-using namespace DirectX;
 
 enum class BufferType
 {
@@ -20,15 +22,25 @@ enum class BufferType
 struct ConstBuffer
 {
     XMMATRIX _worldViewProj;
+
     XMMATRIX _worldMatrix;
+
     u32 _albedoIndex;
     u32 _normalIndex;
+    u32 _metallicRoughnessIndex;
+    u32 _emissiveIndex;
+
     u32 _accelerationStructureIndex;
-    u32 _padding;
-    SM::Vector3 _lightDir;
-    u32 _padding2;
+    SM::Vector3 _dirLightDir;
+
+    float _dirLightIntensity;
+    SM::Vector3 _dirLightColor;
+
+    float _pointLightIntensity;
     SM::Vector3 _cameraPos;
-    u32 _padding3;
+
+    float _pointLightRadius;
+    SM::Vector3 _pointLightColor;
 };
 
 struct DepthPPBuffer
@@ -36,12 +48,11 @@ struct DepthPPBuffer
     XMMATRIX _worldViewProj;
     XMMATRIX _worldMatrix;
 };
+
 struct RTBuffer
 {
-	
+    
 };
-
-typedef u32 Index;
 
 struct Vertex
 {

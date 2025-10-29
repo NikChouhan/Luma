@@ -25,12 +25,6 @@
 //	Buffer vertexBuffer;
 //};
 
-// initially I was going with the all ray traced ("path traced") image
-// to be denoised later but it's kinda stupid. I am happy with the
-// texture mapping through raster while lights/shadows/AO done with
-// Ray tracing. I would have liked the compute shader way (hw agnostic) but
-// DXR is fine for now. Custom BVH, etc will be too time costly too early
-
 bool isOpen = true;
 bool keys[256] = {};
 int lastMouseX = 0;
@@ -42,6 +36,12 @@ static bool isMouseCaptured = false;
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static void HandleCamera(Camera& camera, f32 deltaTime);
+
+struct AppData
+{
+	GfxDevice* gfxDevice;
+	FrameSync* frameSync;
+};
 
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -59,13 +59,21 @@ int WINAPI wWinMain(
 
 	RegisterClassW(&wc);
 
+	// create graphics device
+	constexpr GfxDeviceDesc gfxDeviceDesc{};
+	GfxDevice gfxDevice = CreateDevice(gfxDeviceDesc);
+	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
+
+	AppData appData{ &gfxDevice, &frameSync };
+
+
 	HWND hwnd = CreateWindowExW(
 		0, className, L"Luma", WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 		nullptr,
 		nullptr,
 		hInstance,
-	nullptr);
+		&appData);
 
 	if (hwnd == nullptr)
 		return 0;
@@ -79,12 +87,8 @@ int WINAPI wWinMain(
 	._angle = 1.3,
 	._aspectRatio = 16.f/9.f,
 	._near = 0.1f,
-	._far = 1000.f});
+	._far = 10000.f});
 
-	// create graphics device
-	constexpr GfxDeviceDesc gfxDeviceDesc{};
-	GfxDevice gfxDevice= CreateDevice(gfxDeviceDesc);
-	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
 	// swapchain
 	Swapchain swapchain = CreatSwapChain(gfxDevice, frameSync,
 		{
@@ -98,11 +102,13 @@ int WINAPI wWinMain(
 	DX_ASSERT(commandList->Close());
 	//std::string modelPath = "../../../../assets/models/bistro2/bistro2.gltf";
 	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
+	//std::string modelPath = "../../../../assets/models/haunted_house/haunted_house.gltf";
 	Model model = LoadModel(gfxDevice, frameSync, commandList.Get(),
 		{
 		._path = modelPath});
 
 	DXCRes dxcRes = ShaderCompiler();
+
 
 	// depth pipeline
 	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
@@ -144,38 +150,21 @@ int WINAPI wWinMain(
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE });
 
-
-	// ray tracing pipeline (redundant with forward renderer)
-	/*wchar_t RTshaderPath[] = L"../../../../shaders/shaders/RayTracing/ray_tracing.hlsl";
-	Shader rtShader = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = RTshaderPath,
-		._pEntryPoint = L"RTComputeShader",
-		._pTarget = L"cs_6_7",
-		._type = Type::COMPUTE });
-	Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::COMPUTE,
-		._shaders = {rtShader},
-		._enableDepthTest = FALSE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE });*/
-
-	// wait for the assets to be uploaded before rendering the frame
 	WaitForGPU(gfxDevice, frameSync);
 
-	
 	auto on_render = [&]()
 	{
-		// depth prepass
-		SubmitPass(commandList, gfxDevice, swapchain, frameSync, 
-			camera, depthPrePass, rasterPipeline, model);
+		WaitForGPU(gfxDevice, frameSync);
+		DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
+		DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(), nullptr));
 
+		// 
+		SubmitPasses(commandList, gfxDevice, swapchain, frameSync, 
+			camera, depthPrePass, rasterPipeline, model);
 		// present the Frame
 		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
 	};
-	// high resolution time
 	LARGE_INTEGER perfFrequency;
 	QueryPerformanceFrequency(&perfFrequency);
 
@@ -183,12 +172,7 @@ int WINAPI wWinMain(
 	QueryPerformanceCounter(&lastFrameTime);
 
 	MSG msg{};
-	if (msg.message == WM_QUIT)
-	{
-		WaitForGPU(gfxDevice, frameSync);
-		DestroyDevice(gfxDevice);
-		PostQuitMessage(0);
-	}
+
 	while (WM_QUIT != msg.message)
 	{
 		if (PeekMessageW(&msg, nullptr, 0,0, PM_REMOVE))
@@ -217,8 +201,8 @@ int WINAPI wWinMain(
 				swprintf_s(titleBuffer, L"Luma frametime: %.3f ms", deltaTime * 1000.0f);
 				SetWindowTextW(hwnd, titleBuffer);
 
-				printl(Log::LogLevel::Info, "[Camera] Camera position: x: {}, y: {}, z: {}", 
-				   camera._pos.x, camera._pos.y, camera._pos.z);
+				/*printl(Log::LogLevel::Info, "[Camera] Camera position: x: {}, y: {}, z: {}", 
+				   camera._pos.x, camera._pos.y, camera._pos.z);*/
 
 				timeSinceLastUpdate = 0.f;
 			}
@@ -229,6 +213,19 @@ int WINAPI wWinMain(
 
 LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	AppData* appData = nullptr;
+
+	if (uMsg == WM_CREATE)
+	{
+		CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+		appData = reinterpret_cast<AppData*>(pCreate->lpCreateParams);
+		SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(appData));
+	}
+	else
+	{
+		appData = reinterpret_cast<AppData*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+	}
+
 	switch (uMsg)
 	{
 	case WM_DESTROY:
@@ -240,6 +237,13 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	case WM_KEYUP:
 		if (wParam < 256) keys[wParam] = false;
+
+		if (wParam == VK_ESCAPE)
+		{
+			WaitForGPU(*appData->gfxDevice, *appData->frameSync);
+			DestroyDevice(*appData->gfxDevice);
+			PostQuitMessage(0);
+		}
 		if (wParam == 'M')
 		{
 			isMouseCaptured = !isMouseCaptured;
