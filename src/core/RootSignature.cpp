@@ -95,20 +95,20 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
             signature->GetBufferPointer(), signature->GetBufferSize(),
             IID_PPV_ARGS(&rootSign._rootSignature)));
     }
-    else if (desc._type == RootSignDesc::RT_LIGHT)
+    else if (desc._type == RootSignDesc::SHADER_EFFECT)
     {
-	    // set the descriptors for the ray tracing pipeline
+        // set the descriptors for the ray tracing pipeline
         D3D12_ROOT_PARAMETER1 rootParameters[1]{};
 
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParameters[0].Constants.RegisterSpace = 0;
         rootParameters[0].Constants.ShaderRegister = 0;
-        rootParameters[0].Constants.Num32BitValues = sizeof(RTBuffer) / 4;
+        rootParameters[0].Constants.Num32BitValues = sizeof(ShaderEffects) / 4;
 
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
-            0, nullptr, 
+            0, nullptr,
             D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
         ComPtr<ID3DBlob> signature;

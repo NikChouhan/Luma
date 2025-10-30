@@ -10,7 +10,7 @@ struct RootSign
 
 struct RootSignDesc
 {
-    enum RSType { DEPTH_PRE_PASS, RT_LIGHT, RASTER };
+    enum RSType { DEPTH_PRE_PASS, RT_LIGHT, RASTER , SHADER_EFFECT};
     RSType _type;
 };
 

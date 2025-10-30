@@ -107,8 +107,6 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.SampleDesc.Count = 1;
         DX_ASSERT(gfxDevice._device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
-
-        return pipeline;
     }
 
     if (pipelineDesc._pipelineType == PipelineType::COMPUTE)
@@ -123,10 +121,11 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
             cShaderBytecode.pShaderBytecode = shader._pBlob->GetBufferPointer();
             csoDesc.CS = cShaderBytecode;
         }
-        pipeline._rootSignature = CreateRootSignature(gfxDevice, { ._type = RootSignDesc::RT_LIGHT })._rootSignature;
+        pipeline._rootSignature = CreateRootSignature(gfxDevice, { ._type = RootSignDesc::SHADER_EFFECT })._rootSignature;
 
         csoDesc.NodeMask = 0;
         csoDesc.pRootSignature = pipeline._rootSignature.Get();
         DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
     }
+    return pipeline;
 }

@@ -109,6 +109,21 @@ int WINAPI wWinMain(
 
 	DXCRes dxcRes = ShaderCompiler();
 
+	// compute pass for shader effects
+	wchar_t backdropCSPath[] = L"../../../../shaders/shaders/space_backdrop.hlsl";
+	Shader backdropCS = CreateShader(gfxDevice, dxcRes,
+		{
+		._shaderPath = backdropCSPath,
+		._pEntryPoint = L"CSMain",
+		._pTarget = L"cs_6_7",
+		._type = Type::COMPUTE });
+	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
+		{
+		._pipelineType = PipelineType::COMPUTE,
+		._shaders = {backdropCS},
+		._enableDepthTest = FALSE,
+		._enableStencilTest = FALSE,
+		._isDepthPrePass = FALSE });
 
 	// depth pipeline
 	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
@@ -160,7 +175,7 @@ int WINAPI wWinMain(
 
 		// 
 		SubmitPasses(commandList, gfxDevice, swapchain, frameSync, 
-			camera, depthPrePass, rasterPipeline, model);
+			camera, backdropComputePipeline, depthPrePass, rasterPipeline, model);
 		// present the Frame
 		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 		MoveToNextFrame(gfxDevice, swapchain, frameSync);
@@ -203,9 +218,9 @@ int WINAPI wWinMain(
 
 				/*printl(Log::LogLevel::Info, "[Camera] Camera position: x: {}, y: {}, z: {}", 
 				   camera._pos.x, camera._pos.y, camera._pos.z);*/
-
 				timeSinceLastUpdate = 0.f;
 			}
+			camera._time += deltaTime / 10.;
 		}
 	}
 	return 0;
@@ -319,6 +334,9 @@ void HandleCamera(Camera& camera, f32 deltaTime)
 			lastMouseY = currentMouseY;
 
 			InitViewMatrix(camera);
+
+			camera._yaw = yaw;
+			camera._pitch = pitch;
 		}
 	}
 

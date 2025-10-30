@@ -49,9 +49,17 @@ struct DepthPPBuffer
     XMMATRIX _worldMatrix;
 };
 
-struct RTBuffer
+struct ShaderEffects
 {
-    
+    SM::Vector2 _resolution;
+    float _time;
+    float _cameraYaw;
+
+    float _cameraPitch;
+    SM::Vector3 _cameraPos;
+
+    u32 _uavIndex;
+    SM::Vector3 _padding;
 };
 
 struct Vertex

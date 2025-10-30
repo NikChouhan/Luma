@@ -12,10 +12,14 @@ struct Camera
 	f32 _near{};
 	f32 _far{};
 
-
 	SM::Matrix _ortho{};
 	SM::Matrix _projection{};
 	SM::Matrix _view{};
+
+	float _yaw;
+	float _pitch;
+
+	float _time;
 };
 
 struct OrtCameraDesc

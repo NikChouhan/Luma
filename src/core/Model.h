@@ -104,8 +104,8 @@ struct Model
     std::vector<Texture> _modelTextures;
     ComPtr<ID3D12DescriptorHeap> _commonHeap;
     ComPtr<ID3D12DescriptorHeap> _samplerHeap;
-    // rt shadow resource
-    ComPtr<ID3D12Resource> _uavTracedTextureResource;
+    // compute shader background effects resource
+    ComPtr<ID3D12Resource> _uavBgShaderEffects;
 
     // acceleration structures
     ComPtr<ID3D12Resource> _bottomLevelAccelerationStructure;

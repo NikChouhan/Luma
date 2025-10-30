@@ -467,14 +467,16 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12Graph
         WaitForGPU(gfxDevice, frameSync);
     }
     // uav buffer
-    /*model._uavTracedTextureResource = CreateTexture(gfxDevice, frameSync,
+    model._uavBgShaderEffects = CreateTexture(gfxDevice, frameSync,
         {
         ._texWidth = 1920,
         ._texHeight = 1080,
         ._texPixelSize = 0,
         ._pContents = nullptr,
         ._textureType = TextureResourceType::UAV })._resource;
-    */
+
+    model._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource");
+    
     // common heap for all textures
     {
 		// common heap
@@ -512,69 +514,16 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12Graph
             gfxDevice._device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
         }
-        // Ray tracing buffer (don't need it, everthing will be done in Pixel shader directly
-        /*{
+        // compute shader bg effects
+        {
             D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+            uavDesc.Format = model._uavBgShaderEffects->GetDesc().Format;
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-            gfxDevice._device->CreateUnorderedAccessView(model._uavTracedTextureResource.Get(),
+            gfxDevice._device->CreateUnorderedAccessView(model._uavBgShaderEffects.Get(),
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.Format = DXGI_FORMAT_R32G32B32_FLOAT;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            gfxDevice._device->CreateShaderResourceView(model._uavTracedTextureResource.Get(), &srvDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
-        }*/
-        // normal buffer (don't need it for full forward pass (normals will be sampled before RT inline
-        /*{
-            // resource
-            const CD3DX12_HEAP_PROPERTIES normalRenderTargetHeapProps(D3D12_HEAP_TYPE_DEFAULT);
-            const CD3DX12_RESOURCE_DESC normlRenderTargetResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-                DXGI_FORMAT_R16G16B16A16_SNORM, 1920, 1080, 1, 0, 1,
-                0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-
-            DX_ASSERT(gfxDevice._device->CreateCommittedResource(
-                &normalRenderTargetHeapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &normlRenderTargetResourceDesc,
-                D3D12_RESOURCE_STATE_RENDER_TARGET,
-                nullptr,
-                IID_PPV_ARGS(&model._normalRenderTarget
-                )));
-            // srv view
-            {
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvNormal{};
-                srvNormal.Format = DXGI_FORMAT_R16G16B16A16_SNORM;
-                srvNormal.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvNormal.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-                gfxDevice._device->CreateShaderResourceView(model._normalRenderTarget.Get(), &srvNormal, heapHandle);
-                heapHandle.Offset(descriptorSize);
-            }
-
-            // normal heap and rtv
-            {
-                D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-                rtvHeapDesc.NumDescriptors = frameCount;
-                rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-                rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-                DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&model._normalRenderTargetHeap)));
-
-                D3D12_RENDER_TARGET_VIEW_DESC rtvNormal{};
-                rtvNormal.Format = DXGI_FORMAT_R16G16B16A16_SNORM;
-                rtvNormal.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-                auto rtvNormalHandle = model._normalRenderTargetHeap->GetCPUDescriptorHandleForHeapStart();
-                gfxDevice._device->CreateRenderTargetView(model._normalRenderTarget.Get(), &rtvNormal,
-                    rtvNormalHandle);
-            }
-        }*/
+        }
     }
 }
 

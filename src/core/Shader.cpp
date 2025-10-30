@@ -19,6 +19,8 @@ Shader CreateShader(GfxDevice& gfxDevice, DXCRes& dxcRes, const ShaderDesc& shad
         shader._type = Type::VERTEX;
     else if (shaderDesc._type == Type::PIXEL)
         shader._type = Type::PIXEL;
+    else if (shaderDesc._type == Type::COMPUTE)
+        shader._type = Type::COMPUTE;
 
     // shader model 6.0 and up code
 

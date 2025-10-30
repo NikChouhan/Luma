@@ -108,20 +108,22 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 		uavDesc.Width = desc._texWidth;
 		uavDesc.Height = desc._texHeight;
 		uavDesc.DepthOrArraySize = 1;
-		uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
+		uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		uavDesc.SampleDesc.Count = 1;
 		uavDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 		uavDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 		gfxDevice._device->CreateCommittedResource(
 			&heapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&uavDesc,
-			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(&texture._resource));
+
+		return texture;
 	}
 	else if (desc._textureType == TextureResourceType::SAMPLE)
 	{

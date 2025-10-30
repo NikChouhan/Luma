@@ -31,9 +31,10 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
     swapChainDesc.BufferCount = frameCount;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+    
     swapChainDesc.Width = static_cast<u32>(swapchain._viewport.Width);
     swapChainDesc.Height = static_cast<u32>(swapchain._viewport.Height);
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -55,11 +56,13 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     // create descriptor heaps
     {
 	    // render target heap
-	    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-	    rtvHeapDesc.NumDescriptors = frameCount;
-	    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	    rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&swapchain._rtvHeap)));
+	    {
+            D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+            rtvHeapDesc.NumDescriptors = frameCount;
+            rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+            rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+            DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&swapchain._rtvHeap)));
+	    }
 
 	    swapchain._rtvDescriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
 		    D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -74,8 +77,7 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         srvHeapDesc.NumDescriptors = 1;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-        gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&swapchain._srvDepthHeap));
+        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&swapchain._srvDepthHeap)));
     }
 
     // create frame resources
@@ -137,6 +139,7 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
     Swapchain& swapchain,
     FrameSync& frameSync,
     Camera& camera,
+    Pipeline& backdropComputePipeline,
     Pipeline& depthPassPipeline,
     Pipeline& rasterPipeline,
     Model& model)
@@ -148,7 +151,50 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
     // compute pass for space bg shader
     {
-        
+        commandList->SetPipelineState(backdropComputePipeline._pipelineState.Get());
+        ID3D12DescriptorHeap* ppHeaps[] = {model._commonHeap.Get() };
+
+        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        commandList->SetComputeRootSignature(backdropComputePipeline._rootSignature.Get());
+
+        CD3DX12_RESOURCE_BARRIER rBarriers[2];
+
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+            D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        };
+        commandList->ResourceBarrier(1, &rBarriers[0]);
+
+        ShaderEffects pushConstants{
+        ._resolution = {1920, 1080},
+        ._time = camera._time,
+        ._cameraYaw = camera._yaw,
+        ._cameraPitch = camera._pitch,
+        ._cameraPos = camera._pos,
+        ._uavIndex = u32(model._modelTextures.size() + 1) };
+
+        commandList->SetComputeRoot32BitConstants(0, sizeof(ShaderEffects) / 4, &pushConstants, 0);
+        uint32_t dispatchX = (2560 + 7) / 8;
+        uint32_t dispatchY = (1440 + 7) / 8;
+        commandList->Dispatch(dispatchX, dispatchY, 1);
+
+       
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE)
+        };
+        rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+           D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST)
+        };
+        commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
+
+        commandList->CopyResource(swapchain._renderTargets[frameSync._frameIndex].Get(), model._uavBgShaderEffects.Get());
+
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON)
+        };
+
+        rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+           D3D12_RESOURCE_STATE_COPY_DEST,D3D12_RESOURCE_STATE_RENDER_TARGET) };
+        commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
     }
 
     // depth pre-pass
@@ -194,13 +240,13 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
         CD3DX12_RESOURCE_BARRIER rBarriers[1];
-    	rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET)
+    	/*rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET)
         };
-        commandList->ResourceBarrier(1, rBarriers);
+        commandList->ResourceBarrier(1, rBarriers);*/
 
         const float clearColor[4] = {0.8f, 0.8, 0.3, 1.0f};
-        commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        //commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
         commandList->OMSetRenderTargets(1, &rtvHandle,
             FALSE, &dsvHandle);

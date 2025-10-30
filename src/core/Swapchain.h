@@ -40,4 +40,5 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
 void DestroySwapChain(Swapchain& swapchain);
 
 void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
-    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& depthPipeline, Pipeline& rasterPipeline, Model& model);
+    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& backdropComputePipeline,
+    Pipeline& depthPipeline, Pipeline& rasterPipeline, Model& model);
