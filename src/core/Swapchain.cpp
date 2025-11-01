@@ -7,13 +7,124 @@
 #include "Texture.h"
 #include "Camera.h"
 
+#include "Inspector.h"
+
 #define IF_DEPTH 1
 
-Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc)
+
+void Swapchain::ResizeSwapChain(u16 width, u16 height)
+{
+    // 1. Wait for GPU to finish all work
+    WaitForGPU(*_gfxDevice, *_frameSync);
+
+    // 2. Release all references to swap chain buffers
+    for (u32 i = 0; i < frameCount; i++)
+    {
+        _renderTargets[i].Reset(); // Release the ComPtr references
+    }
+
+    // 3. Release depth stencil
+    _depthStencil.Reset();
+
+    // 4. Resize the swap chain buffers
+    DXGI_SWAP_CHAIN_DESC1 desc;
+    _swapchain->GetDesc1(&desc);
+
+    DX_ASSERT(_swapchain->ResizeBuffers(
+        frameCount,
+        width,
+        height,
+        desc.Format,
+        desc.Flags
+    ));
+
+    _width = width;
+    _height = height;
+
+    _viewport.Width = width;
+    _viewport.Height = height;
+
+    _scissorRect.right = static_cast<LONG>(width);
+    _scissorRect.bottom = static_cast<LONG>(height);
+
+    // 6. Recreate render target views
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+    for (u32 i = 0; i < frameCount; i++)
+    {
+        DX_ASSERT(_swapchain->GetBuffer(i, IID_PPV_ARGS(&_renderTargets[i])));
+        _gfxDevice->_device->CreateRenderTargetView(_renderTargets[i].Get(), nullptr, rtvHandle);
+        rtvHandle.Offset(1, _rtvDescriptorSize);
+    }
+
+    // 7. Recreate depth stencil buffer
+    D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
+    depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+    D3D12_CLEAR_VALUE depthOptimisedClearValue{};
+    depthOptimisedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    depthOptimisedClearValue.DepthStencil.Depth = 1.f;
+    depthOptimisedClearValue.DepthStencil.Stencil = 0;
+
+    const CD3DX12_HEAP_PROPERTIES depthStencilHeapProps(D3D12_HEAP_TYPE_DEFAULT);
+    const CD3DX12_RESOURCE_DESC depthStencilTextureDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+        DXGI_FORMAT_D32_FLOAT,
+        static_cast<UINT64>(width),
+        static_cast<UINT>(height),
+        1, 0, 1, 0,
+        D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
+    );
+
+    DX_ASSERT(_gfxDevice->_device->CreateCommittedResource(
+        &depthStencilHeapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &depthStencilTextureDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &depthOptimisedClearValue,
+        IID_PPV_ARGS(&_depthStencil)
+    ));
+
+    _gfxDevice->_device->CreateDepthStencilView(
+        _depthStencil.Get(),
+        &depthStencilViewDesc,
+        _dsvDepthHeap->GetCPUDescriptorHandleForHeapStart()
+    );
+
+    // Recreate depth SRV
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
+    depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSRV.Texture2D.MipLevels = 1;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = _srvDepthHeap->GetCPUDescriptorHandleForHeapStart();
+    _gfxDevice->_device->CreateShaderResourceView(_depthStencil.Get(), &depthSRV, srvHandle);
+
+    // recreate render size dependent resources
+    auto ResizeSizeDependentResources = [&]()
+        {
+            _uavBgShaderEffects.Reset();
+
+            // Recreate UAV with new dimensions
+            _uavBgShaderEffects = CreateTexture(*_gfxDevice, *_frameSync,
+                {
+                ._texWidth = static_cast<u32>(_width),
+                ._texHeight = static_cast<u32>(_height),
+                ._texPixelSize = 0,
+                ._pContents = nullptr,
+                ._textureType = TextureResourceType::UAV })._resource;
+        };
+    ResizeSizeDependentResources();
+}
+
+Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc)
 {
     Swapchain swapchain{};
 
-    swapchain._aspectRatio = desc._aspectRatio;
+    swapchain._gfxDevice = &gfxDevice;
+    swapchain._frameSync = &frameSync;
+
     swapchain._hwnd = desc._hwnd;
     // viewport and scissor
     swapchain._viewport.TopLeftX = 0;
@@ -22,6 +133,9 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
     swapchain._viewport.Width = desc._width;
     swapchain._viewport.MinDepth = 1.0f;
     swapchain._viewport.MaxDepth = 0.0f;
+
+    swapchain._height = desc._height;
+    swapchain._width = desc._width;
 
     swapchain._scissorRect.left = 0;
     swapchain._scissorRect.top = 0;
@@ -130,6 +244,19 @@ Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDe
         gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, srvHandle);
     }
 
+    // uav buffer
+    {
+        swapchain._uavBgShaderEffects = CreateTexture(gfxDevice, frameSync,
+            {
+            ._texWidth = u32(swapchain._width),
+            ._texHeight = u32(swapchain._height),
+            ._texPixelSize = 0,
+            ._pContents = nullptr,
+            ._textureType = TextureResourceType::UAV })._resource;
+
+        DX_ASSERT(swapchain._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource"));
+    }
+
     return swapchain;
 }
 
@@ -138,13 +265,14 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
     GfxDevice& gfxDevice,
     Swapchain& swapchain,
     FrameSync& frameSync,
+    Inspector& inspector,
     Camera& camera,
     Pipeline& backdropComputePipeline,
     Pipeline& depthPassPipeline,
     Pipeline& rasterPipeline,
     Model& model)
 {
-
+    //frameSync._frameIndex = swapchain._swapchain->GetCurrentBackBufferIndex();
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart(),
         frameSync._frameIndex, swapchain._rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
@@ -156,16 +284,15 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
         commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
         commandList->SetComputeRootSignature(backdropComputePipeline._rootSignature.Get());
-
         CD3DX12_RESOURCE_BARRIER rBarriers[2];
 
-        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._uavBgShaderEffects.Get(),
             D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
         };
         commandList->ResourceBarrier(1, &rBarriers[0]);
 
         ShaderEffects pushConstants{
-        ._resolution = {1920, 1080},
+        ._resolution = {swapchain._width, swapchain._height},
         ._time = camera._time,
         ._cameraYaw = camera._yaw,
         ._cameraPitch = camera._pitch,
@@ -173,22 +300,22 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         ._uavIndex = u32(model._modelTextures.size() + 1) };
 
         commandList->SetComputeRoot32BitConstants(0, sizeof(ShaderEffects) / 4, &pushConstants, 0);
-        uint32_t dispatchX = (2560 + 7) / 8;
-        uint32_t dispatchY = (1440 + 7) / 8;
+        u16 dispatchX = (swapchain._width + 7) / 8;
+        u16 dispatchY = (swapchain._height + 7) / 8;
         commandList->Dispatch(dispatchX, dispatchY, 1);
 
        
-        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._uavBgShaderEffects.Get(),
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE)
-        };
+        }; 
         rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST)
         };
         commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
+        
+        commandList->CopyResource(swapchain._renderTargets[frameSync._frameIndex].Get(), swapchain._uavBgShaderEffects.Get());
 
-        commandList->CopyResource(swapchain._renderTargets[frameSync._frameIndex].Get(), model._uavBgShaderEffects.Get());
-
-        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._uavBgShaderEffects.Get(),
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._uavBgShaderEffects.Get(),
     D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON)
         };
 
@@ -239,15 +366,6 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
 
-        CD3DX12_RESOURCE_BARRIER rBarriers[1];
-    	/*rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET)
-        };
-        commandList->ResourceBarrier(1, rBarriers);*/
-
-        const float clearColor[4] = {0.8f, 0.8, 0.3, 1.0f};
-        //commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
         commandList->OMSetRenderTargets(1, &rtvHandle,
             FALSE, &dsvHandle);
 
@@ -291,15 +409,22 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 			commandList->DrawIndexedInstanced(mesh._indexCount,
                 1, mesh._startIndex, mesh._startVertex, 0);
         }
-
-        // transition the render target to present format
-        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT) };
-        commandList->ResourceBarrier(1, rBarriers);
-
-        DX_ASSERT(commandList->Close());
-        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-        gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-        
     }
+    // imgui pass
+    {
+        commandList->OMSetRenderTargets(1, &rtvHandle, 
+            FALSE, &dsvHandle);
+        ID3D12DescriptorHeap* ppHeaps = { inspector._imguiHeap.Get() };
+        commandList->SetDescriptorHeaps(1, &ppHeaps);
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
+    }
+    CD3DX12_RESOURCE_BARRIER rBarriers;
+    // transition the render target to present format
+    rBarriers = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT) };
+    commandList->ResourceBarrier(1, &rBarriers);
+
+    DX_ASSERT(commandList->Close());
+    ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+    gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }

@@ -2,6 +2,7 @@
 
 #include "GfxDevice.h"
 
+struct Inspector;
 struct Camera;
 struct Model;
 struct Texture;
@@ -10,6 +11,9 @@ struct FrameSync;
 
 struct Swapchain
 {
+    GfxDevice* _gfxDevice;
+    FrameSync* _frameSync;
+
     CD3DX12_VIEWPORT _viewport;
     CD3DX12_RECT _scissorRect;
     ComPtr<IDXGISwapChain4> _swapchain;
@@ -23,22 +27,30 @@ struct Swapchain
     ComPtr<ID3D12Resource> _depthStencil;
 	u32 _dsvDescriptorSize{0};
 
+    // compute shader background effects resource
+    ComPtr<ID3D12Resource> _uavBgShaderEffects;
+
+    bool _isResizing = false;
+    bool _needsResize = false;
+
     HWND _hwnd;
-    float _aspectRatio{};
-    
+
+    u16 _height{};
+    u16 _width{};
+
+    void ResizeSwapChain(u16 width, u16 height);
 };
 struct SwapchainDesc
 {
-    float _aspectRatio{};
-    float _height{};
-    float _width{};
+    u16 _height{};
+    u16 _width{};
     bool _vsyncEnable{};
     HWND _hwnd = nullptr;
 };
 
-Swapchain CreatSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc);
+Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc);
 void DestroySwapChain(Swapchain& swapchain);
 
 void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
-    Swapchain& swapchain, FrameSync& frameSync, Camera& camera, Pipeline& backdropComputePipeline,
-    Pipeline& depthPipeline, Pipeline& rasterPipeline, Model& model);
+    Swapchain& swapchain, FrameSync& frameSync, Inspector& inspector, Camera& camera, Pipeline& backdropComputePipeline,
+    Pipeline& depthPassPipeline, Pipeline& rasterPipeline, Model& model);

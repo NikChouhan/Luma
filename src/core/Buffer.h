@@ -51,7 +51,7 @@ struct DepthPPBuffer
 
 struct ShaderEffects
 {
-    SM::Vector2 _resolution;
+    u16 _resolution[2];
     float _time;
     float _cameraYaw;
 

@@ -8,6 +8,7 @@
 #include "GfxDevice.h"
 #include "Buffer.h"
 
+struct Swapchain;
 struct Texture;
 struct Vertex;
 struct Buffer;
@@ -104,9 +105,7 @@ struct Model
     std::vector<Texture> _modelTextures;
     ComPtr<ID3D12DescriptorHeap> _commonHeap;
     ComPtr<ID3D12DescriptorHeap> _samplerHeap;
-    // compute shader background effects resource
-    ComPtr<ID3D12Resource> _uavBgShaderEffects;
-
+    
     // acceleration structures
     ComPtr<ID3D12Resource> _bottomLevelAccelerationStructure;
     ComPtr<ID3D12Resource> _topLevelAccelerationStructure;
@@ -123,5 +122,5 @@ struct Model
     auto end() { return _meshes.end(); }
 };
 
-Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12GraphicsCommandList10 *commandList, ModelDesc desc);
+Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10 *commandList, ModelDesc desc);
 void DestroyModel(GfxDevice& gfxDevice, Model& model);

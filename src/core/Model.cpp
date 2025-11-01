@@ -10,6 +10,7 @@
 #include "Texture.h"
 
 #include "Log.h"
+#include "Swapchain.h"
 
 
 static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model, const cgltf_texture_view* textureView, TextureType type)
@@ -366,7 +367,7 @@ static void ProcessNode(GfxDevice& gfxDevice, FrameSync& frameSync, cgltf_node* 
     }
 }
 
-static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12GraphicsCommandList10* commandList, Model& model)
+static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10* commandList, Model& model)
 {
     model._vertexBuffer = CreateBuffer(gfxDevice,
         {
@@ -466,16 +467,6 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12Graph
         gfxDevice._commandQueue->ExecuteCommandLists(1, &pCommandLists);
         WaitForGPU(gfxDevice, frameSync);
     }
-    // uav buffer
-    model._uavBgShaderEffects = CreateTexture(gfxDevice, frameSync,
-        {
-        ._texWidth = 1920,
-        ._texHeight = 1080,
-        ._texPixelSize = 0,
-        ._pContents = nullptr,
-        ._textureType = TextureResourceType::UAV })._resource;
-
-    model._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource");
     
     // common heap for all textures
     {
@@ -517,17 +508,17 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12Graph
         // compute shader bg effects
         {
             D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = model._uavBgShaderEffects->GetDesc().Format;
+            uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-            gfxDevice._device->CreateUnorderedAccessView(model._uavBgShaderEffects.Get(),
+            gfxDevice._device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
         }
     }
 }
 
-Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12GraphicsCommandList10* commandList, ModelDesc desc)
+Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10* commandList, ModelDesc desc)
 {
 	Model model{};
 
@@ -571,7 +562,7 @@ Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, ID3D12GraphicsComman
         // no of nodes
         printl(Log::LogLevel::InfoDebug, "[CGLTF] No of nodes in the scene: {} ", scene->nodes_count);
 
-        SetResources(gfxDevice, frameSync, commandList, model);
+        SetResources(gfxDevice, frameSync, swapchain, commandList, model);
 
         printl(Log::LogLevel::Info, "[CGLTF] Successfully loaded gltf file");
     }

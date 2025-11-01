@@ -15,6 +15,10 @@
 #include "Camera.h"
 #include "Model.h"
 #include "RootSignature.h"
+#include "Inspector.h"
+
+extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 
 //struct FramePresent
 //{
@@ -41,6 +45,7 @@ struct AppData
 {
 	GfxDevice* gfxDevice;
 	FrameSync* frameSync;
+	Swapchain* swapchain;
 };
 
 int WINAPI wWinMain(
@@ -78,8 +83,6 @@ int WINAPI wWinMain(
 	if (hwnd == nullptr)
 		return 0;
 
-	ShowWindow(hwnd, cmdShow);
-
 	Log::Init();
 
 	Camera camera = CreatePerspectiveCamera(
@@ -90,20 +93,24 @@ int WINAPI wWinMain(
 	._far = 10000.f});
 
 	// swapchain
-	Swapchain swapchain = CreatSwapChain(gfxDevice, frameSync,
+	Swapchain swapchain = CreateSwapChain(gfxDevice, frameSync,
 		{
-			._aspectRatio = 16./9.,
 			._height = 1080,
 			._width = 1920,
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
+
+	appData.swapchain = &swapchain;
+
+	ShowWindow(hwnd, cmdShow);
+
 	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(commandList->Close());
 	//std::string modelPath = "../../../../assets/models/bistro2/bistro2.gltf";
 	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
 	//std::string modelPath = "../../../../assets/models/haunted_house/haunted_house.gltf";
-	Model model = LoadModel(gfxDevice, frameSync, commandList.Get(),
+	Model model = LoadModel(gfxDevice, frameSync, swapchain, commandList.Get(),
 		{
 		._path = modelPath});
 
@@ -165,6 +172,13 @@ int WINAPI wWinMain(
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE });
 
+	// imgui parts
+	Inspector inspector;
+	inspector.CreateInspector(gfxDevice, swapchain, frameSync);
+	bool show_demo_window = true;
+	bool show_another_window = false;
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
 	WaitForGPU(gfxDevice, frameSync);
 
 	auto on_render = [&]()
@@ -174,7 +188,7 @@ int WINAPI wWinMain(
 		DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(), nullptr));
 
 		// 
-		SubmitPasses(commandList, gfxDevice, swapchain, frameSync, 
+		SubmitPasses(commandList, gfxDevice, swapchain, frameSync, inspector,
 			camera, backdropComputePipeline, depthPrePass, rasterPipeline, model);
 		// present the Frame
 		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
@@ -197,6 +211,52 @@ int WINAPI wWinMain(
 		}
 		else
 		{
+			// imgui per frame part
+			{
+				// Start the Dear ImGui frame
+				ImGui_ImplDX12_NewFrame();
+				ImGui_ImplWin32_NewFrame();
+				ImGui::NewFrame();
+
+				if (show_demo_window)
+					ImGui::ShowDemoWindow(&show_demo_window);
+
+				{
+					static float f = 0.0f;
+					static int counter = 0;
+
+					ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+					ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+					ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+					ImGui::Checkbox("Another Window", &show_another_window);
+
+					ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+					ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+					if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+						counter++;
+					ImGui::SameLine();
+					ImGui::Text("counter = %d", counter);
+
+					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / inspector.io->Framerate, inspector.io->Framerate);
+					ImGui::End();
+				}
+
+				// 3. Show another simple window.
+				if (show_another_window)
+				{
+					ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+					ImGui::Text("Hello from another window!");
+					if (ImGui::Button("Close Me"))
+						show_another_window = false;
+					ImGui::End();
+				}
+
+				// Rendering
+				ImGui::Render();
+			}
+
 			LARGE_INTEGER currentFrameTime;
 			QueryPerformanceCounter(&currentFrameTime);
 
@@ -223,17 +283,26 @@ int WINAPI wWinMain(
 			camera._time += deltaTime / 10.;
 		}
 	}
+	WaitForGPU(gfxDevice, frameSync);
+
+	// Cleanup
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 	return 0;
 }
 
 LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam)) 
+	{
+		return true;
+	}
 	AppData* appData = nullptr;
-
 	if (uMsg == WM_CREATE)
 	{
 		CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-		appData = reinterpret_cast<AppData*>(pCreate->lpCreateParams);
+		appData = static_cast<AppData*>(pCreate->lpCreateParams);
 		SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(appData));
 	}
 	else
@@ -277,7 +346,6 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				ClipCursor(NULL);
 			}
-
 			POINT center = { rect.right / 2, rect.bottom / 2 };
 			SetCursorPos(center.x, center.y);
 			lastMouseX = currentMouseX = center.x;
@@ -290,12 +358,71 @@ LRESULT WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		currentMouseX = GET_X_LPARAM(lParam);
 		currentMouseY = GET_Y_LPARAM(lParam);
 		return 0;
-	//case WM_LBUTTONDOWN:
+	case WM_SIZE:
+	{
+		if (appData)
+		{
+			UINT width = LOWORD(lParam);
+			UINT height = HIWORD(lParam);
+
+			// Ignore zero size (minimized)
+			if (width == 0 || height == 0)
+				return 0;
+			if (width == static_cast<UINT>(appData->swapchain->_width) &&
+				height == static_cast<UINT>(appData->swapchain->_height))
+				return 0;
+
+			appData->swapchain->_width = width;
+			appData->swapchain->_height = height;
+
+			// If we're actively resizing, just flag it
+			if (appData->swapchain->_isResizing)
+			{
+				appData->swapchain->_needsResize = true;
+			}
+			else
+			{
+				appData->swapchain->ResizeSwapChain(width, height);
+			}
+		}
+	return 0;
+	}
+	case WM_ENTERSIZEMOVE:
+	{
+		WaitForGPU(*appData->gfxDevice, *appData->frameSync);
+		// User started dragging/resizing
+		if (appData)
+		{
+			appData->swapchain->_isResizing = true;
+		}
+		return 0;
+	}
+
+	case WM_EXITSIZEMOVE:
+	{
+		// User finished dragging/resizing
+		if (appData)
+		{
+			appData->swapchain->_isResizing = false;
+
+			// Now perform the actual resize if needed
+			if (appData->swapchain->_needsResize)
+			{
+				WaitForGPU(*appData->gfxDevice, *appData->frameSync);
+				appData->swapchain->ResizeSwapChain(appData->swapchain->_width, appData->swapchain->_height);
+				appData->swapchain->_needsResize = false;
+			}
+		}
+		return 0;
+	}
+	//case WM_GETMINMAXINFO:
+	//{
+	//	// Optional: Set minimum window size
+	//	MINMAXINFO* minMaxInfo = reinterpret_cast<MINMAXINFO*>(lParam);
+	//	minMaxInfo->ptMinTrackSize.x = 320;
+	//	minMaxInfo->ptMinTrackSize.y = 240;
 	//	return 0;
-	//case WM_RBUTTONDOWN:
-	//	return 0;
-	//case WM_MOUSEWHEEL:
-	//	return 0;
+	//}
 	default:
 		return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 	}
