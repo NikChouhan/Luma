@@ -34,13 +34,13 @@ struct ConstBuffer
     SM::Vector3 _dirLightDir;
 
     float _dirLightIntensity;
-    SM::Vector3 _dirLightColor;
+    float _dirLightColor[3];
 
     float _pointLightIntensity;
     SM::Vector3 _cameraPos;
 
     float _pointLightRadius;
-    SM::Vector3 _pointLightColor;
+    float _pointLightColor[3];
 };
 
 struct DepthPPBuffer
@@ -51,15 +51,16 @@ struct DepthPPBuffer
 
 struct ShaderEffects
 {
-    u16 _resolution[2];
+    u32 _resolution[2];
     float _time;
     float _cameraYaw;
 
     float _cameraPitch;
-    SM::Vector3 _cameraPos;
-
     u32 _uavIndex;
-    SM::Vector3 _padding;
+    u32 _padding1;
+    u32 _padding2;
+
+    alignas(16) SM::Vector3 _cameraPos;
 };
 
 struct Vertex

@@ -211,7 +211,7 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
     cgltf_material* material = primitive->material;
     if (!model._materialLookup.contains(material)) // if the hash table doesn't have the material hash
     {
-        Material mat;
+        Material mat = {};
 
         HRESULT hr = E_FAIL;
 
@@ -471,7 +471,6 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
     // common heap for all textures
     {
 		// common heap
-    	// heap descriptor count - 2 normal(1 rtv, 1srv), 2 RT target(1 uav for writing, 1 srv for reading), 1 tlas srv
 
         D3D12_DESCRIPTOR_HEAP_DESC srvTextureHeap{};
         srvTextureHeap.NumDescriptors = MAX_TEXTURES;
@@ -503,18 +502,17 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.RaytracingAccelerationStructure.Location = model._topLevelAccelerationStructure->GetGPUVirtualAddress();
             gfxDevice._device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
+            //heapHandle.Offset(descriptorSize);
         }
-        // compute shader bg effects
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        //// compute shader bg effects
+        //{
+        //    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+        //    uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;
+        //    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; 
 
-            gfxDevice._device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
-                nullptr, &uavDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
-        }
+        //    gfxDevice._device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
+        //        nullptr, &uavDesc, heapHandle);
+        //}
     }
 }
 

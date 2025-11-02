@@ -1,4 +1,4 @@
-// barebones setup
+//// barebones setup
 //cbuffer SceneData : register(b0)
 //{
 //    float2 resolution;
@@ -25,7 +25,7 @@
 //    uv.y *= resolution.y / resolution.x;
 //    
 //
-//    OutputTexture[DTid.xy] = float4(v * 0.01, 1.0);
+//    OutputTexture[DTid.xy] = float4(uv * 0.01, uv.x, 1.0);
 //}
 
 // Galaxy shader
@@ -34,18 +34,24 @@
 
 cbuffer SceneData : register(b0)
 {
+    // 16 bytes
     float2 resolution;
     float time;
     float cameraYaw;
 
+    // 16 bytes
     float cameraPitch;
-    float3 cameraPos;
-
     uint uavIndex;
-    float3 padding;
+    float padding2;
+    float padding3;
+
+    // 16 bytes
+    float3 cameraPos;
+    float padding4;
 };
 
 #define SCREEN_EFFECT 0
+SamplerState LinearSampler : register(s0);
 
 // random/hash function              
 float hash(float n)
@@ -137,7 +143,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     col += 0.3 * float3(0.8, 0.9, 1.2) * pow(sundot, 8.0);
 
     // stars
-    float3 stars = 85.5 * float3(pow(fbmslow(rd.xyz * 312.0), 7.0), pow(fbmslow(rd.xyz * 312.0), 7.0), pow(fbmslow(rd.xyz * 312.0), 7.0)) * 
+    float3 stars = 85.5 * float3(pow(fbmslow(rd.xyz * 312.0), 7.0), pow(fbmslow(rd.xyz * 312.0), 7.0), pow(fbmslow(rd.xyz * 312.0), 7.0)) *
         float3(pow(fbmslow(rd.zxy * 440.3), 8.0), pow(fbmslow(rd.zxy * 440.3), 8.0), pow(fbmslow(rd.zxy * 440.3), 8.0));
 
     // moving background fog
@@ -244,5 +250,6 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     float2 xy2 = fragCoord.xy / resolution.xy;
     col *= float3(.5, .5, .5) + 0.25 * pow(100.0 * xy2.x * xy2.y * (1.0 - xy2.x) * (1.0 - xy2.y), .5);
 
-    OutputTexture[DTid.xy] = float4(col, 1.0);
+    OutputTexture[DTid.xy] = float4(col * 10.f, 1.0);
+    //OutputTexture[DTid.xy] = float4(1., 1., 0., 1.);
 }

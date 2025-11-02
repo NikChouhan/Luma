@@ -38,7 +38,7 @@ struct Swapchain
     u16 _height{};
     u16 _width{};
 
-    void ResizeSwapChain(u16 width, u16 height);
+    void ResizeSwapChain(u16 width, u16 height, Model* model);
 };
 struct SwapchainDesc
 {
@@ -54,3 +54,5 @@ void DestroySwapChain(Swapchain& swapchain);
 void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
     Swapchain& swapchain, FrameSync& frameSync, Inspector& inspector, Camera& camera, Pipeline& backdropComputePipeline,
     Pipeline& depthPassPipeline, Pipeline& rasterPipeline, Model& model);
+
+void SetupLightSettingsHandler();

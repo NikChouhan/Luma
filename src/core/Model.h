@@ -15,6 +15,16 @@ struct Buffer;
 using namespace DirectX;
 namespace SM = DirectX::SimpleMath;
 
+struct LightSettings
+{
+    float pointIntensity = 70.0f;
+    float pointColor[3] = { 0.8f, 0.6f, 0.5f };
+    float pointRadius = 10.0f;
+    float dirIntensity = 2.0f;
+    float dirColor[3] = { 1.0f, 0.85f, 0.6f };
+    SM::Vector3 direction = { -1.0f, -2.0f, 0.0f };
+};
+
 struct ModelDesc
 {
     std::string _path;

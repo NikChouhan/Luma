@@ -21,13 +21,13 @@ FrameSync CreateFrameSyncResources(GfxDevice& gfxDevice)
 void WaitForGPU(GfxDevice& gfxDevice, FrameSync& frameSync)
 {
     /* commandQueue->Signal processes the GPU side command to set the fence to the fence value at the particular index
-     * then fence->SetEventOnCompletion sets the event the same (set the fence value to frame index)
+     * then fence->SetEventOnCompletion sets the event the same (set the fence value at frame index)
      * but on the CPU. The next command (WaitForSingleObjectEx) waits for the fence event CPU side to complete in the GPU side.
      * We basically linked the GPU and the CPU side with an event and a fence. Then increase the fence value for the next frame
     */
 
     /* This is more imp info:
-    * what Singal command does is it pushes the value of the fenceValue (for the particular frame index) at the end of the 
+    * what Signal command does is it pushes the value of the fenceValue (for the particular frame index) at the end of the 
     * command queue. This ensures that all the commands submitted prior execute and then the value of the fence is set to
     * the submitted fence value
     */
@@ -66,4 +66,3 @@ void MoveToNextFrame(GfxDevice& gfxDevice, Swapchain& swapchain, FrameSync& fram
     // set the fence value for the next frame
     frameSync._fenceValues[frameSync._frameIndex] = currentFenceValue + 1;
 }
-

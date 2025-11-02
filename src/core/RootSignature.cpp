@@ -106,9 +106,24 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
         rootParameters[0].Constants.ShaderRegister = 0;
         rootParameters[0].Constants.Num32BitValues = sizeof(ShaderEffects) / 4;
 
+        D3D12_STATIC_SAMPLER_DESC samplers[1] = {};
+        samplers[0].Filter = D3D12_FILTER_ANISOTROPIC;
+        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].MipLODBias = 0;
+        samplers[0].MaxAnisotropy = 16;
+        samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+        samplers[0].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        samplers[0].MinLOD = 0.0f;
+        samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+        samplers[0].ShaderRegister = 0;
+        samplers[0].RegisterSpace = 0;
+        samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters,
-            0, nullptr,
+            1, samplers,
             D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
         ComPtr<ID3DBlob> signature;

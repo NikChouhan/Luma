@@ -1,5 +1,7 @@
 ﻿#include "Swapchain.h"
 
+#include <imgui_internal.h>
+
 #include "Buffer.h"
 #include "FrameSync.h"
 #include "Model.h"
@@ -11,22 +13,66 @@
 
 #define IF_DEPTH 1
 
+static LightSettings g_lightSettings;
 
-void Swapchain::ResizeSwapChain(u16 width, u16 height)
+void SetupLightSettingsHandler()
 {
-    // 1. Wait for GPU to finish all work
+    ImGuiSettingsHandler ini_handler;
+    ini_handler.TypeName = "LightSettings";
+    ini_handler.TypeHash = ImHashStr("LightSettings");
+
+    ini_handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) { return (void*)1; };
+    ini_handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
+        float x, y, z;
+        if (sscanf(line, "pointIntensity=%f", &x) == 1)
+            g_lightSettings.pointIntensity = x;
+        else if (sscanf(line, "pointColor=%f,%f,%f", &x, &y, &z) == 3) {
+            g_lightSettings.pointColor[0] = x;
+            g_lightSettings.pointColor[1] = y;
+            g_lightSettings.pointColor[2] = z;
+        }
+        else if (sscanf(line, "pointRadius=%f", &x) == 1)
+            g_lightSettings.pointRadius = x;
+        else if (sscanf(line, "dirIntensity=%f", &x) == 1)
+            g_lightSettings.dirIntensity = x;
+        else if (sscanf(line, "dirColor=%f,%f,%f", &x, &y, &z) == 3) {
+            g_lightSettings.dirColor[0] = x;
+            g_lightSettings.dirColor[1] = y;
+            g_lightSettings.dirColor[2] = z;
+        }
+        else if (sscanf(line, "direction=%f,%f,%f", &x, &y, &z) == 3)
+            g_lightSettings.direction = SM::Vector3(x, y, z);
+        };
+
+    ini_handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf) {
+        buf->appendf("[%s][Settings]\n", handler->TypeName);
+        buf->appendf("pointIntensity=%.3f\n", g_lightSettings.pointIntensity);
+        buf->appendf("pointColor=%.3f,%.3f,%.3f\n",
+            g_lightSettings.pointColor[0], g_lightSettings.pointColor[1], g_lightSettings.pointColor[2]);
+        buf->appendf("pointRadius=%.3f\n", g_lightSettings.pointRadius);
+        buf->appendf("dirIntensity=%.3f\n", g_lightSettings.dirIntensity);
+        buf->appendf("dirColor=%.3f,%.3f,%.3f\n",
+            g_lightSettings.dirColor[0], g_lightSettings.dirColor[1], g_lightSettings.dirColor[2]);
+        buf->appendf("direction=%.3f,%.3f,%.3f\n",
+            g_lightSettings.direction.x, g_lightSettings.direction.y, g_lightSettings.direction.z);
+        buf->append("\n");
+        };
+
+    ImGui::GetCurrentContext()->SettingsHandlers.push_back(ini_handler);
+}
+
+
+void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
+{
     WaitForGPU(*_gfxDevice, *_frameSync);
 
-    // 2. Release all references to swap chain buffers
     for (u32 i = 0; i < frameCount; i++)
     {
-        _renderTargets[i].Reset(); // Release the ComPtr references
+        _renderTargets[i].Reset();
     }
 
-    // 3. Release depth stencil
     _depthStencil.Reset();
 
-    // 4. Resize the swap chain buffers
     DXGI_SWAP_CHAIN_DESC1 desc;
     _swapchain->GetDesc1(&desc);
 
@@ -47,7 +93,6 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height)
     _scissorRect.right = static_cast<LONG>(width);
     _scissorRect.bottom = static_cast<LONG>(height);
 
-    // 6. Recreate render target views
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(_rtvHeap->GetCPUDescriptorHandleForHeapStart());
     for (u32 i = 0; i < frameCount; i++)
     {
@@ -56,7 +101,6 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height)
         rtvHandle.Offset(1, _rtvDescriptorSize);
     }
 
-    // 7. Recreate depth stencil buffer
     D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
     depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
     depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
@@ -116,6 +160,27 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height)
                 ._textureType = TextureResourceType::UAV })._resource;
         };
     ResizeSizeDependentResources();
+
+    // reset the compute shader uav index and view(s)
+    const u32 descriptorSize = _gfxDevice->_device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(
+        model->_commonHeap->GetCPUDescriptorHandleForHeapStart());
+
+    u32 uavIndex = model->_modelTextures.size() + 1;
+
+    heapHandle.Offset(uavIndex, descriptorSize);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = _uavBgShaderEffects->GetDesc().Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    _gfxDevice->_device->CreateUnorderedAccessView(
+        _uavBgShaderEffects.Get(),
+        nullptr,
+        &uavDesc,
+        heapHandle);
 }
 
 Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc)
@@ -256,7 +321,6 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
 
         DX_ASSERT(swapchain._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource"));
     }
-
     return swapchain;
 }
 
@@ -277,6 +341,10 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         frameSync._frameIndex, swapchain._rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
 
+    SM::Vector3 direction = g_lightSettings.direction;
+    direction.Normalize();
+
+
     // compute pass for space bg shader
     {
         commandList->SetPipelineState(backdropComputePipeline._pipelineState.Get());
@@ -291,13 +359,15 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         };
         commandList->ResourceBarrier(1, &rBarriers[0]);
 
-        ShaderEffects pushConstants{
-        ._resolution = {swapchain._width, swapchain._height},
-        ._time = camera._time,
-        ._cameraYaw = camera._yaw,
-        ._cameraPitch = camera._pitch,
-        ._cameraPos = camera._pos,
-        ._uavIndex = u32(model._modelTextures.size() + 1) };
+        ShaderEffects pushConstants{};
+        pushConstants._resolution[0] = swapchain._width;
+        pushConstants._resolution[1] = swapchain._height;
+
+        pushConstants._time = camera._time;
+        pushConstants._cameraYaw = camera._yaw;
+        pushConstants._cameraPitch = camera._pitch;
+        pushConstants._cameraPos = camera._pos;
+        pushConstants._uavIndex = u32(model._modelTextures.size() + 1);
 
         commandList->SetComputeRoot32BitConstants(0, sizeof(ShaderEffects) / 4, &pushConstants, 0);
         u16 dispatchX = (swapchain._width + 7) / 8;
@@ -392,18 +462,22 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
             
             pushConstants._accelerationStructureIndex = model._modelTextures.size();
             //SM::Vector3 dirLightDir = SM::Vector3(-0.59628606, 6.0584383, -0.014198627) - SM::Vector3(-0.40488148, 13.129597, -0.81999177);
-            SM::Vector3 dirLightDir = SM::Vector3(-1., -2., 0.);
-            dirLightDir.Normalize();
-            pushConstants._dirLightDir = dirLightDir;
 
-            pushConstants._dirLightIntensity = 2;
-            pushConstants._dirLightColor = SM::Vector3(1.0, 0.85, 0.6);
+            pushConstants._dirLightDir = direction;
 
-            pushConstants._pointLightIntensity = 70;
-            pushConstants._cameraPos = camera._pos;
+            pushConstants._dirLightIntensity = g_lightSettings.dirIntensity;
+            pushConstants._dirLightColor[0] = g_lightSettings.dirColor[0];
+            pushConstants._dirLightColor[1] = g_lightSettings.dirColor[1];
+            pushConstants._dirLightColor[2] = g_lightSettings.dirColor[2];
 
-            pushConstants._pointLightRadius = 10;
-            pushConstants._pointLightColor = SM::Vector3(.8, .6, 0.5);
+            pushConstants._pointLightIntensity = g_lightSettings.pointIntensity;
+        	pushConstants._cameraPos = camera._pos;
+
+            pushConstants._pointLightRadius = g_lightSettings.pointRadius;
+            pushConstants._pointLightColor[0] = g_lightSettings.pointColor[0];
+            pushConstants._pointLightColor[1] = g_lightSettings.pointColor[1];
+            pushConstants._pointLightColor[2] = g_lightSettings.pointColor[2];
+
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
 
 			commandList->DrawIndexedInstanced(mesh._indexCount,
@@ -412,6 +486,29 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
     }
     // imgui pass
     {
+        ImGui::Begin("Light Settings");
+
+        if (ImGui::CollapsingHeader("Point Light"))
+        {
+            static bool pointLightEnabled = true;
+            ImGui::Checkbox("Enable##Point", &pointLightEnabled);
+            ImGui::SliderFloat("Intensity##Point", &g_lightSettings.pointIntensity, 0.0f, 200.0f);
+            ImGui::ColorEdit3("Color##Point", g_lightSettings.pointColor);
+            ImGui::SliderFloat("Radius", &g_lightSettings.pointRadius, 0.1f, 100.0f);
+        }
+
+        if (ImGui::CollapsingHeader("Directional Light"))
+        {
+            static bool dirLightEnabled = true;
+            ImGui::Checkbox("Enable##Dir", &dirLightEnabled);
+            ImGui::SliderFloat("Intensity##Dir", &g_lightSettings.dirIntensity, 0.0f, 10.0f);
+            ImGui::ColorEdit3("Color##Dir", g_lightSettings.dirColor);
+            ImGui::SliderFloat3("Direction", &g_lightSettings.direction.x, -1.0f, 1.0f);
+        }
+
+        ImGui::End();
+        ImGui::Render();
+
         commandList->OMSetRenderTargets(1, &rtvHandle, 
             FALSE, &dsvHandle);
         ID3D12DescriptorHeap* ppHeaps = { inspector._imguiHeap.Get() };
