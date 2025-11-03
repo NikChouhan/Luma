@@ -51,7 +51,7 @@ struct DepthPPBuffer
 
 struct ShaderEffects
 {
-    u32 _resolution[2];
+    float _resolution[2];
     float _time;
     float _cameraYaw;
 

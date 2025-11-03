@@ -360,8 +360,8 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->ResourceBarrier(1, &rBarriers[0]);
 
         ShaderEffects pushConstants{};
-        pushConstants._resolution[0] = swapchain._width;
-        pushConstants._resolution[1] = swapchain._height;
+        pushConstants._resolution[0] = (float)swapchain._width;
+        pushConstants._resolution[1] = (float)swapchain._height;
 
         pushConstants._time = camera._time;
         pushConstants._cameraYaw = camera._yaw;

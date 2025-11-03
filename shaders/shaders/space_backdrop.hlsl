@@ -42,12 +42,12 @@ cbuffer SceneData : register(b0)
     // 16 bytes
     float cameraPitch;
     uint uavIndex;
+    float padding1;
     float padding2;
-    float padding3;
 
     // 16 bytes
     float3 cameraPos;
-    float padding4;
+    float padding3;
 };
 
 #define SCREEN_EFFECT 0
@@ -250,6 +250,6 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     float2 xy2 = fragCoord.xy / resolution.xy;
     col *= float3(.5, .5, .5) + 0.25 * pow(100.0 * xy2.x * xy2.y * (1.0 - xy2.x) * (1.0 - xy2.y), .5);
 
-    OutputTexture[DTid.xy] = float4(col * 10.f, 1.0);
+    OutputTexture[DTid.xy] = float4(col, 1.0);
     //OutputTexture[DTid.xy] = float4(1., 1., 0., 1.);
 }
