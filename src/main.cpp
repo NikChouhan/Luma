@@ -86,8 +86,8 @@ int WINAPI wWinMain(
 	// swapchain
 	Swapchain swapchain = CreateSwapChain(gfxDevice, frameSync,
 		{
-			._height = 1080,
-			._width = 1920,
+			._height = 720,
+			._width = 1280,
 			._vsyncEnable = true,
 			._hwnd = hwnd
 		});
@@ -96,9 +96,9 @@ int WINAPI wWinMain(
 
 	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(commandList->Close());
-	//std::string modelPath = "../../../../assets/models/bistro2/bistro2.gltf";
+	//std::string modelPath = "../../../../assets/models/bistro3/scene.gltf";
 	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
-	//std::string modelPath = "../../../../assets/models/haunted_house/haunted_house.gltf";
+	//std::string modelPath = "../../../../assets/models/main_sponza/NewSponza_Main_glTF_003.gltf";
 	Model model = LoadModel(gfxDevice, frameSync, swapchain, commandList.Get(),
 		{
 		._path = modelPath });
@@ -107,7 +107,7 @@ int WINAPI wWinMain(
 	ShowWindow(hwnd, cmdShow);
 
 	DXCRes dxcRes = ShaderCompiler();
-	// compute pass for shader effects
+
 	wchar_t backdropCSPath[] = L"../../../../shaders/shaders/space_backdrop.hlsl";
 	Shader backdropCS = CreateShader(gfxDevice, dxcRes,
 		{
@@ -115,32 +115,13 @@ int WINAPI wWinMain(
 		._pEntryPoint = L"CSMain",
 		._pTarget = L"cs_6_7",
 		._type = Type::COMPUTE });
-	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::COMPUTE,
-		._shaders = {backdropCS},
-		._enableDepthTest = FALSE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE });
-
-	// depth pipeline
 	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
-	Shader depthPrePassVS= CreateShader(gfxDevice, dxcRes,
+	Shader depthPrePassVS = CreateShader(gfxDevice, dxcRes,
 		{
 		._shaderPath = depthPPVertexShaderPath,
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX });
-
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {depthPrePassVS} ,
-		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = TRUE });
-
-	// inline ray tracing pass
 	wchar_t inlineRayTracingVertexShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
 	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, dxcRes,
 		{
@@ -155,6 +136,26 @@ int WINAPI wWinMain(
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL });
+
+	// compute pass for shader effects
+	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
+		{
+		._pipelineType = PipelineType::COMPUTE,
+		._shaders = {backdropCS},
+		._enableDepthTest = FALSE,
+		._enableStencilTest = FALSE,
+		._isDepthPrePass = FALSE });
+
+	// depth pipeline
+	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain,
+		{
+		._pipelineType = PipelineType::GRAPHICS,
+		._shaders = {depthPrePassVS} ,
+		._enableDepthTest = TRUE,
+		._enableStencilTest = FALSE,
+		._isDepthPrePass = TRUE });
+
+	// inline ray tracing pass
 	Pipeline rasterPipeline = CreatePipeline(gfxDevice, swapchain,
 		{
 		._pipelineType = PipelineType::GRAPHICS,
@@ -162,6 +163,63 @@ int WINAPI wWinMain(
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE });
+
+	auto CompileShaders = [&]()
+		{
+			backdropCS = CreateShader(gfxDevice, dxcRes,
+				{
+				._shaderPath = backdropCSPath,
+				._pEntryPoint = L"CSMain",
+				._pTarget = L"cs_6_7",
+				._type = Type::COMPUTE });
+			depthPrePassVS = CreateShader(gfxDevice, dxcRes,
+				{
+				._shaderPath = depthPPVertexShaderPath,
+				._pEntryPoint = L"DepthVS",
+				._pTarget = L"vs_6_7",
+				._type = Type::VERTEX });
+			inlineRayTracingVertexShader = CreateShader(gfxDevice, dxcRes,
+				{
+				._shaderPath = inlineRayTracingVertexShaderPath,
+				._pEntryPoint = L"VSMain",
+				._pTarget = L"vs_6_7",
+				._type = Type::VERTEX });
+			inlineRayTracingPixelShader = CreateShader(gfxDevice, dxcRes,
+				{
+				._shaderPath = inlineRayTracingPixelShaderPath,
+				._pEntryPoint = L"PSMain",
+				._pTarget = L"ps_6_7",
+				._type = Type::PIXEL });
+		};
+
+	auto RecreatePipelines = [&]()
+		{
+			backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
+				{
+				._pipelineType = PipelineType::COMPUTE,
+				._shaders = {backdropCS},
+				._enableDepthTest = FALSE,
+				._enableStencilTest = FALSE,
+				._isDepthPrePass = FALSE });
+
+			// depth pipeline
+			depthPrePass = CreatePipeline(gfxDevice, swapchain,
+				{
+				._pipelineType = PipelineType::GRAPHICS,
+				._shaders = {depthPrePassVS} ,
+				._enableDepthTest = TRUE,
+				._enableStencilTest = FALSE,
+				._isDepthPrePass = TRUE });
+
+			// inline ray tracing pass
+			rasterPipeline = CreatePipeline(gfxDevice, swapchain,
+				{
+				._pipelineType = PipelineType::GRAPHICS,
+				._shaders = {inlineRayTracingVertexShader, inlineRayTracingPixelShader},
+				._enableDepthTest = TRUE,
+				._enableStencilTest = FALSE,
+				._isDepthPrePass = FALSE });
+		};
 
 	// imgui parts
 	Inspector inspector;
@@ -217,6 +275,16 @@ int WINAPI wWinMain(
 				{
 					ImGui::Begin("Frame stats!");
 					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / inspector.io->Framerate, inspector.io->Framerate);
+					ImGui::End();
+				}
+				{
+					ImGui::Begin("Compile shaders");
+					if (ImGui::Button("Compile!"))
+					{
+						WaitForGPU(gfxDevice, frameSync);
+						CompileShaders();
+						RecreatePipelines();
+					}
 					ImGui::End();
 				}
 			}
