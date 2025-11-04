@@ -49,9 +49,9 @@ PSInput VSMain(VSInput input)
 {
     PSInput result;
     result._position = mul(float4(input._position, 1.0f), constBuffer._worldViewProjMatrix);
-    result._normal = mul(constBuffer._worldMatrix, float4(input._normal, 0.0f)).xyz;
-    result._uv = input._uv;
-    result._worldPos = mul(float4(input._position, 1.f), constBuffer._worldMatrix).xyz;
+    result._normal = input._normal;
+	result._uv = input._uv;
+    result._worldPos = (float4(input._position, 1.f)).xyz;
     return result;
 }
 
@@ -148,11 +148,17 @@ float4 PSMain(PSInput input) : SV_TARGET
     Texture2D metallicRoughnessTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._metallicRoughNessIndex)];
     Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._emissiveIndex)];
 
-    float4 albedoColor = albedoTex.Sample(samplerDiffuse, input._uv);
-    float2 metallicRoughness = metallicRoughnessTex.Sample(samplerDiffuse, input._uv).bg;
+    float2 uv = input._uv;
+	//uv.x = 1.0 - uv.x;
+	//uv.y = 1.0 - uv.y;
+	//uv = uv.yx;
+
+
+    float4 albedoColor = albedoTex.Sample(samplerDiffuse, uv);
+    float2 metallicRoughness = metallicRoughnessTex.Sample(samplerDiffuse, uv).rg;
     float metallic = metallicRoughness.x;
     float roughness = metallicRoughness.y;
-    float3 emissive = emissiveTex.Sample(samplerDiffuse, input._uv).rgb;
+    float3 emissive = emissiveTex.Sample(samplerDiffuse, uv).rgb;
 
     float3 N = normalize(input._normal);
     float3 V = normalize(constBuffer._cameraPos - input._worldPos);
@@ -164,7 +170,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // the looks of directional light are still messed up
     {
         float3 L = -(constBuffer._dirLightDir);
-        float shadow = TraceShadowRay(accelStruct, surfaceOffset, L, 10000.0, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES);
+        float shadow = TraceShadowRay(accelStruct, surfaceOffset, L, 10000.0, RAY_FLAG_CULL_BACK_FACING_TRIANGLES);
         //float shadow = 1.f;
         if (shadow > 0.0)
         {
@@ -176,7 +182,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      // point light attached to cam
     {
         float3 lightPos = constBuffer._cameraPos;
-        float3 L = lightPos - input._worldPos;
+        float3 L = lightPos -  mul(input._worldPos, constBuffer._worldMatrix).xyz;
         float distance = length(L);
         L = normalize(L);
 
@@ -196,19 +202,14 @@ float4 PSMain(PSInput input) : SV_TARGET
         }
     }
 
-    float3 ambient = float3(0.03, 0.03, 0.03) * albedoColor.rgb * (1.0 - metallic * 0.5);
+    float3 ambient = float3(0.3, 0.3, 0.3) * albedoColor.rgb * (1.0 - metallic * 0.5);
 
     float3 finalColor = ambient + Lo + emissive;
+
+    //finalColor = pow(finalColor.rgb, 1 / 2.2);
 
     // Tone mapping (simple Reinhard)
     finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));
 
-    // Gamma correction
-    finalColor = pow(finalColor, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
-
-    //float3 L = normalize(-constBuffer._dirLightDir);
-    //float NdotL = max(dot(N, L), 0.0);
-    //return float4(NdotL, NdotL, NdotL, 1.0);
-
-    return float4(finalColor, albedoColor.a);
+    return float4(finalColor, albedoColor.a);   
 }

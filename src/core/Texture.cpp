@@ -3,6 +3,8 @@
 
 #include <D3D12MemAlloc.h>
 
+#include "Model.h"
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -131,7 +133,11 @@ Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc de
 
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.MipLevels = 1;
-		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		if (desc._type == TextureType::ALBEDO)
+		{
+			textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		}
+		else textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		textureDesc.Width = desc._texWidth;
 		textureDesc.Height = desc._texHeight;
 		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;

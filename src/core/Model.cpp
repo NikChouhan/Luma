@@ -39,7 +39,8 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
             ._texHeight = u32(height),
             ._texPixelSize = u32(channels),
             ._pContents = imgData,
-            ._textureType = TextureResourceType::SAMPLE
+            ._textureType = TextureResourceType::SAMPLE,
+            ._type = type
             });
 
         stbi_image_free(imgData);

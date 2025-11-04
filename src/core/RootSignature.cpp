@@ -27,12 +27,13 @@ RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
         rootParameters[0].Constants.ShaderRegister = 0;
         rootParameters[0].Constants.Num32BitValues = sizeof(ConstBuffer) / 4;
 
+        D3D12_TEXTURE_ADDRESS_MODE mode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 
         D3D12_STATIC_SAMPLER_DESC samplers[2] = {};
         samplers[0].Filter = D3D12_FILTER_ANISOTROPIC;
-        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        samplers[0].AddressU = mode;
+        samplers[0].AddressV = mode;
+        samplers[0].AddressW = mode;
         samplers[0].MipLODBias = 0;
         samplers[0].MaxAnisotropy = 16;
         samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;

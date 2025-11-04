@@ -1,6 +1,7 @@
 #pragma once
 #include "GfxDevice.h"
 
+enum class TextureType;
 struct GfxDevice;
 
 enum class TextureResourceType : u8
@@ -20,6 +21,7 @@ struct TextureDesc
 	u32 _texPixelSize = 4;
 	unsigned char* _pContents = nullptr;
 	TextureResourceType _textureType{};
+	TextureType _type;
 };
 
 Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc desc);
