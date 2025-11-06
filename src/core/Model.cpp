@@ -437,7 +437,12 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
         }
         ComPtr<ID3D12Resource> instanceDescs;
         D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-        instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
+
+        XMMATRIX matrix = model._meshes[0]._transform._matrix;
+        XMFLOAT3X4 transform3x4;
+        XMStoreFloat3x4(&transform3x4, matrix);
+        memcpy(instanceDesc.Transform, &transform3x4, sizeof(transform3x4));
+
         instanceDesc.InstanceMask = 1;
         instanceDesc.AccelerationStructure = model._bottomLevelAccelerationStructure->GetGPUVirtualAddress();
         AllocateUploadBuffer(gfxDevice._device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");

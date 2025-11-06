@@ -38,7 +38,6 @@ struct PerDraw
 
     float _pointLightRadius;
     float3 _pointLightColor;
-
 };
 
 ConstantBuffer<PerDraw> constBuffer : register(b0);
@@ -49,9 +48,9 @@ PSInput VSMain(VSInput input)
 {
     PSInput result;
     result._position = mul(float4(input._position, 1.0f), constBuffer._worldViewProjMatrix);
-    result._normal = input._normal;
-	result._uv = input._uv;
-    result._worldPos = (float4(input._position, 1.f)).xyz;
+    result._normal =  mul(input._normal, (float3x3)constBuffer._worldMatrix);
+    result._uv = input._uv;
+    result._worldPos = (mul(float4(input._position, 1.), constBuffer._worldMatrix));
     return result;
 }
 
@@ -125,9 +124,8 @@ float3 CalculatePBR(float3 N, float3 V, float3 L, float3 lightColor, float3 albe
 
 float TraceShadowRay(RaytracingAccelerationStructure accelStruct, float3 origin, float3 direction, float maxDist, RAY_FLAG flags)
 {
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
-        RAY_FLAG_CULL_NON_OPAQUE > query;
-    flags |= RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_CULL_NON_OPAQUE;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
+    flags |= RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
 
     RayDesc ray;
     ray.Origin = origin;
@@ -162,16 +160,20 @@ float4 PSMain(PSInput input) : SV_TARGET
 
     float3 N = normalize(input._normal);
     float3 V = normalize(constBuffer._cameraPos - input._worldPos);
-    float3 surfaceOffset = input._worldPos + N * 0.01;
+    float3 surfaceOffset = input._worldPos + N * 0.1;
 
     float3 Lo = float3(0.0, 0.0, 0.0);
 
     // Directional Light
     // the looks of directional light are still messed up
     {
-        float3 L = -(constBuffer._dirLightDir);
-        float shadow = TraceShadowRay(accelStruct, surfaceOffset, L, 10000.0, RAY_FLAG_CULL_BACK_FACING_TRIANGLES);
-        //float shadow = 1.f;
+        float3 L = -normalize(constBuffer._dirLightDir);
+        float NdotL = max(dot(N, L), 0.0);
+        float bias = max(0.05 * (1.0 - NdotL), 0.01);
+        float3 shadowOrigin = input._worldPos + N * bias;
+
+        float shadow = TraceShadowRay(accelStruct, shadowOrigin, L, 10000.0, RAY_FLAG_NONE);
+
         if (shadow > 0.0)
         {
             float3 radiance = constBuffer._dirLightColor * constBuffer._dirLightIntensity;
@@ -182,8 +184,8 @@ float4 PSMain(PSInput input) : SV_TARGET
      // point light attached to cam
     {
         float3 lightPos = constBuffer._cameraPos;
-        float3 L = lightPos -  mul(input._worldPos, constBuffer._worldMatrix).xyz;
-        float distance = length(L);
+        float3 L = lightPos -  (input._worldPos);
+        float distance = length(L); 
         L = normalize(L);
 
         // Attenuation with smooth falloff
@@ -194,7 +196,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         {
             float shadow = TraceShadowRay(accelStruct, surfaceOffset, L, distance - 0.01, RAY_FLAG_NONE);
 
-            if (shadow > 0.0)
+            if (shadow > 0.5)
             {
                 float3 radiance = constBuffer._pointLightColor * constBuffer._pointLightIntensity * attenuation;
                 Lo += CalculatePBR(N, V, L, radiance, albedoColor.rgb, metallic, roughness, 1.0) * shadow;
@@ -211,5 +213,5 @@ float4 PSMain(PSInput input) : SV_TARGET
     // Tone mapping (simple Reinhard)
     finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));
 
-    return float4(finalColor, albedoColor.a);   
+    return float4(finalColor, albedoColor.a);
 }

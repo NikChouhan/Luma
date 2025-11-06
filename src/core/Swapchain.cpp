@@ -503,7 +503,7 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
             ImGui::Checkbox("Enable##Dir", &dirLightEnabled);
             ImGui::SliderFloat("Intensity##Dir", &g_lightSettings.dirIntensity, 0.0f, 50.0f);
             ImGui::ColorEdit3("Color##Dir", g_lightSettings.dirColor);
-            ImGui::SliderFloat3("Direction", &g_lightSettings.direction.x, -100.0f, 100.f);
+            ImGui::SliderFloat3("Direction", &g_lightSettings.direction.x, -20.0f, 20.f);
         }
 
         ImGui::End();
