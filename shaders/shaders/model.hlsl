@@ -203,15 +203,12 @@ float4 PSMain(PSInput input) : SV_TARGET
             }
         }
     }
-
-    float3 ambient = float3(0.3, 0.3, 0.3) * albedoColor.rgb * (1.0 - metallic * 0.5);
+    float amb = .1f;
+    float3 ambient = float3(amb, amb, amb) * albedoColor.rgb * (1.0 - metallic * 0.5);
 
     float3 finalColor = ambient + Lo + emissive;
 
-    //finalColor = pow(finalColor.rgb, 1 / 2.2);
-
     // Tone mapping (simple Reinhard)
     finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));
-
     return float4(finalColor, albedoColor.a);
 }

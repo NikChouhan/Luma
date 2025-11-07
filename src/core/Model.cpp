@@ -24,8 +24,6 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
         unsigned char* imgData = stbi_load(path.c_str(), &width, &height,
             &channels, STBI_rgb_alpha);
 
-        if (type == TextureType::NORMAL) channels = 3;
-        else channels = 4;
 
         if (imgData == nullptr)
         {
@@ -37,7 +35,7 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
             {
             ._texWidth = u32(width),
             ._texHeight = u32(height),
-            ._texPixelSize = u32(channels),
+            ._texPixelSize = u32(4),
             ._pContents = imgData,
             ._textureType = TextureResourceType::SAMPLE,
             ._type = type

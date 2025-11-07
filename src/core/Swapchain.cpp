@@ -262,12 +262,17 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
     // create frame resources
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain._rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
         // create rtv for each frame
         for (u32 i = 0; i< frameCount; i++)
         {
             DX_ASSERT(swapchain._swapchain->GetBuffer(i, IID_PPV_ARGS(&swapchain._renderTargets[i])));
             gfxDevice._device->CreateRenderTargetView(swapchain._renderTargets[i].Get(),
-                nullptr, rtvHandle);
+                &rtvDesc, rtvHandle);
             rtvHandle.Offset(1, swapchain._rtvDescriptorSize);
         }
     }
