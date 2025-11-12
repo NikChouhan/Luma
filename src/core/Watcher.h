@@ -1,4 +1,14 @@
 #pragma once
 #include <string>
 
-bool WatchDirectory(const std::wstring& directory);
+struct Watcher
+{
+	HANDLE _hDir;
+	bool _stopRequested;
+	std::string _dir;
+
+	void StartWatching();
+	bool WatchDirectory();
+};
+
+Watcher CreateWatcher(const LPWSTR& directory);

@@ -30,72 +30,61 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._path = scene._modelPath });
 	scene.dxcRes = ShaderCompiler();
 
-	wchar_t backdropCSPath[] = L"../../../../shaders/shaders/space_backdrop.hlsl";
 	ShaderDesc backdropDesc = {
-		.resourcePtr = &scene.resources,
-		._shaderPath = backdropCSPath,
+		._shaderPath = L"../../../../shaders/shaders/space_backdrop.hlsl",
 		._pEntryPoint = L"CSMain",
 		._pTarget = L"cs_6_7",
 		._type = Type::COMPUTE
 	};
-	Shader backdropCS = CreateShader(gfxDevice, scene.dxcRes, backdropDesc);
+	Shader backdropCS = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, backdropDesc);
 
-	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
 	ShaderDesc depthPPDesc = {
-		.resourcePtr = &scene.resources,
-		._shaderPath = depthPPVertexShaderPath,
+		._shaderPath = L"../../../../shaders/shaders/depth_pass.hlsl",
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
-	Shader depthPrePassVS = CreateShader(gfxDevice, scene.dxcRes, depthPPDesc);
+	Shader depthPrePassVS = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, depthPPDesc);
 
-	wchar_t inlineRayTracingVertexShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
 	ShaderDesc inlineRTVertexDesc = {
-		.resourcePtr = &scene.resources,
-		._shaderPath = inlineRayTracingVertexShaderPath,
+		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
 		._pEntryPoint = L"VSMain",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
-	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, scene.dxcRes, inlineRTVertexDesc);
+	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, inlineRTVertexDesc);
 
-	wchar_t inlineRayTracingPixelShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
 	ShaderDesc inlineRTPixelDesc = {
-		.resourcePtr = &scene.resources,
-		._shaderPath = inlineRayTracingPixelShaderPath,
+		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL };
-	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, scene.dxcRes, inlineRTPixelDesc);
+	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, inlineRTPixelDesc);
 
 	// compute pass for shader effects
 	PipelineDesc backfropComputePDesc = {
-		.resourcePtr = &scene.resources,
 		._pipelineType = PipelineType::COMPUTE,
-		._shaders = {backdropCS},
+		._shaderIndex = {0},
 		._enableDepthTest = FALSE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
-	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, backfropComputePDesc);
+	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene.resources, backfropComputePDesc);
 
 	// depth pipeline
 	PipelineDesc depthPassDesc = {
-		.resourcePtr = &scene.resources,
 		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {depthPrePassVS} ,
+		._shaderIndex = {1} ,
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = TRUE };
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, depthPassDesc);
+	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene.resources, depthPassDesc);
 
 	// inline ray tracing pass
 	PipelineDesc rtPipelineDesc = {
-		.resourcePtr = &scene.resources,
 		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {inlineRayTracingVertexShader, inlineRayTracingPixelShader},
+		._shaderIndex = {2,3},
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
-	Pipeline rTPipeline= CreatePipeline(gfxDevice, swapchain, rtPipelineDesc);
+	Pipeline rTPipeline= CreatePipeline(gfxDevice, swapchain, &scene.resources, rtPipelineDesc);
 
 	// imgui parts
 	scene.inspector.CreateInspector(gfxDevice, swapchain, frameSync);
@@ -106,6 +95,23 @@ Scene CreateScene(GfxDevice& gfxDevice,
 	return scene;
 }
 
+void Scene::HotReload(GfxDevice& gfxDevice, Swapchain& swapchain, DXCRes& dxcRes, Resources& resources)
+{
+	for (auto& shader : resources.shaders)
+		shader.Release();
+	for (auto& pipeline : resources.pipelines)
+		pipeline.Release();
+
+	for (int i = 0; i < resources.shaders.size(); i++)
+	{
+		CompileShaderInternal(gfxDevice, dxcRes, resources.shaders[i], resources.shaderParams[i]);
+	}
+	for (int i = 0; i < resources.pipelines.size(); i++)
+	{
+		CompilePipelineInternal(gfxDevice, swapchain, resources.pipelines[i], &resources, resources.pipelineParams[i]);
+	}
+}
+
 void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, Camera& camera)
 {
 	WaitForGPU(gfxDevice, frameSync);
@@ -114,23 +120,24 @@ void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapch
 
 	std::wstring watchDirectory = L"../../../../shaders";
 
-	/*if (bool isChange = WatchDirectory(watchDirectory))
-	{
-		printl(Log::LogLevel::Info, "Shader change noticed");
-		HotReloadShaders(gfxDevice, &dxcRes, swapchain);
-	}*/
-
 	// imgui frame init
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+	// imgui frame stats
 	{
-		// Start the Dear ImGui frame
+		ImGui::Begin("Frame stats!");
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / inspector.io->Framerate, inspector.io->Framerate);
+		ImGui::End();
+	}
+	// hot reload
+	{
+		ImGui::Begin("Hot reload");
+		if (ImGui::Button("Compile!"))
 		{
-			ImGui::Begin("Frame stats!");
-			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / inspector.io->Framerate, inspector.io->Framerate);
-			ImGui::End();
+			HotReload(gfxDevice, swapchain, dxcRes, resources);
 		}
+		ImGui::End();
 	}
 	SubmitPasses(_commandList, gfxDevice, swapchain, frameSync, inspector, 
 		camera, resources.pipelines[0],
@@ -139,15 +146,4 @@ void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapch
 	// present the Frame
 	DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 	MoveToNextFrame(gfxDevice, swapchain, frameSync);
-}
-
-void Scene::HotReloadShaders(GfxDevice& gfxDevice, DXCRes* dxcRes, Swapchain& swapchain)
-{
-	for (auto& shader : resources.shaders) shader.Release();
-	for (auto& pipeline : resources.pipelines) pipeline.Release();
-
-	resources.shaders.clear();
-	resources.pipelines.clear();
-
-	
 }

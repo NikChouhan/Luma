@@ -38,6 +38,7 @@ struct Scene
 	Inspector inspector = {};
 	Model model = {};
 
+	static void HotReload(GfxDevice& gfxDevice, Swapchain& swapchain, DXCRes& dxcRes, Resources& resources);
 	void Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, Camera& camera);
 	void HotReloadShaders(GfxDevice& gfxDevice, DXCRes* dxcRes, Swapchain& swapchain);
 };

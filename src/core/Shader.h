@@ -28,22 +28,20 @@ struct Shader
     DxcBuffer _source;
     ComPtr<IDxcResult> _result;
     Type _type{};
-    Resources* resources;
+    u32 _index;
 
     void Release();
 };
 
-typedef std::initializer_list<Shader> Shaders;
-
 struct ShaderDesc
 {
-    Resources* resourcePtr;
-    wchar_t* _shaderPath;
+    const wchar_t* _shaderPath{};
     const wchar_t* _pEntryPoint;
     const wchar_t* _pTarget;
     Type _type{};
 };
 
 DXCRes ShaderCompiler();
-Shader CreateShader(GfxDevice& gfxDevice, DXCRes& dxcRes, const ShaderDesc& shaderDesc);
+void CompileShaderInternal(GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader, const ShaderDesc& shaderDesc);
+Shader CreateShader(GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc);
 void DestroyShader(GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader);

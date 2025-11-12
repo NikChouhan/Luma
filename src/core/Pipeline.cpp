@@ -16,11 +16,8 @@ void Pipeline::Release()
     }
 }
 
-Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc)
+void CompilePipelineInternal(GfxDevice& gfxDevice, Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc)
 {
-    Pipeline pipeline{};
-    pipeline.resources = pipelineDesc.resourcePtr;
-
     if (pipelineDesc._pipelineType == PipelineType::GRAPHICS)
     {
         // define the vertex input layout
@@ -52,8 +49,9 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         psoDesc.InputLayout = { .pInputElementDescs = inputElementDescs, .NumElements = _countof(inputElementDescs) };
         psoDesc.pRootSignature = pipeline._rootSignature.Get();
 
-        for (const Shader& shader : pipelineDesc._shaders)
+        for (const u32 shaderIndex : pipelineDesc._shaderIndex)
         {
+            Shader shader = resources->shaders[shaderIndex];
             if (shader._type == Type::VERTEX)
             {
                 D3D12_SHADER_BYTECODE bytecode{};
@@ -84,8 +82,8 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
              .ForcedSampleCount = 0,
              .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
          };*/
-        //  Will be replacing with proper resources provided directly
-        //  in the CreatePipeline call. For now, this should work
+         //  Will be replacing with proper resources provided directly
+         //  in the CreatePipeline call. For now, this should work
         if (pipelineDesc._isDepthPrePass == TRUE)
         {
             psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
@@ -111,7 +109,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
 
         psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
-        
+
         psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
         psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;
         psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
@@ -124,10 +122,12 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
     if (pipelineDesc._pipelineType == PipelineType::COMPUTE)
     {
         D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
-        assert(pipelineDesc._shaders.begin()->_type == Type::COMPUTE && pipelineDesc._shaders.size() == 1);
+        /*assert(pipelineDesc._shaders.begin()->_type == Type::COMPUTE && pipelineDesc._shaders.size() == 1);*/
 
-        for (auto& shader : pipelineDesc._shaders)
+        for (const u32 shaderIndex : pipelineDesc._shaderIndex)
         {
+            Shader shader = resources->shaders[shaderIndex];
+
             D3D12_SHADER_BYTECODE cShaderBytecode{};
             cShaderBytecode.BytecodeLength = shader._pBlob->GetBufferSize();
             cShaderBytecode.pShaderBytecode = shader._pBlob->GetBufferPointer();
@@ -139,7 +139,15 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         csoDesc.pRootSignature = pipeline._rootSignature.Get();
         DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
     }
-    pipeline.resources->pipelines.push_back(pipeline);
-    pipeline.resources->pipelineParams.push_back(pipelineDesc);
+}
+
+Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, Resources* resources, const PipelineDesc& pipelineDesc)
+{
+    Pipeline pipeline{};
+
+    CompilePipelineInternal(gfxDevice, swapChain, pipeline, resources, pipelineDesc);
+
+    resources->pipelines.push_back(pipeline);
+    resources->pipelineParams.push_back(pipelineDesc);
     return pipeline;
 }

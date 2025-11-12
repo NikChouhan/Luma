@@ -2,9 +2,50 @@
 
 #include <windows.h>
 
-bool WatchDirectory(const std::wstring& directory) {
-    HANDLE hDir = CreateFileW(
-        directory.c_str(),
+#include "Log.h"
+
+void Watcher::StartWatching()
+{
+    
+}
+
+bool Watcher::WatchDirectory()
+{
+    constexpr DWORD bufferSize = 64 * 1024;
+    std::vector<BYTE> buffer(bufferSize);
+    DWORD bytesReturned;
+
+    bool result = false;
+    while (!_stopRequested) 
+    {
+        if(!ReadDirectoryChangesW(
+            _hDir,
+            buffer.data(),
+            bufferSize,
+            TRUE, // Watch subdirectories
+            FILE_NOTIFY_CHANGE_LAST_WRITE |
+            FILE_NOTIFY_CHANGE_FILE_NAME |
+            FILE_NOTIFY_CHANGE_DIR_NAME,
+            &bytesReturned,
+            nullptr,
+            nullptr
+        )) 
+        {
+            return false;
+        }
+        if (bytesReturned == 0) break;
+
+        //ProcessNotifications(buffer.data(), bytesReturned);
+    }
+    CloseHandle(_hDir);
+    return result;  
+}
+
+Watcher CreateWatcher(const LPWSTR& directory)
+{
+    Watcher watcher{};
+    watcher._hDir = CreateFileW(
+        directory,
         FILE_LIST_DIRECTORY,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,
@@ -12,28 +53,11 @@ bool WatchDirectory(const std::wstring& directory) {
         FILE_FLAG_BACKUP_SEMANTICS,
         nullptr
     );
-    bool result = false;
-    if (hDir == INVALID_HANDLE_VALUE) return false;
-
-    char buffer[1024];
-    DWORD bytesReturned;
-
-    while (ReadDirectoryChangesW(
-        hDir,
-        &buffer,
-        sizeof(buffer),
-        TRUE,
-        FILE_NOTIFY_CHANGE_LAST_WRITE,
-        &bytesReturned,
-        nullptr,
-        nullptr
-    )) {
-        FILE_NOTIFY_INFORMATION* event = (FILE_NOTIFY_INFORMATION*)buffer;
-        // Handle the change event
-        if (event->Action == FILE_ACTION_MODIFIED) {
-            result = true;
-        }
+    if (watcher._hDir == INVALID_HANDLE_VALUE)
+    {
+        printl(Luma::Log::LogLevel::Error, "Watcher failed!");
+        abort();
     }
-    CloseHandle(hDir);
-    return result;  
+    watcher._stopRequested = false;
+    return watcher;
 }

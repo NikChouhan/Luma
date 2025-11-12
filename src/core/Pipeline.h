@@ -16,20 +16,21 @@ struct Pipeline
 {
     ComPtr<ID3D12PipelineState> _pipelineState;
     ComPtr<ID3D12RootSignature> _rootSignature;
-    Resources* resources;
 
     void Release();
 };
 
+typedef std::initializer_list<u32> ShaderIndex;
+
 struct PipelineDesc
 {
-    Resources* resourcePtr;
     PipelineType _pipelineType{};
-    Shaders _shaders;
+    std::vector<u32> _shaderIndex{};
     BOOL _enableDepthTest;
     BOOL _enableStencilTest{};
     BOOL _isDepthPrePass = false;
 };
 
-Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc);
+void CompilePipelineInternal(GfxDevice& gfxDevice, Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc);
+Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, Resources* resources, const PipelineDesc& pipelineDesc);
 void DestroyPipeline(GfxDevice& gfxDevice, Pipeline& pipeline);
