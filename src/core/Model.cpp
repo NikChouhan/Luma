@@ -508,7 +508,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             gfxDevice._device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
             //heapHandle.Offset(descriptorSize);
         }
-        //// compute shader bg effects
+        // compute shader bg effects
         //{
         //    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
         //    uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;

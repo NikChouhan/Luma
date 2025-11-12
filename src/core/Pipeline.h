@@ -16,10 +16,14 @@ struct Pipeline
 {
     ComPtr<ID3D12PipelineState> _pipelineState;
     ComPtr<ID3D12RootSignature> _rootSignature;
+    Resources* resources;
+
+    void Release();
 };
 
 struct PipelineDesc
 {
+    Resources* resourcePtr;
     PipelineType _pipelineType{};
     Shaders _shaders;
     BOOL _enableDepthTest;

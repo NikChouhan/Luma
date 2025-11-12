@@ -1,13 +1,25 @@
 #include "Pipeline.h"
 
 #include "Buffer.h"
+#include "Resources.h"
 #include "Swapchain.h"
 
 #include "RootSignature.h"
 
+void Pipeline::Release()
+{
+    if (_pipelineState) {
+        _pipelineState.Reset();
+    }
+    if (_rootSignature) {
+        _rootSignature.Reset();
+    }
+}
+
 Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc pipelineDesc)
 {
     Pipeline pipeline{};
+    pipeline.resources = pipelineDesc.resourcePtr;
 
     if (pipelineDesc._pipelineType == PipelineType::GRAPHICS)
     {
@@ -127,5 +139,7 @@ Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc
         csoDesc.pRootSignature = pipeline._rootSignature.Get();
         DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
     }
+    pipeline.resources->pipelines.push_back(pipeline);
+    pipeline.resources->pipelineParams.push_back(pipelineDesc);
     return pipeline;
 }

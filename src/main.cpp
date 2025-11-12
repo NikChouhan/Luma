@@ -16,15 +16,17 @@
 #include "Model.h"
 #include "RootSignature.h"
 #include "Inspector.h"
+#include "scene.h"
+#include "Timer.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-bool isOpen = true;
-bool keys[256] = {};
-int lastMouseX = 0;
-int lastMouseY = 0;
-int currentMouseX = 0;
-int currentMouseY = 0;
+static bool isOpen = true;
+static bool keys[256] = {};
+static int lastMouseX = 0;
+static int lastMouseY = 0;
+static int currentMouseX = 0;
+static int currentMouseY = 0;
 
 static bool isMouseCaptured = false;
 
@@ -59,9 +61,7 @@ int WINAPI wWinMain(
 	constexpr GfxDeviceDesc gfxDeviceDesc{};
 	GfxDevice gfxDevice = CreateDevice(gfxDeviceDesc);
 	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
-
-	AppData appData{ &gfxDevice, &frameSync };
-
+	AppData appData{.gfxDevice = &gfxDevice, .frameSync = &frameSync };
 
 	HWND hwnd = CreateWindowExW(
 		0, className, L"Luma", WS_OVERLAPPEDWINDOW,
@@ -70,7 +70,6 @@ int WINAPI wWinMain(
 		nullptr,
 		hInstance,
 		&appData);
-
 	if (hwnd == nullptr)
 		return 0;
 
@@ -94,161 +93,16 @@ int WINAPI wWinMain(
 
 	appData.swapchain = &swapchain;
 
-	ComPtr<ID3D12GraphicsCommandList10> commandList = CreateCommandList(gfxDevice);
-	DX_ASSERT(commandList->Close());
-	//std::string modelPath = "../../../../assets/models/bistro3/scene.gltf";
-	std::string modelPath = "../../../../assets/models/sponza2/sponza2.gltf";
-	//std::string modelPath = "../../../../assets/models/main_sponza/NewSponza_Main_glTF_003.gltf";
-	Model model = LoadModel(gfxDevice, frameSync, swapchain, commandList.Get(),
+	Scene scene = CreateScene(gfxDevice,
+		frameSync,
+		swapchain,
+		camera,
 		{
-		._path = modelPath });
-	appData.model = &model;
-
+		._sceneType = SceneType::SPONZA });
+	appData.model = &scene.model;
 	ShowWindow(hwnd, cmdShow);
 
-	DXCRes dxcRes = ShaderCompiler();
-
-	wchar_t backdropCSPath[] = L"../../../../shaders/shaders/space_backdrop.hlsl";
-	Shader backdropCS = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = backdropCSPath,
-		._pEntryPoint = L"CSMain",
-		._pTarget = L"cs_6_7",
-		._type = Type::COMPUTE });
-	wchar_t depthPPVertexShaderPath[] = L"../../../../shaders/shaders/depth_pass.hlsl";
-	Shader depthPrePassVS = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = depthPPVertexShaderPath,
-		._pEntryPoint = L"DepthVS",
-		._pTarget = L"vs_6_7",
-		._type = Type::VERTEX });
-	wchar_t inlineRayTracingVertexShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
-	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = inlineRayTracingVertexShaderPath,
-		._pEntryPoint = L"VSMain",
-		._pTarget = L"vs_6_7",
-		._type = Type::VERTEX });
-	wchar_t inlineRayTracingPixelShaderPath[] = L"../../../../shaders/shaders/model.hlsl";
-	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, dxcRes,
-		{
-		._shaderPath = inlineRayTracingPixelShaderPath,
-		._pEntryPoint = L"PSMain",
-		._pTarget = L"ps_6_7",
-		._type = Type::PIXEL });
-
-	// compute pass for shader effects
-	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::COMPUTE,
-		._shaders = {backdropCS},
-		._enableDepthTest = FALSE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE });
-
-	// depth pipeline
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {depthPrePassVS} ,
-		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = TRUE });
-
-	// inline ray tracing pass
-	Pipeline rasterPipeline = CreatePipeline(gfxDevice, swapchain,
-		{
-		._pipelineType = PipelineType::GRAPHICS,
-		._shaders = {inlineRayTracingVertexShader, inlineRayTracingPixelShader},
-		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE });
-
-	auto CompileShaders = [&]()
-		{
-			backdropCS = CreateShader(gfxDevice, dxcRes,
-				{
-				._shaderPath = backdropCSPath,
-				._pEntryPoint = L"CSMain",
-				._pTarget = L"cs_6_7",
-				._type = Type::COMPUTE });
-			depthPrePassVS = CreateShader(gfxDevice, dxcRes,
-				{
-				._shaderPath = depthPPVertexShaderPath,
-				._pEntryPoint = L"DepthVS",
-				._pTarget = L"vs_6_7",
-				._type = Type::VERTEX });
-			inlineRayTracingVertexShader = CreateShader(gfxDevice, dxcRes,
-				{
-				._shaderPath = inlineRayTracingVertexShaderPath,
-				._pEntryPoint = L"VSMain",
-				._pTarget = L"vs_6_7",
-				._type = Type::VERTEX });
-			inlineRayTracingPixelShader = CreateShader(gfxDevice, dxcRes,
-				{
-				._shaderPath = inlineRayTracingPixelShaderPath,
-				._pEntryPoint = L"PSMain",
-				._pTarget = L"ps_6_7",
-				._type = Type::PIXEL });
-		};
-
-	auto RecreatePipelines = [&]()
-		{
-			backdropComputePipeline = CreatePipeline(gfxDevice, swapchain,
-				{
-				._pipelineType = PipelineType::COMPUTE,
-				._shaders = {backdropCS},
-				._enableDepthTest = FALSE,
-				._enableStencilTest = FALSE,
-				._isDepthPrePass = FALSE });
-
-			// depth pipeline
-			depthPrePass = CreatePipeline(gfxDevice, swapchain,
-				{
-				._pipelineType = PipelineType::GRAPHICS,
-				._shaders = {depthPrePassVS} ,
-				._enableDepthTest = TRUE,
-				._enableStencilTest = FALSE,
-				._isDepthPrePass = TRUE });
-
-			// inline ray tracing pass
-			rasterPipeline = CreatePipeline(gfxDevice, swapchain,
-				{
-				._pipelineType = PipelineType::GRAPHICS,
-				._shaders = {inlineRayTracingVertexShader, inlineRayTracingPixelShader},
-				._enableDepthTest = TRUE,
-				._enableStencilTest = FALSE,
-				._isDepthPrePass = FALSE });
-		};
-
-	// imgui parts
-	Inspector inspector;
-	inspector.CreateInspector(gfxDevice, swapchain, frameSync);
-	bool show_demo_window = false;
-	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-	inspector.io->IniFilename = "imgui.ini";
-
-	WaitForGPU(gfxDevice, frameSync);
-
-	auto on_render = [&]()
-	{
-		WaitForGPU(gfxDevice, frameSync);
-		DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
-		DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(), nullptr));
-
-		SubmitPasses(commandList, gfxDevice, swapchain, frameSync, inspector,
-			camera, backdropComputePipeline, depthPrePass, rasterPipeline, model);
-		// present the Frame
-		DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
-		MoveToNextFrame(gfxDevice, swapchain, frameSync);
-	};
-	LARGE_INTEGER perfFrequency;
-	QueryPerformanceFrequency(&perfFrequency);
-
-	LARGE_INTEGER lastFrameTime;
-	QueryPerformanceCounter(&lastFrameTime);
+	Timer timer = CreateTimer();
 
 	SetupLightSettingsHandler();
 
@@ -263,55 +117,16 @@ int WINAPI wWinMain(
 		}
 		else
 		{
-			// imgui per frame part
-			{
-				// Start the Dear ImGui frame
-				ImGui_ImplDX12_NewFrame();
-				ImGui_ImplWin32_NewFrame();
-				ImGui::NewFrame();
-
-				if (show_demo_window)
-					ImGui::ShowDemoWindow(&show_demo_window);
-				{
-					ImGui::Begin("Frame stats!");
-					ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / inspector.io->Framerate, inspector.io->Framerate);
-					ImGui::End();
-				}
-				{
-					ImGui::Begin("Compile shaders");
-					if (ImGui::Button("Compile!"))
-					{
-						WaitForGPU(gfxDevice, frameSync);
-						CompileShaders();
-						RecreatePipelines();
-					}
-					ImGui::End();
-				}
-			}
-
 			LARGE_INTEGER currentFrameTime;
 			QueryPerformanceCounter(&currentFrameTime);
 
-			f32 deltaTime = static_cast<f32>(currentFrameTime.QuadPart - lastFrameTime.QuadPart) / static_cast<f32>(perfFrequency.QuadPart);
+			f32 deltaTime = static_cast<f32>(currentFrameTime.QuadPart - timer._lastFrameTime.QuadPart) / static_cast<f32>(timer._perfFrequency.QuadPart);
 
-			lastFrameTime = currentFrameTime;
+			timer._lastFrameTime = currentFrameTime;
 
 			HandleCamera(camera, deltaTime);
+			scene.Render(gfxDevice, frameSync, swapchain, camera);
 
-			on_render();
-
-			static f32 timeSinceLastUpdate = 0.f;
-			timeSinceLastUpdate += deltaTime;
-			if (timeSinceLastUpdate >= 1.0f)
-			{
-				wchar_t titleBuffer[64];
-				swprintf_s(titleBuffer, L"Luma frametime: %.3f ms", deltaTime * 1000.0f);
-				SetWindowTextW(hwnd, titleBuffer);
-
-				/*printl(Log::LogLevel::Info, "[Camera] Camera position: x: {}, y: {}, z: {}", 
-				   camera._pos.x, camera._pos.y, camera._pos.z);*/
-				timeSinceLastUpdate = 0.f;
-			}
 			camera._time += deltaTime / 1.;
 		}
 	}

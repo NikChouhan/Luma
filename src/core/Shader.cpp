@@ -1,6 +1,24 @@
 #include "Shader.h"
 #include <string>
 
+#include "Resources.h"
+
+void Shader::Release()
+{
+    if (_pBlobEnc) {
+        _pBlobEnc.Reset();
+    }
+    if (_pBlob) {
+        _pBlob.Reset();
+    }
+    if (_result) {
+        _result.Reset();
+    }
+
+    _source.Ptr = nullptr;
+    _source.Size = 0;
+    _source.Encoding = 0;
+}
 DXCRes ShaderCompiler()
 {
     DXCRes dxcRes;
@@ -144,5 +162,8 @@ Shader CreateShader(GfxDevice& gfxDevice, DXCRes& dxcRes, const ShaderDesc& shad
 //        // You should probably throw an exception or handle the error here
 //        DX_ASSERT(hr);
 //    }
+    shader.resources = shaderDesc.resourcePtr;
+    shader.resources->shaders.push_back(shader);
+    shader.resources->shaderParams.push_back(shaderDesc);
     return shader;
 }

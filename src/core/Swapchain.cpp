@@ -168,7 +168,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
     CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(
         model->_commonHeap->GetCPUDescriptorHandleForHeapStart());
 
-    u32 uavIndex = model->_modelTextures.size() + 1;
+    u32 uavIndex = model->_modelTextures.size() + 1; //(separate the heap from the model)
 
     heapHandle.Offset(uavIndex, descriptorSize);
 

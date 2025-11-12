@@ -4,6 +4,8 @@
 
 #include "GfxDevice.h"
 
+struct Resources;
+
 enum class Type : u32
 {
     VERTEX,
@@ -26,12 +28,16 @@ struct Shader
     DxcBuffer _source;
     ComPtr<IDxcResult> _result;
     Type _type{};
+    Resources* resources;
+
+    void Release();
 };
 
 typedef std::initializer_list<Shader> Shaders;
 
 struct ShaderDesc
 {
+    Resources* resourcePtr;
     wchar_t* _shaderPath;
     const wchar_t* _pEntryPoint;
     const wchar_t* _pTarget;
