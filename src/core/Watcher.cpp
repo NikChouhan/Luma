@@ -3,13 +3,20 @@
 #include <windows.h>
 
 #include "Log.h"
+#include "Resources.h"
+#include "Shader.h"
 
 void Watcher::StartWatching()
 {
     
 }
 
-bool Watcher::WatchDirectory()
+void Watcher::ProcessNotifications(BYTE* data, DWORD dword)
+{
+
+}
+
+bool Watcher::WatchDirectory(LAMBDA(Resources*) resources)
 {
     constexpr DWORD bufferSize = 64 * 1024;
     std::vector<BYTE> buffer(bufferSize);
@@ -35,13 +42,13 @@ bool Watcher::WatchDirectory()
         }
         if (bytesReturned == 0) break;
 
-        //ProcessNotifications(buffer.data(), bytesReturned);
+        ProcessNotifications(buffer.data(), bytesReturned);
     }
     CloseHandle(_hDir);
     return result;  
 }
 
-Watcher CreateWatcher(const LPWSTR& directory)
+Watcher CreateWatcher(const wchar_t* directory)
 {
     Watcher watcher{};
     watcher._hDir = CreateFileW(

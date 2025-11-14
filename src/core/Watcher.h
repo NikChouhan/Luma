@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+#include "Resources.h"
+
 struct Watcher
 {
 	HANDLE _hDir;
@@ -8,7 +10,8 @@ struct Watcher
 	std::string _dir;
 
 	void StartWatching();
-	bool WatchDirectory();
+	void ProcessNotifications(BYTE* data, DWORD dword);
+	bool WatchDirectory(LAMBDA(Resources*) resources);
 };
 
-Watcher CreateWatcher(const LPWSTR& directory);
+Watcher CreateWatcher(const wchar_t* directory);

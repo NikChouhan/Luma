@@ -3,7 +3,7 @@
 #include "Buffer.h"
 #include "Pipeline.h"
 
-RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc)
+RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
 {
 	RootSign rootSign{};
 

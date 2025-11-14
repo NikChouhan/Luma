@@ -1,5 +1,7 @@
 #include "scene.h"
 
+#include <thread>
+
 #include "GfxDevice.h"
 #include "Swapchain.h"
 #include "Pipeline.h"
@@ -36,28 +38,28 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._pTarget = L"cs_6_7",
 		._type = Type::COMPUTE
 	};
-	Shader backdropCS = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, backdropDesc);
+	Shader backdropCS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, backdropDesc);
 
 	ShaderDesc depthPPDesc = {
 		._shaderPath = L"../../../../shaders/shaders/depth_pass.hlsl",
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
-	Shader depthPrePassVS = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, depthPPDesc);
+	Shader depthPrePassVS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, depthPPDesc);
 
 	ShaderDesc inlineRTVertexDesc = {
 		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
 		._pEntryPoint = L"VSMain",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
-	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, inlineRTVertexDesc);
+	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTVertexDesc);
 
 	ShaderDesc inlineRTPixelDesc = {
 		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL };
-	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, &scene.resources, scene.dxcRes, inlineRTPixelDesc);
+	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTPixelDesc);
 
 	// compute pass for shader effects
 	PipelineDesc backfropComputePDesc = {
@@ -66,7 +68,7 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._enableDepthTest = FALSE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
-	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene.resources, backfropComputePDesc);
+	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, backfropComputePDesc);
 
 	// depth pipeline
 	PipelineDesc depthPassDesc = {
@@ -75,7 +77,7 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = TRUE };
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene.resources, depthPassDesc);
+	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene._resources, depthPassDesc);
 
 	// inline ray tracing pass
 	PipelineDesc rtPipelineDesc = {
@@ -84,7 +86,7 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
-	Pipeline rTPipeline= CreatePipeline(gfxDevice, swapchain, &scene.resources, rtPipelineDesc);
+	Pipeline rTPipeline= CreatePipeline(gfxDevice, swapchain, &scene._resources, rtPipelineDesc);
 
 	// imgui parts
 	scene.inspector.CreateInspector(gfxDevice, swapchain, frameSync);
@@ -95,7 +97,7 @@ Scene CreateScene(GfxDevice& gfxDevice,
 	return scene;
 }
 
-void Scene::HotReload(GfxDevice& gfxDevice, Swapchain& swapchain, DXCRes& dxcRes, Resources& resources)
+void Scene::HotReload(const GfxDevice& gfxDevice, const Swapchain& swapchain, DXCRes& dxcRes, Resources& resources)
 {
 	for (auto& shader : resources.shaders)
 		shader.Release();
@@ -135,13 +137,13 @@ void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapch
 		ImGui::Begin("Hot reload");
 		if (ImGui::Button("Compile!"))
 		{
-			HotReload(gfxDevice, swapchain, dxcRes, resources);
+			HotReload(gfxDevice, swapchain, dxcRes, _resources);
 		}
 		ImGui::End();
 	}
 	SubmitPasses(_commandList, gfxDevice, swapchain, frameSync, inspector, 
-		camera, resources.pipelines[0],
-		resources.pipelines[1], resources.pipelines[2], model);
+		camera, _resources.pipelines[0],
+		_resources.pipelines[1], _resources.pipelines[2], model);
 
 	// present the Frame
 	DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));

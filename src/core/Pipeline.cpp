@@ -16,7 +16,7 @@ void Pipeline::Release()
     }
 }
 
-void CompilePipelineInternal(GfxDevice& gfxDevice, Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc)
+void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc)
 {
     if (pipelineDesc._pipelineType == PipelineType::GRAPHICS)
     {

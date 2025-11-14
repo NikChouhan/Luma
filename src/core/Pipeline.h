@@ -31,6 +31,6 @@ struct PipelineDesc
     BOOL _isDepthPrePass = false;
 };
 
-void CompilePipelineInternal(GfxDevice& gfxDevice, Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc);
+void CompilePipelineInternal(const GfxDevice& gfxDevice, const Swapchain& swapChain, Pipeline& pipeline, Resources* resources, const PipelineDesc& pipelineDesc);
 Pipeline CreatePipeline(GfxDevice& gfxDevice, Swapchain& swapChain, Resources* resources, const PipelineDesc& pipelineDesc);
 void DestroyPipeline(GfxDevice& gfxDevice, Pipeline& pipeline);

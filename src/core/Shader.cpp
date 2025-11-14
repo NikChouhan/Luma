@@ -29,7 +29,7 @@ DXCRes ShaderCompiler()
 	return dxcRes;
 }
 
-void CompileShaderInternal(GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader, const ShaderDesc& shaderDesc)
+void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader, const ShaderDesc& shaderDesc)
 {
     if (shaderDesc._type == Type::VERTEX)
         shader._type = Type::VERTEX;

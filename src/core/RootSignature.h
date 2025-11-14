@@ -14,4 +14,4 @@ struct RootSignDesc
     RSType _type;
 };
 
-RootSign CreateRootSignature(GfxDevice& gfxDevice, RootSignDesc desc);
+RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc);
