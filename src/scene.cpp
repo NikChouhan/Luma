@@ -33,7 +33,7 @@ Scene CreateScene(GfxDevice& gfxDevice,
 	scene.dxcRes = ShaderCompiler();
 
 	ShaderDesc backdropDesc = {
-		._shaderPath = L"../../../../shaders/shaders/space_backdrop.hlsl",
+		._shaderPath = L"../../../../shaders/space_backdrop.hlsl",
 		._pEntryPoint = L"CSMain",
 		._pTarget = L"cs_6_7",
 		._type = Type::COMPUTE
@@ -41,21 +41,21 @@ Scene CreateScene(GfxDevice& gfxDevice,
 	Shader backdropCS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, backdropDesc);
 
 	ShaderDesc depthPPDesc = {
-		._shaderPath = L"../../../../shaders/shaders/depth_pass.hlsl",
+		._shaderPath = L"../../../../shaders/depth_pass.hlsl",
 		._pEntryPoint = L"DepthVS",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
 	Shader depthPrePassVS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, depthPPDesc);
 
 	ShaderDesc inlineRTVertexDesc = {
-		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
+		._shaderPath = L"../../../../shaders/model.hlsl",
 		._pEntryPoint = L"VSMain",
 		._pTarget = L"vs_6_7",
 		._type = Type::VERTEX };
 	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTVertexDesc);
 
 	ShaderDesc inlineRTPixelDesc = {
-		._shaderPath = L"../../../../shaders/shaders/model.hlsl",
+		._shaderPath = L"../../../../shaders/model.hlsl",
 		._pEntryPoint = L"PSMain",
 		._pTarget = L"ps_6_7",
 		._type = Type::PIXEL };
@@ -119,8 +119,6 @@ void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapch
 	WaitForGPU(gfxDevice, frameSync);
 	DX_ASSERT(gfxDevice._commandAllocators[frameSync._frameIndex]->Reset());
 	DX_ASSERT(_commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(), nullptr));
-
-	std::wstring watchDirectory = L"../../../../shaders";
 
 	// imgui frame init
 	ImGui_ImplDX12_NewFrame();
