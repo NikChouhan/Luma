@@ -13,16 +13,6 @@ using namespace Microsoft::WRL;
 
 #include <StandardTypes.h>
 
-#define DX_ASSERT(call)                                                                                     \
-    do                                                                                                      \
-    {                                                                                                       \
-        HRESULT result = call;                                                                           \
-        if (result != S_OK)                                                                 \
-        {                                                                                                   \
-            fprintf(stderr, "D3D12 error %d at %s:%d\n", static_cast<int>(result), __FILE__, __LINE__);    \
-			abort();                                                                                        \
-        }                                                                                                   \
-    } while (0)
 
 // function pointer thingy
 #define LAMBDA(...) std::function<void(__VA_ARGS__)> const&
