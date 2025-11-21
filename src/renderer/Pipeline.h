@@ -12,7 +12,7 @@ enum class PipelineType : u8
     COMPUTE
 };
 
-
+typedef std::initializer_list<u32> Shaders;
 struct Pipeline
 {
     ComPtr<ID3D12PipelineState> _pipelineState;
@@ -21,13 +21,12 @@ struct Pipeline
     void Release();
 };
 
-typedef std::initializer_list<u32> ShaderIndex;
 
 struct PipelineDesc
 {
     PipelineType _pipelineType{};
     RootSignDesc::RSType _rootSignType;
-    std::vector<u32> _shaderIndex{};
+    Shaders _shaderIndex;
     BOOL _enableDepthTest;
     BOOL _enableStencilTest{};
     BOOL _isDepthPrePass = false;

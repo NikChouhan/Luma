@@ -36,6 +36,15 @@ struct PipelineIndex
     u8 ImguiPass{};
     u8 RenderPass{};
 };
+struct ShaderIndex
+{
+    u8 bgComputeShader{};
+    u8 depthPPShader{};
+    u8 rtaoShader{};
+
+    u8 renderPassVSShader{};
+    u8 renderPassPSShader{};
+};
 struct LightSettings
 {
     float pointIntensity = 70.0f;
@@ -50,6 +59,8 @@ namespace GlobalStorage
 {
     inline HeapTextureIndex index{};
     inline PipelineIndex pipelineIndex{};
+    inline ShaderIndex shaderIndex{};
+
     inline XMMATRIX _projMatrixInv{};
     inline XMMATRIX _viewMatrixInv{};
     inline LightSettings g_lightSettings;

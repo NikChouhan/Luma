@@ -21,6 +21,8 @@ Scene CreateScene(GfxDevice& gfxDevice,
                   SceneDesc sceneDesc)
 {
 	Scene scene{};
+	static u32 pipelineCount = 0;
+	static u32 shaderCount = 0;
 	scene._commandList = CreateCommandList(gfxDevice);
 	DX_ASSERT(scene._commandList->Close());
 
@@ -32,70 +34,79 @@ Scene CreateScene(GfxDevice& gfxDevice,
 		._path = scene._modelPath });
 	scene.dxcRes = ShaderCompiler();
 
-	ShaderDesc backdropDesc = {
+	// shaders
+	{
+		ShaderDesc backdropDesc = {
 		._shaderPath = L"../../../../shaders/space_backdrop.hlsl",
 		._pEntryPoint = L"CSMain",
 		._pTarget = L"cs_6_7",
 		._type = Type::COMPUTE
-	};
-	Shader backdropCS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, backdropDesc);
+		};
+		Shader backdropCS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, backdropDesc);
+		GlobalStorage::shaderIndex.bgComputeShader = shaderCount;
 
-	ShaderDesc depthPPDesc = {
-		._shaderPath = L"../../../../shaders/depth_pass.hlsl",
-		._pEntryPoint = L"DepthVS",
-		._pTarget = L"vs_6_7",
-		._type = Type::VERTEX };
-	Shader depthPrePassVS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, depthPPDesc);
+		ShaderDesc depthPPDesc = {
+			._shaderPath = L"../../../../shaders/depth_pass.hlsl",
+			._pEntryPoint = L"DepthVS",
+			._pTarget = L"vs_6_7",
+			._type = Type::VERTEX };
+		Shader depthPrePassVS = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, depthPPDesc);
+		GlobalStorage::shaderIndex.depthPPShader = ++shaderCount;
 
-	ShaderDesc inlineRTVertexDesc = {
-		._shaderPath = L"../../../../shaders/model.hlsl",
-		._pEntryPoint = L"VSMain",
-		._pTarget = L"vs_6_7",
-		._type = Type::VERTEX };
-	Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTVertexDesc);
+		ShaderDesc inlineRTVertexDesc = {
+			._shaderPath = L"../../../../shaders/model.hlsl",
+			._pEntryPoint = L"VSMain",
+			._pTarget = L"vs_6_7",
+			._type = Type::VERTEX };
+		Shader inlineRayTracingVertexShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTVertexDesc);
+		GlobalStorage::shaderIndex.renderPassVSShader = ++shaderCount;
 
-	ShaderDesc inlineRTPixelDesc = {
-		._shaderPath = L"../../../../shaders/model.hlsl",
-		._pEntryPoint = L"PSMain",
-		._pTarget = L"ps_6_7",
-		._type = Type::PIXEL };
-	Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTPixelDesc);
+		ShaderDesc inlineRTPixelDesc = {
+			._shaderPath = L"../../../../shaders/model.hlsl",
+			._pEntryPoint = L"PSMain",
+			._pTarget = L"ps_6_7",
+			._type = Type::PIXEL };
+		Shader inlineRayTracingPixelShader = CreateShader(gfxDevice, &scene._resources, scene.dxcRes, inlineRTPixelDesc);
+		GlobalStorage::shaderIndex.renderPassPSShader = ++shaderCount;
+	}
+	// pipelines
+	{
+		// compute pass for shader effects
+		PipelineDesc backfropComputePDesc = {
+			._pipelineType = PipelineType::COMPUTE,
+			._rootSignType = RootSignDesc::RSType::SHADER_EFFECTS,
+			._shaderIndex = {GlobalStorage::shaderIndex.bgComputeShader},
+			._enableDepthTest = FALSE,
+			._enableStencilTest = FALSE,
+			._isDepthPrePass = FALSE };
+		Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, backfropComputePDesc);
+		GlobalStorage::pipelineIndex.BGComputePass = pipelineCount;
 
-	// compute pass for shader effects
-	PipelineDesc backfropComputePDesc = {
-		._pipelineType = PipelineType::COMPUTE,
-		._rootSignType = RootSignDesc::RSType::SHADER_EFFECTS,
-		._shaderIndex = {0},
-		._enableDepthTest = FALSE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE };
-	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, backfropComputePDesc);
-	GlobalStorage::pipelineIndex.BGComputePass = 0;
+		// depth pipeline
+		PipelineDesc depthPassDesc = {
+			._pipelineType = PipelineType::GRAPHICS,
+			._rootSignType = RootSignDesc::RSType::DEPTHPP,
+			._shaderIndex = {GlobalStorage::shaderIndex.depthPPShader} ,
+			._enableDepthTest = TRUE,
+			._enableStencilTest = FALSE,
+			._isDepthPrePass = TRUE };
+		Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene._resources, depthPassDesc);
+		GlobalStorage::pipelineIndex.DepthPrePass = ++pipelineCount;
 
-	// depth pipeline
-	PipelineDesc depthPassDesc = {
-		._pipelineType = PipelineType::GRAPHICS,
-		._rootSignType = RootSignDesc::RSType::DEPTHPP,
-		._shaderIndex = {1} ,
-		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = TRUE };
-	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene._resources, depthPassDesc);
-	GlobalStorage::pipelineIndex.DepthPrePass = 1;
+		scene._rtaoPass = InitRTAOResources(gfxDevice, frameSync, swapchain, scene.dxcRes, &scene._resources);
+		GlobalStorage::pipelineIndex.RTAOPass = ++pipelineCount;
 
-	scene._rtaoPass = InitRTAOResources(gfxDevice, frameSync, swapchain, scene.dxcRes, &scene._resources);
-	GlobalStorage::pipelineIndex.RTAOPass = 2;
-
-	// inline ray tracing pass
-	PipelineDesc rtPipelineDesc = {
-		._pipelineType = PipelineType::GRAPHICS,
-		._rootSignType = RootSignDesc::RSType::RENDER,
-		._shaderIndex = {2,3},
-		._enableDepthTest = TRUE,
-		._enableStencilTest = FALSE,
-		._isDepthPrePass = FALSE };
-	Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, rtPipelineDesc);
-	GlobalStorage::pipelineIndex.RenderPass = 3;
+		// inline ray tracing pass
+		PipelineDesc rtPipelineDesc = {
+			._pipelineType = PipelineType::GRAPHICS,
+			._rootSignType = RootSignDesc::RSType::RENDER,
+			._shaderIndex = {GlobalStorage::shaderIndex.renderPassVSShader, GlobalStorage::shaderIndex.renderPassPSShader},
+			._enableDepthTest = TRUE,
+			._enableStencilTest = FALSE,
+			._isDepthPrePass = FALSE };
+		Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, rtPipelineDesc);
+		GlobalStorage::pipelineIndex.RenderPass = ++pipelineCount;
+	}
 
 	// imgui parts
 	scene.inspector.CreateInspector(gfxDevice, swapchain, frameSync);

@@ -13,7 +13,7 @@
 
 #include <atomic>
 
-#include "techniques/RTAO.h"
+#include "passes/RTAO.h"
 
 struct Inspector;
 using namespace Microsoft::WRL;

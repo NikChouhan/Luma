@@ -118,15 +118,22 @@ void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& s
     }
 }
 
+static void RegisterShader(Resources* resources, const ShaderDesc &shaderDesc, const Shader& shader)
+{
+    static int shaderCount = -1;
+    resources->shaders.push_back(shader);
+    resources->shaderParams.push_back(shaderDesc);
+
+    ++shaderCount;
+}
+
 Shader CreateShader(const GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc)
 {
     Shader shader{};
 
     CompileShaderInternal(gfxDevice, dxcRes, shader, shaderDesc);
 
-
-    resources->shaders.push_back(shader);
-    resources->shaderParams.push_back(shaderDesc);
+    RegisterShader(resources, shaderDesc, shader);
 
     return shader;
 }
