@@ -22,6 +22,7 @@ struct TextureDesc
 	unsigned char* _pContents = nullptr;
 	TextureResourceType _textureType{};
 	TextureType _type;
+	DXGI_FORMAT _format;
 };
 
 Texture CreateTexture(GfxDevice& gfxDevice, FrameSync& frameSync, TextureDesc desc);

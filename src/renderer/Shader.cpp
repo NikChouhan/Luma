@@ -118,7 +118,7 @@ void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& s
     }
 }
 
-Shader CreateShader(GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc)
+Shader CreateShader(const GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc)
 {
     Shader shader{};
 

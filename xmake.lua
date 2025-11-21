@@ -23,7 +23,7 @@ elseif(is_mode("release")) then
     set_runtimes("MD")
 end
 
-add_includedirs("src", "src/core", "D3D12/include", "src/includes")
+add_includedirs("src", "src/core", "D3D12/include", "src/includes", "src/renderer")
 
 target("game")
     set_default(true)

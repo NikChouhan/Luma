@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GfxDevice.h"
+#include <vector>
 
 struct Inspector;
 struct Camera;
@@ -23,7 +24,6 @@ struct Swapchain
     u32 _rtvDescriptorSize{0};
     // dsv resources
     ComPtr<ID3D12DescriptorHeap> _dsvDepthHeap;
-    ComPtr<ID3D12DescriptorHeap> _srvDepthHeap;
     ComPtr<ID3D12Resource> _depthStencil;
 	u32 _dsvDescriptorSize{0};
 
@@ -52,7 +52,4 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
 void DestroySwapChain(Swapchain& swapchain);
 
 void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList, GfxDevice& gfxDevice,
-    Swapchain& swapchain, FrameSync& frameSync, Inspector& inspector, Camera& camera, Pipeline& backdropComputePipeline,
-    Pipeline& depthPassPipeline, Pipeline& rasterPipeline, Model& model);
-
-void SetupLightSettingsHandler();
+    Swapchain& swapchain, FrameSync& frameSync, Inspector& inspector, Camera& camera, std::vector<Pipeline>& pipelines, Model& model);

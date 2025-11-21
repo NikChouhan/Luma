@@ -13,54 +13,6 @@
 
 #define IF_DEPTH 1
 
-static LightSettings g_lightSettings;
-
-void SetupLightSettingsHandler()
-{
-    ImGuiSettingsHandler ini_handler;
-    ini_handler.TypeName = "LightSettings";
-    ini_handler.TypeHash = ImHashStr("LightSettings");
-
-    ini_handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) { return (void*)1; };
-    ini_handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
-        float x, y, z;
-        if (sscanf(line, "pointIntensity=%f", &x) == 1)
-            g_lightSettings.pointIntensity = x;
-        else if (sscanf(line, "pointColor=%f,%f,%f", &x, &y, &z) == 3) {
-            g_lightSettings.pointColor[0] = x;
-            g_lightSettings.pointColor[1] = y;
-            g_lightSettings.pointColor[2] = z;
-        }
-        else if (sscanf(line, "pointRadius=%f", &x) == 1)
-            g_lightSettings.pointRadius = x;
-        else if (sscanf(line, "dirIntensity=%f", &x) == 1)
-            g_lightSettings.dirIntensity = x;
-        else if (sscanf(line, "dirColor=%f,%f,%f", &x, &y, &z) == 3) {
-            g_lightSettings.dirColor[0] = x;
-            g_lightSettings.dirColor[1] = y;
-            g_lightSettings.dirColor[2] = z;
-        }
-        else if (sscanf(line, "direction=%f,%f,%f", &x, &y, &z) == 3)
-            g_lightSettings.direction = SM::Vector3(x, y, z);
-        };
-
-    ini_handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf) {
-        buf->appendf("[%s][Settings]\n", handler->TypeName);
-        buf->appendf("pointIntensity=%.3f\n", g_lightSettings.pointIntensity);
-        buf->appendf("pointColor=%.3f,%.3f,%.3f\n",
-            g_lightSettings.pointColor[0], g_lightSettings.pointColor[1], g_lightSettings.pointColor[2]);
-        buf->appendf("pointRadius=%.3f\n", g_lightSettings.pointRadius);
-        buf->appendf("dirIntensity=%.3f\n", g_lightSettings.dirIntensity);
-        buf->appendf("dirColor=%.3f,%.3f,%.3f\n",
-            g_lightSettings.dirColor[0], g_lightSettings.dirColor[1], g_lightSettings.dirColor[2]);
-        buf->appendf("direction=%.3f,%.3f,%.3f\n",
-            g_lightSettings.direction.x, g_lightSettings.direction.y, g_lightSettings.direction.z);
-        buf->append("\n");
-        };
-
-    ImGui::GetCurrentContext()->SettingsHandlers.push_back(ini_handler);
-}
-
 
 void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
 {
@@ -135,21 +87,13 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         _dsvDepthHeap->GetCPUDescriptorHandleForHeapStart()
     );
 
-    // Recreate depth SRV
-    D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
-    depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
-    depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    depthSRV.Texture2D.MipLevels = 1;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = _srvDepthHeap->GetCPUDescriptorHandleForHeapStart();
-    _gfxDevice->_device->CreateShaderResourceView(_depthStencil.Get(), &depthSRV, srvHandle);
+    const u32 descriptorSize = _gfxDevice->_device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // recreate render size dependent resources
     auto ResizeSizeDependentResources = [&]()
         {
             _uavBgShaderEffects.Reset();
-
             // Recreate UAV with new dimensions
             _uavBgShaderEffects = CreateTexture(*_gfxDevice, *_frameSync,
                 {
@@ -157,20 +101,37 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
                 ._texHeight = static_cast<u32>(_height),
                 ._texPixelSize = 0,
                 ._pContents = nullptr,
-                ._textureType = TextureResourceType::UAV })._resource;
+                ._textureType = TextureResourceType::UAV,
+                ._format = DXGI_FORMAT_R8G8B8A8_UNORM })._resource;
+
+            model->_normalUAV.Reset();
+            model->_normalUAV = CreateTexture(*_gfxDevice, *_frameSync,
+                {
+                ._texWidth = static_cast<u32>(_width),
+                ._texHeight = static_cast<u32>(_height),
+                ._texPixelSize = 0,
+                ._pContents = nullptr,
+                ._textureType = TextureResourceType::UAV,
+                ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+
+            model->_rtaoUAV.Reset();
+            model->_rtaoUAV = CreateTexture(*_gfxDevice, *_frameSync,
+                {
+                ._texWidth = static_cast<u32>(_width),
+                ._texHeight = static_cast<u32>(_height),
+                ._texPixelSize = 0,
+                ._pContents = nullptr,
+                ._textureType = TextureResourceType::UAV,
+                ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+
         };
     ResizeSizeDependentResources();
 
     // reset the compute shader uav index and view(s)
-    const u32 descriptorSize = _gfxDevice->_device->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
     CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(
         model->_commonHeap->GetCPUDescriptorHandleForHeapStart());
 
-    u32 uavIndex = model->_modelTextures.size() + 1; //(separate the heap from the model)
-
-    heapHandle.Offset(uavIndex, descriptorSize);
+    heapHandle.Offset((int)GlobalStorage::index._computeShaderBgIndex, descriptorSize);
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
     uavDesc.Format = _uavBgShaderEffects->GetDesc().Format;
@@ -181,6 +142,39 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         nullptr,
         &uavDesc,
         heapHandle);
+
+    // Recreate depth SRV
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
+        depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
+        depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        depthSRV.Texture2D.MipLevels = 1;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = model->_commonHeap->GetCPUDescriptorHandleForHeapStart();
+        _gfxDevice->_device->CreateShaderResourceView(_depthStencil.Get(), &depthSRV, srvHandle);
+    }
+    // recreate normal UAV
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+        uavDesc.Format = model->_normalUAV->GetDesc().Format;
+	        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+        heapHandle.Offset(descriptorSize);
+
+        _gfxDevice->_device->CreateUnorderedAccessView(model->_normalUAV.Get(),
+            nullptr, &uavDesc, heapHandle);
+    }
+    // recreate rtao UAV
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+        uavDesc.Format = model->_rtaoUAV->GetDesc().Format;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        heapHandle.Offset(descriptorSize);
+
+        _gfxDevice->_device->CreateUnorderedAccessView(model->_rtaoUAV.Get(),
+            nullptr, &uavDesc, heapHandle);
+    }
 }
 
 Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainDesc desc)
@@ -251,12 +245,6 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
         dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&swapchain._dsvDepthHeap)));
-
-        D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        srvHeapDesc.NumDescriptors = 1;
-        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&swapchain._srvDepthHeap)));
     }
 
     // create frame resources
@@ -303,15 +291,6 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
 
         gfxDevice._device->CreateDepthStencilView(swapchain._depthStencil.Get(), &depthStencilViewDesc,
             swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
-        depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
-        depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        depthSRV.Texture2D.MipLevels = 1;
-
-        D3D12_CPU_DESCRIPTOR_HANDLE srvHandle =  swapchain._srvDepthHeap->GetCPUDescriptorHandleForHeapStart();
-        gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, srvHandle);
     }
 
     // uav buffer
@@ -322,7 +301,8 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
             ._texHeight = u32(swapchain._height),
             ._texPixelSize = 0,
             ._pContents = nullptr,
-            ._textureType = TextureResourceType::UAV })._resource;
+            ._textureType = TextureResourceType::UAV,
+            ._format = DXGI_FORMAT_R8G8B8A8_UNORM})._resource;
 
         DX_ASSERT(swapchain._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource"));
     }
@@ -336,9 +316,7 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
     FrameSync& frameSync,
     Inspector& inspector,
     Camera& camera,
-    Pipeline& backdropComputePipeline,
-    Pipeline& depthPassPipeline,
-    Pipeline& rasterPipeline,
+    std::vector<Pipeline>& pipelines,
     Model& model)
 {
     //frameSync._frameIndex = swapchain._swapchain->GetCurrentBackBufferIndex();
@@ -346,17 +324,16 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         frameSync._frameIndex, swapchain._rtvDescriptorSize);
     CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
 
-    SM::Vector3 direction = g_lightSettings.direction;
+    SM::Vector3 direction = GlobalStorage::g_lightSettings.direction;
     direction.Normalize();
-
 
     // compute pass for space bg shader
     {
-        commandList->SetPipelineState(backdropComputePipeline._pipelineState.Get());
+        commandList->SetPipelineState(pipelines[0]._pipelineState.Get());
         ID3D12DescriptorHeap* ppHeaps[] = {model._commonHeap.Get() };
 
         commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-        commandList->SetComputeRootSignature(backdropComputePipeline._rootSignature.Get());
+        commandList->SetComputeRootSignature(pipelines[0]._rootSignature.Get());
         CD3DX12_RESOURCE_BARRIER rBarriers[2];
 
         rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._uavBgShaderEffects.Get(),
@@ -372,7 +349,7 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         pushConstants._cameraYaw = camera._yaw;
         pushConstants._cameraPitch = camera._pitch;
         pushConstants._cameraPos = camera._pos;
-        pushConstants._uavIndex = u32(model._modelTextures.size() + 1);
+        pushConstants._uavIndex = GlobalStorage::index._computeShaderBgIndex;
 
         commandList->SetComputeRoot32BitConstants(0, sizeof(ShaderEffects) / 4, &pushConstants, 0);
         u16 dispatchX = (swapchain._width + 7) / 8;
@@ -401,8 +378,8 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
     // depth pre-pass
 	{
-        commandList->SetPipelineState(depthPassPipeline._pipelineState.Get());
-        commandList->SetGraphicsRootSignature(depthPassPipeline._rootSignature.Get());
+        commandList->SetPipelineState(pipelines[1]._pipelineState.Get());
+        commandList->SetGraphicsRootSignature(pipelines[1]._rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
@@ -429,14 +406,54 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
                 1, mesh._startIndex, mesh._startVertex, 0);
         }
     }
+    // Normal buffer and RTAO pass
+    {
+        commandList->SetPipelineState(pipelines[2]._pipelineState.Get());
+
+        commandList->SetComputeRootSignature(pipelines[2]._rootSignature.Get());
+        CD3DX12_RESOURCE_BARRIER rBarriers[2];
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._normalUAV.Get(),
+            D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        };
+        rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(model._rtaoUAV.Get(),
+            D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        };
+        commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
+
+        GlobalStorage::_projMatrixInv = XMMatrixInverse(nullptr, camera._projection);
+        GlobalStorage::_viewMatrixInv = XMMatrixInverse(nullptr, camera._view);
+
+        RTAO pushConstants{};
+        pushConstants._projMatrixInv = GlobalStorage::_projMatrixInv;
+        pushConstants.viewMatrixInv = GlobalStorage::_viewMatrixInv;
+
+        pushConstants._accelerationStructureIndex = GlobalStorage::index._accelerationStructureIndex;
+        pushConstants._rtUAVIndex = GlobalStorage::index._rtaoUAV;
+        pushConstants._depthIndex = GlobalStorage::index._depthSRV;
+        pushConstants._normalUAVIndex = GlobalStorage::index._normalUAV;
+
+        pushConstants._isEnabled = TRUE;
+        pushConstants._samplesPerPixel = 3;
+
+        commandList->SetComputeRoot32BitConstants(0, sizeof(RTAO) / 4, &pushConstants, 0);
+        u16 dispatchX = (swapchain._width + 7) / 8;
+        u16 dispatchY = (swapchain._height + 7) / 8;
+        commandList->Dispatch(dispatchX, dispatchY, 1);
+
+        rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._normalUAV.Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
+        };
+        rBarriers[1] = { CD3DX12_RESOURCE_BARRIER::Transition(model._rtaoUAV.Get(),
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON)
+        };
+        commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
+    }
+
     // forward RT path
     {
-        commandList->SetPipelineState(rasterPipeline._pipelineState.Get());
+        commandList->SetPipelineState(pipelines[3]._pipelineState.Get());
 
-        ID3D12DescriptorHeap* ppHeaps[] = { model._commonHeap.Get() };
-        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-        commandList->SetGraphicsRootSignature(rasterPipeline._rootSignature.Get());
+        commandList->SetGraphicsRootSignature(pipelines[3]._rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
@@ -455,7 +472,7 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
             XMMATRIX proj = camera._projection;
 
             XMMATRIX worldViewProj = world * view * proj;
-            ConstBuffer pushConstants{};
+            RenderPass pushConstants{};
             pushConstants._worldViewProj = worldViewProj;
 
             pushConstants._worldMatrix = (world);
@@ -465,25 +482,25 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
             pushConstants._metallicRoughnessIndex = currentMaterial._metallicRoughnessIndex;
             pushConstants._emissiveIndex = currentMaterial._emmisiveIndex;
             
-            pushConstants._accelerationStructureIndex = model._modelTextures.size();
+            pushConstants._accelerationStructureIndex = GlobalStorage::index._accelerationStructureIndex;
             //SM::Vector3 dirLightDir = SM::Vector3(-0.59628606, 6.0584383, -0.014198627) - SM::Vector3(-0.40488148, 13.129597, -0.81999177);
 
             pushConstants._dirLightDir = direction;
 
-            pushConstants._dirLightIntensity = g_lightSettings.dirIntensity;
-            pushConstants._dirLightColor[0] = g_lightSettings.dirColor[0];
-            pushConstants._dirLightColor[1] = g_lightSettings.dirColor[1];
-            pushConstants._dirLightColor[2] = g_lightSettings.dirColor[2];
+            pushConstants._dirLightIntensity = GlobalStorage::g_lightSettings.dirIntensity;
+            pushConstants._dirLightColor[0] = GlobalStorage::g_lightSettings.dirColor[0];
+            pushConstants._dirLightColor[1] = GlobalStorage::g_lightSettings.dirColor[1];
+            pushConstants._dirLightColor[2] = GlobalStorage::g_lightSettings.dirColor[2];
 
-            pushConstants._pointLightIntensity = g_lightSettings.pointIntensity;
+            pushConstants._pointLightIntensity = GlobalStorage::g_lightSettings.pointIntensity;
         	pushConstants._cameraPos = camera._pos;
 
-            pushConstants._pointLightRadius = g_lightSettings.pointRadius;
-            pushConstants._pointLightColor[0] = g_lightSettings.pointColor[0];
-            pushConstants._pointLightColor[1] = g_lightSettings.pointColor[1];
-            pushConstants._pointLightColor[2] = g_lightSettings.pointColor[2];
+            pushConstants._pointLightRadius = GlobalStorage::g_lightSettings.pointRadius;
+            pushConstants._pointLightColor[0] = GlobalStorage::g_lightSettings.pointColor[0];
+            pushConstants._pointLightColor[1] = GlobalStorage::g_lightSettings.pointColor[1];
+            pushConstants._pointLightColor[2] = GlobalStorage::g_lightSettings.pointColor[2];
 
-            commandList->SetGraphicsRoot32BitConstants(0, sizeof(ConstBuffer)/4, &pushConstants, 0);
+            commandList->SetGraphicsRoot32BitConstants(0, sizeof(RenderPass)/4, &pushConstants, 0);
 
 			commandList->DrawIndexedInstanced(mesh._indexCount,
                 1, mesh._startIndex, mesh._startVertex, 0);
@@ -497,18 +514,18 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         {
             static bool pointLightEnabled = true;
             ImGui::Checkbox("Enable##Point", &pointLightEnabled);
-            ImGui::SliderFloat("Intensity##Point", &g_lightSettings.pointIntensity, 0.0f, 200.0f);
-            ImGui::ColorEdit3("Color##Point", g_lightSettings.pointColor);
-            ImGui::SliderFloat("Radius", &g_lightSettings.pointRadius, 0.1f, 100.0f);
+            ImGui::SliderFloat("Intensity##Point", &GlobalStorage::g_lightSettings.pointIntensity, 0.0f, 200.0f);
+            ImGui::ColorEdit3("Color##Point", GlobalStorage::g_lightSettings.pointColor);
+            ImGui::SliderFloat("Radius", &GlobalStorage::g_lightSettings.pointRadius, 0.1f, 100.0f);
         }
 
         if (ImGui::CollapsingHeader("Directional Light"))
         {
             static bool dirLightEnabled = true;
             ImGui::Checkbox("Enable##Dir", &dirLightEnabled);
-            ImGui::SliderFloat("Intensity##Dir", &g_lightSettings.dirIntensity, 0.0f, 50.0f);
-            ImGui::ColorEdit3("Color##Dir", g_lightSettings.dirColor);
-            ImGui::SliderFloat3("Direction", &g_lightSettings.direction.x, -20.0f, 20.f);
+            ImGui::SliderFloat("Intensity##Dir", &GlobalStorage::g_lightSettings.dirIntensity, 0.0f, 50.0f);
+            ImGui::ColorEdit3("Color##Dir", GlobalStorage::g_lightSettings.dirColor);
+            ImGui::SliderFloat3("Direction", &GlobalStorage::g_lightSettings.direction.x, -20.0f, 20.f);
         }
 
         ImGui::End();
@@ -520,13 +537,4 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->SetDescriptorHeaps(1, &ppHeaps);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
     }
-    CD3DX12_RESOURCE_BARRIER rBarriers;
-    // transition the render target to present format
-    rBarriers = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT) };
-    commandList->ResourceBarrier(1, &rBarriers);
-
-    DX_ASSERT(commandList->Close());
-    ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-    gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }

@@ -43,5 +43,5 @@ struct ShaderDesc
 
 DXCRes ShaderCompiler();
 void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader, const ShaderDesc& shaderDesc);
-Shader CreateShader(GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc);
+Shader CreateShader(const GfxDevice& gfxDevice, Resources* resources, DXCRes& dxcRes, const ShaderDesc& shaderDesc);
 void DestroyShader(GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader);
