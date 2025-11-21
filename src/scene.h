@@ -13,6 +13,8 @@
 
 #include <atomic>
 
+#include "techniques/RTAO.h"
+
 struct Inspector;
 using namespace Microsoft::WRL;
 
@@ -42,6 +44,7 @@ struct Scene
 	Inspector inspector = {};
 	Model model = {};
 	Watcher _watcher{};
+	RTAOPass _rtaoPass;
 
 	std::unique_ptr<std::atomic<bool>> _reloadRequested;
 	std::thread _watcherThread;

@@ -64,29 +64,38 @@ Scene CreateScene(GfxDevice& gfxDevice,
 	// compute pass for shader effects
 	PipelineDesc backfropComputePDesc = {
 		._pipelineType = PipelineType::COMPUTE,
+		._rootSignType = RootSignDesc::RSType::SHADER_EFFECTS,
 		._shaderIndex = {0},
 		._enableDepthTest = FALSE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
 	Pipeline backdropComputePipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, backfropComputePDesc);
+	GlobalStorage::pipelineIndex.BGComputePass = 0;
 
 	// depth pipeline
 	PipelineDesc depthPassDesc = {
 		._pipelineType = PipelineType::GRAPHICS,
+		._rootSignType = RootSignDesc::RSType::DEPTHPP,
 		._shaderIndex = {1} ,
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = TRUE };
 	Pipeline depthPrePass = CreatePipeline(gfxDevice, swapchain, &scene._resources, depthPassDesc);
+	GlobalStorage::pipelineIndex.DepthPrePass = 1;
+
+	scene._rtaoPass = InitRTAOResources(gfxDevice, frameSync, swapchain, scene.dxcRes, &scene._resources);
+	GlobalStorage::pipelineIndex.RTAOPass = 2;
 
 	// inline ray tracing pass
 	PipelineDesc rtPipelineDesc = {
 		._pipelineType = PipelineType::GRAPHICS,
+		._rootSignType = RootSignDesc::RSType::RENDER,
 		._shaderIndex = {2,3},
 		._enableDepthTest = TRUE,
 		._enableStencilTest = FALSE,
 		._isDepthPrePass = FALSE };
-	Pipeline rTPipeline= CreatePipeline(gfxDevice, swapchain, &scene._resources, rtPipelineDesc);
+	Pipeline rtPipeline = CreatePipeline(gfxDevice, swapchain, &scene._resources, rtPipelineDesc);
+	GlobalStorage::pipelineIndex.RenderPass = 3;
 
 	// imgui parts
 	scene.inspector.CreateInspector(gfxDevice, swapchain, frameSync);
@@ -140,8 +149,20 @@ void Scene::Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapch
 		ImGui::End();
 	}
 	SubmitPasses(_commandList, gfxDevice, swapchain, frameSync, inspector, 
-		camera, _resources.pipelines[0],
-		_resources.pipelines[1], _resources.pipelines[2], model);
+		camera, _resources.pipelines, model);
+
+	// execute passes
+	{
+		CD3DX12_RESOURCE_BARRIER rBarriers;
+		// transition the render target to present format
+		rBarriers = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._renderTargets[frameSync._frameIndex].Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT) };
+		_commandList->ResourceBarrier(1, &rBarriers);
+
+		DX_ASSERT(_commandList->Close());
+		ID3D12CommandList* ppCommandLists[] = { _commandList.Get() };
+		gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	}
 
 	// present the Frame
 	DX_ASSERT(swapchain._swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));

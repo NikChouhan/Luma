@@ -63,6 +63,8 @@ float4 PSMain(PSInput input) : SV_TARGET
     Texture2D metallicRoughnessTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._metallicRoughNessIndex)];
     Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._emissiveIndex)];
 
+    RWTexture2D<float4> normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(72)];
+
     float2 uv = input._uv;
 	//uv.x = 1.0 - uv.x;
 	//uv.y = 1.0 - uv.y;
@@ -75,52 +77,19 @@ float4 PSMain(PSInput input) : SV_TARGET
     float roughness = metallicRoughness.y;
     float3 emissive = emissiveTex.Sample(samplerDiffuse, uv).rgb;
 
-    float3 N = normalize(input._normal);
+    float3 N = normalTex.Load(uv);
     float3 V = normalize(constBuffer._cameraPos - input._worldPos);
     float3 surfaceOffset = input._worldPos + N * 0.1;
 
     float3 Lo = float3(0.0, 0.0, 0.0);
 
-    // Directional Light
-    // the looks of directional light are still messed up
-    {
-        float3 L = -normalize(constBuffer._dirLightDir);
-        float NdotL = max(dot(N, L), 0.0);
-        float bias = max(0.05 * (1.0 - NdotL), 0.01);
-        float3 shadowOrigin = input._worldPos + N * bias;
+    /*float attenuation = 1.0 / (distance * distance);
+    attenuation *= pow(max(1.0 - (distance / constBuffer._pointLightRadius), 0.0), 2.0);*/
 
-        float shadow = TraceShadowRay(accelStruct, shadowOrigin, L, 10000.0, RAY_FLAG_NONE);
-
-        if (shadow > 0.0)
-        {
-            float3 radiance = constBuffer._dirLightColor * constBuffer._dirLightIntensity;
-            Lo += CalculatePBR(N, V, L, radiance, albedoColor.rgb, metallic, roughness, 1.0) * shadow;
-        }
-    }
-
-     // point light attached to cam
-    {
-        float3 lightPos = constBuffer._cameraPos;
-        float3 L = lightPos -  (input._worldPos);
-        float distance = length(L); 
-        L = normalize(L);
-
-        // Attenuation with smooth falloff
-        float attenuation = 1.0 / (distance * distance);
-        attenuation *= pow(max(1.0 - (distance / constBuffer._pointLightRadius), 0.0), 2.0);
-
-        if (attenuation > 0.001)
-        {
-            float shadow = TraceShadowRay(accelStruct, surfaceOffset, L, distance - 0.01, RAY_FLAG_NONE);
-
-            if (shadow > 0.5)
-            {
-                float3 radiance = constBuffer._pointLightColor * constBuffer._pointLightIntensity * attenuation;
-                Lo += CalculatePBR(N, V, L, radiance, albedoColor.rgb, metallic, roughness, 1.0) * shadow;
-            }
-        }
-    }
-    float amb = .1f;
+    float shadow = 1.f;
+    float3 radiance = constBuffer._pointLightColor * constBuffer._pointLightIntensity;
+    Lo += CalculatePBR(N, V, float3(0.,0.,0.), radiance, albedoColor.rgb, metallic, roughness, 1.0) * shadow;
+    float amb = .9f;
     float3 ambient = float3(amb, amb, amb) * albedoColor.rgb * (1.0 - metallic * 0.5);
 
     float3 finalColor = ambient + Lo + emissive;
