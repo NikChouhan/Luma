@@ -8,7 +8,7 @@ add_rules("mode.debug", "mode.release")
 add_defines("UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "NOMINMAX")
 set_languages("cxx23", "c17")
 add_syslinks("user32.lib", "kernel32.lib", "shell32.lib", "comctl32.lib", "d3d12.lib", "dxgi.lib", "dxguid.lib")
-
+add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 if (is_mode("debug")) then
     set_symbols("debug")
     add_defines("DEBUG")
