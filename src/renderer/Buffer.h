@@ -1,242 +1,267 @@
 #pragma once
 
-#include <imgui_internal.h>
+#include <optional>
+#include <variant>
 
 #include "Common.h"
 #include "GfxDevice.h"
+#include "Globals.h"
 
 typedef u32 Index;
-using namespace DirectX;
 
 namespace D3D12MA
 {
 	class Allocation;
 }
 
-
-enum class BufferType
-{
-	VERTEX,
-    INDEX,
-    UAV
-};
-struct HeapTextureIndex
-{
-    u32 _accelerationStructureIndex{};
-    u32 _computeShaderBgIndex{};
-    u32 _depthSRV{};
-    u32 _normalUAV{};
-    u32 _rtaoUAV{};
-};
-struct PipelineIndex
-{
-    u8 BGComputePass{};
-    u8 DepthPrePass{};
-    u8 RTAOPass{};
-    u8 ImguiPass{};
-    u8 RenderPass{};
-};
-struct ShaderIndex
-{
-    u8 bgComputeShader{};
-    u8 depthPPShader{};
-    u8 rtaoShader{};
-
-    u8 renderPassVSShader{};
-    u8 renderPassPSShader{};
-};
-struct LightSettings
-{
-    float pointIntensity = 70.0f;
-    float pointColor[3] = { 0.8f, 0.6f, 0.5f };
-    float pointRadius = 10.0f;
-    float dirIntensity = 2.0f;
-    float dirColor[3] = { 1.0f, 0.85f, 0.6f };
-    SM::Vector3 direction = { -1.0f, -2.0f, 0.0f };
-};
-
-namespace GlobalStorage
-{
-    inline HeapTextureIndex index{};
-    inline PipelineIndex pipelineIndex{};
-    inline ShaderIndex shaderIndex{};
-
-    inline XMMATRIX _projMatrixInv{};
-    inline XMMATRIX _viewMatrixInv{};
-    inline LightSettings g_lightSettings;
-}
-
-inline void SetupLightSettingsHandler()
-{
-    ImGuiSettingsHandler ini_handler;
-    ini_handler.TypeName = "LightSettings";
-    ini_handler.TypeHash = ImHashStr("LightSettings");
-
-    ini_handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) { return (void*)1; };
-    ini_handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
-        float x, y, z;
-        if (sscanf(line, "pointIntensity=%f", &x) == 1)
-	        GlobalStorage::g_lightSettings.pointIntensity = x;
-        else if (sscanf(line, "pointColor=%f,%f,%f", &x, &y, &z) == 3) {
-	        GlobalStorage::g_lightSettings.pointColor[0] = x;
-	        GlobalStorage::g_lightSettings.pointColor[1] = y;
-	        GlobalStorage::g_lightSettings.pointColor[2] = z;
-        }
-        else if (sscanf(line, "pointRadius=%f", &x) == 1)
-	        GlobalStorage::g_lightSettings.pointRadius = x;
-        else if (sscanf(line, "dirIntensity=%f", &x) == 1)
-	        GlobalStorage::g_lightSettings.dirIntensity = x;
-        else if (sscanf(line, "dirColor=%f,%f,%f", &x, &y, &z) == 3) {
-	        GlobalStorage::g_lightSettings.dirColor[0] = x;
-	        GlobalStorage::g_lightSettings.dirColor[1] = y;
-	        GlobalStorage::g_lightSettings.dirColor[2] = z;
-        }
-        else if (sscanf(line, "direction=%f,%f,%f", &x, &y, &z) == 3)
-	        GlobalStorage::g_lightSettings.direction = SM::Vector3(x, y, z);
-        };
-
-    ini_handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf) {
-        buf->appendf("[%s][Settings]\n", handler->TypeName);
-        buf->appendf("pointIntensity=%.3f\n", GlobalStorage::g_lightSettings.pointIntensity);
-        buf->appendf("pointColor=%.3f,%.3f,%.3f\n",
-            GlobalStorage::g_lightSettings.pointColor[0], GlobalStorage::g_lightSettings.pointColor[1], GlobalStorage::g_lightSettings.pointColor[2]);
-        buf->appendf("pointRadius=%.3f\n", GlobalStorage::g_lightSettings.pointRadius);
-        buf->appendf("dirIntensity=%.3f\n", GlobalStorage::g_lightSettings.dirIntensity);
-        buf->appendf("dirColor=%.3f,%.3f,%.3f\n",
-            GlobalStorage::g_lightSettings.dirColor[0], GlobalStorage::g_lightSettings.dirColor[1], GlobalStorage::g_lightSettings.dirColor[2]);
-        buf->appendf("direction=%.3f,%.3f,%.3f\n",
-            GlobalStorage::g_lightSettings.direction.x, GlobalStorage::g_lightSettings.direction.y, GlobalStorage::g_lightSettings.direction.z);
-        buf->append("\n");
-        };
-
-    ImGui::GetCurrentContext()->SettingsHandlers.push_back(ini_handler);
-}
-
-struct RenderPass
-{
-    XMMATRIX _worldViewProj;
-
-    XMMATRIX _worldMatrix;
-
-    u32 _albedoIndex;
-    u32 _normalIndex;
-    u32 _metallicRoughnessIndex;
-    u32 _emissiveIndex;
-
-    u32 _accelerationStructureIndex;
-    SM::Vector3 _dirLightDir;
-
-    float _dirLightIntensity;
-    float _dirLightColor[3];
-
-    float _pointLightIntensity;
-    SM::Vector3 _cameraPos;
-
-    float _pointLightRadius;
-    float _pointLightColor[3];
-};
-
-struct DepthPPBuffer
-{
-    XMMATRIX _worldViewProj;
-    XMMATRIX _worldMatrix;
-};
-
-struct ShaderEffects
-{
-    float _resolution[2];
-    float _time;
-    float _cameraYaw;
-
-    float _cameraPitch;
-    u32 _uavIndex;
-    u32 _padding1;
-    u32 _padding2;
-
-    alignas(16) SM::Vector3 _cameraPos;
-};
-
-struct RTAO
-{
-    XMMATRIX _projMatrixInv;
-	XMMATRIX viewMatrixInv;
-
-    u32 _accelerationStructureIndex;
-    u32 _rtUAVIndex;
-    u32 _depthIndex;
-    u32 _normalUAVIndex;
-
-    BOOL _isEnabled;
-    u32 _samplesPerPixel;
-    u32 padding;
-    u32 padding1;
-};
-
 struct Vertex
 {
-    XMFLOAT3 _position;
-    XMFLOAT2 _texCoord;
-    XMFLOAT3 _normal;
+	DirectX::XMFLOAT3 position;
+    DirectX::XMFLOAT2 texCoord;
+    DirectX::XMFLOAT3 normal;
 };
+
+struct VertexBufferView {
+    D3D12_VERTEX_BUFFER_VIEW view;
+    u32 stride;
+};
+
+struct IndexBufferView {
+    D3D12_INDEX_BUFFER_VIEW view;
+    DXGI_FORMAT indexFormat;  // R16 or R32
+};
+
+struct ConstantBufferView {
+    D3D12_GPU_VIRTUAL_ADDRESS gpuAddress;
+    u32 sizeInBytes;
+    std::optional<u32> heapIndex;
+};
+struct UnorderedAccessView {
+    D3D12_GPU_VIRTUAL_ADDRESS gpuAddress;
+    u32 sizeInBytes;
+    DXGI_FORMAT format;
+    std::optional<u32> heapIndex;
+};
+
+struct ShaderResourceView {
+    D3D12_GPU_VIRTUAL_ADDRESS gpuAddress;
+    u32 sizeInBytes;
+    DXGI_FORMAT format;
+    std::optional<u32> heapIndex;
+};
+
+using BufferView = std::variant<
+	std::monostate,        // No view (raw buffer)
+	VertexBufferView,
+	IndexBufferView,
+	ConstantBufferView,
+    UnorderedAccessView,
+    ShaderResourceView
+>;
 
 struct Buffer
 {
-    ComPtr<ID3D12Resource> _resource;
-    D3D12MA::Allocation* _allocation;
-    union
-	{
-        D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view;
-        D3D12_INDEX_BUFFER_VIEW index_buffer_view;
-    };
+    ComPtr<ID3D12Resource> resource;
+    D3D12MA::Allocation* allocation = nullptr;
+    BufferView view;
+    u32 heapIndex = 0;
+
+    [[nodiscard]] const VertexBufferView* AsVertexBuffer() const
+    {
+        return std::get_if<VertexBufferView>(&view);
+    }
+    [[nodiscard]] const IndexBufferView* AsIndexBuffer() const
+    {
+        return std::get_if<IndexBufferView>(&view);
+    }
+    [[nodiscard]] const ConstantBufferView* AsConstantBuffer() const
+    {
+        return std::get_if<ConstantBufferView>(&view);
+    }
+	[[nodiscard]] const UnorderedAccessView* AsUnorderedAccessView() const
+    {
+        return std::get_if<UnorderedAccessView>(&view);
+    }
+    [[nodiscard]] const ShaderResourceView* AsShaderResourceView() const
+    {
+        return std::get_if<ShaderResourceView>(&view);
+    }
 };
 
-struct BufferDesc
+struct VertexBufferDesc
 {
-    u32 _bufferSize = 0;
-    /* buffer may or may not have contents. Imagine just a pointer to memory
-       in a shader reflection system where a change in GPU code affects CPU side memory
-    */
-    BufferType _bufferType;
-    void* _pContents = nullptr; 
+    const void* vertices;
+    u32 vertexCount;
+    u32 vertexStride;
 };
 
-Buffer CreateBuffer(GfxDevice& gfxDevice, BufferDesc desc);
-void DestroyBuffer(GfxDevice& gfxDevice, Buffer& buffer);
-
-inline void AllocateUAVBuffer(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* resourceName = nullptr)
+struct IndexBufferDesc
 {
-    auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    DX_ASSERT(pDevice->CreateCommittedResource(
-        &uploadHeapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        initialResourceState,
-        nullptr,
-        IID_PPV_ARGS(ppResource)));
-    if (resourceName)
-    {
-        (*ppResource)->SetName(resourceName);
-    }
+    const void* indices;
+    u32 indexCount;
+    DXGI_FORMAT indexFormat = DXGI_FORMAT_R32_UINT;
+};
+
+struct ConstantBufferDesc
+{
+    const void* data;
+    u32 sizeInBytes;
+    bool createView = true; // view created and set in descriptor heap
+};
+
+struct StructuredBufferDesc
+{
+    const void* data;
+    u32 elementCount;
+    u32 elementStride;
+    bool createSRV = false;
+    bool createUAV = false;
+};
+
+struct RawBufferDesc
+{
+    const void* data;
+    u32 sizeInBytes;
+
+    bool createSRV = false;
+    bool createUAV = false;
+    DXGI_FORMAT format = DXGI_FORMAT_R32_TYPELESS;
+};
+
+using BufferDesc = std::variant<
+    VertexBufferDesc,
+    IndexBufferDesc,
+    ConstantBufferDesc,
+	StructuredBufferDesc,
+    RawBufferDesc
+>;
+
+enum class BufferUsage : u8 {
+    UPLOAD,      // CPU write, GPU read (default for VB/IB/CB)
+    DEFAULT,     // GPU only
+    READBACK,    // GPU write, CPU read
+    GPU_UPLOAD   // CPU available (and writeable, don't read ever, its slow af), GPU located memory
+};
+
+struct BufferCreateInfo {
+    BufferDesc desc;
+    BufferUsage usage = BufferUsage::UPLOAD;
+    bool keepMapped = false;
+    const wchar_t* debugName = nullptr;
+
+    ID3D12DescriptorHeap* bindlessHeap = nullptr;
+    u32* nextHeapIndex = nullptr; // global heap index passed, it is set and counter increased in CreateBuffer func
+};
+Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createInfo);
+
+inline Buffer CreateVertexBuffer(const GfxDevice& gfxDevice,
+    const void* vertices,
+    u32 vertexCount,
+    u32 vertexStride,
+    const wchar_t* debugName = nullptr)
+{
+    return CreateBuffer(gfxDevice, {
+        .desc = VertexBufferDesc{.vertices = vertices, .vertexCount = vertexCount, .vertexStride = vertexStride},
+        .debugName = debugName
+        });
 }
 
-inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource, const wchar_t* resourceName = nullptr)
+inline Buffer CreateIndexBuffer(const GfxDevice& gfxDevice,
+    const void* indices,
+    u32 indexCount,
+    DXGI_FORMAT format = DXGI_FORMAT_R32_UINT,
+    const wchar_t* debugName = nullptr)
 {
-    auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-    DX_ASSERT(pDevice->CreateCommittedResource(
-        &uploadHeapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(ppResource)));
-    if (resourceName)
-    {
-        (*ppResource)->SetName(resourceName);
-    }
-    void* pMappedData;
-    (*ppResource)->Map(0, nullptr, &pMappedData);
-    memcpy(pMappedData, pData, datasize);
-    (*ppResource)->Unmap(0, nullptr);
+    return CreateBuffer(gfxDevice, {
+        .desc = IndexBufferDesc{.indices = indices, .indexCount = indexCount, .indexFormat = format},
+        .debugName = debugName
+        });
 }
+
+inline Buffer CreateConstantBuffer(const GfxDevice& gfxDevice,
+    const void* data,
+    u32 sizeInBytes,
+    const wchar_t* debugName = nullptr)
+{
+    return CreateBuffer(gfxDevice, {
+        .desc = ConstantBufferDesc{.data = data, .sizeInBytes = sizeInBytes},
+        .keepMapped = true, // cbs almost 
+        .debugName = debugName
+        });
+}
+// buffer size
+struct BufferSizeVisitor
+{
+    u32 operator()(const VertexBufferDesc& desc) const
+    {
+        return desc.vertexCount * desc.vertexStride;
+    }
+    u32 operator()(const IndexBufferDesc& desc) const
+    {
+        u32 indexSize = (desc.indexFormat == DXGI_FORMAT_R16_UINT) ? 2 : 4;
+        return desc.indexCount * indexSize;
+    }
+    u32 operator()(const ConstantBufferDesc& desc) const
+    {
+        // Align to 256 bytes for CBVs
+        return (desc.sizeInBytes + 255) & ~255; // last bits of 255 in binary are flipped to 0 with ~ op,
+        // which when &ed with something > 255 give multiple of 256
+    }
+    u32 operator()(const StructuredBufferDesc& desc) const
+    {
+        return desc.elementCount * desc.elementStride;
+    }
+    u32 operator()(const RawBufferDesc& desc) const
+    {
+        return desc.sizeInBytes;
+    }
+};
+
+inline u32 GetBufferSize(const BufferDesc& desc)
+{
+    return std::visit(BufferSizeVisitor{}, desc);
+}
+
+// buffer update for mapped buffers (included in .h cuz it can be called anywhere)
+
+struct BufferUpdateVisitor
+{
+    void* mappedData;
+
+    void operator()(const VertexBufferDesc& desc) const
+    {
+        u32 size = GetBufferSize(desc);
+        memcpy(mappedData, desc.vertices, size);
+    }
+    void operator()(const IndexBufferDesc& desc) const
+    {
+        u32 size = GetBufferSize(desc);
+        memcpy(mappedData, desc.indices, size);
+    }
+    void operator()(const ConstantBufferDesc& desc) const
+    {
+        if (desc.data)
+        {
+            u32 size = GetBufferSize(desc);
+            memcpy(mappedData, desc.data, size);
+        }
+    }
+    void operator()(const StructuredBufferDesc& desc) const
+    {
+        if (desc.data)
+        {
+            u32 size = GetBufferSize(desc);
+            memcpy(mappedData, desc.data, size);
+        }
+    }
+    void operator()(const RawBufferDesc& desc) const
+    {
+        if (desc.data)
+        {
+            u32 size = GetBufferSize(desc);
+            memcpy(mappedData, desc.data, size);
+        }
+    }
+};
+
+void UpdateBuffer(Buffer& buffer, const BufferDesc& desc);
