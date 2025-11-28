@@ -8,19 +8,19 @@
 
 void Pipeline::Release()
 {
-    if (_pipelineState) {
-        _pipelineState.Reset();
+    if (pipelineState) {
+        pipelineState.Reset();
     }
-    if (_rootSignature) {
-        _rootSignature.Reset();
+    if (rootSignature) {
+        rootSignature.Reset();
     }
 }
 
-void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapChain, Pipeline& pipeline, Resources* resources, PipelineDesc& pipelineDesc)
+void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc)
 {
-    pipeline._rootSignature = CreateRootSignature(gfxDevice, { ._type = pipelineDesc._rootSignType })._rootSignature;
+    pipeline.rootSignature = CreateRootSignature(gfxDevice, { ._type = pipelineDesc.rootSignType })._rootSignature;
 
-    if (pipelineDesc._pipelineType == PipelineType::GRAPHICS)
+    if (pipelineDesc.pipelineType == PipelineType::GRAPHICS)
     {
         // define the vertex input layout
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -45,23 +45,23 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         // Describe and create the PSO
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.InputLayout = { .pInputElementDescs = inputElementDescs, .NumElements = _countof(inputElementDescs) };
-        psoDesc.pRootSignature = pipeline._rootSignature.Get();
+        psoDesc.pRootSignature = pipeline.rootSignature.Get();
 
-        for (const u32 shaderIndex : pipelineDesc._shaderIndex)
+        for (const u32 shaderIndex : pipelineDesc.shaderIndex)
         {
             Shader shader = resources->shaders[shaderIndex];
-            if (shader._type == Type::VERTEX)
+            if (shader.type == Type::VERTEX)
             {
                 D3D12_SHADER_BYTECODE bytecode{};
-                bytecode.BytecodeLength = shader._pBlob->GetBufferSize();
-                bytecode.pShaderBytecode = shader._pBlob->GetBufferPointer();
+                bytecode.BytecodeLength = shader.pBlob->GetBufferSize();
+                bytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
                 psoDesc.VS = bytecode;
             }
-            else if (shader._type == Type::PIXEL)
+            else if (shader.type == Type::PIXEL)
             {
                 D3D12_SHADER_BYTECODE bytecode{};
-                bytecode.BytecodeLength = shader._pBlob->GetBufferSize();
-                bytecode.pShaderBytecode = shader._pBlob->GetBufferPointer();
+                bytecode.BytecodeLength = shader.pBlob->GetBufferSize();
+                bytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
                 psoDesc.PS = bytecode;
             }
         }
@@ -82,7 +82,7 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
          };*/
          //  Will be replacing with proper resources provided directly
          //  in the CreatePipeline call. For now, this should work
-        if (pipelineDesc._isDepthPrePass == TRUE)
+        if (pipelineDesc.isDepthPrePass == TRUE)
         {
             psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
             psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
@@ -108,40 +108,40 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
 
-        psoDesc.DepthStencilState.DepthEnable = pipelineDesc._enableDepthTest;
-        psoDesc.DepthStencilState.StencilEnable = pipelineDesc._enableStencilTest;
+        psoDesc.DepthStencilState.DepthEnable = pipelineDesc.enableDepthTest;
+        psoDesc.DepthStencilState.StencilEnable = pipelineDesc.enableStencilTest;
         psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.SampleDesc.Count = 1;
-        DX_ASSERT(gfxDevice._device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
+        DX_ASSERT(gfxDevice._device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
 
-    if (pipelineDesc._pipelineType == PipelineType::COMPUTE)
+    if (pipelineDesc.pipelineType == PipelineType::COMPUTE)
     {
         D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
         /*assert(pipelineDesc._shaders.begin()->_type == Type::COMPUTE && pipelineDesc._shaders.size() == 1);*/
 
-        for (const u32 shaderIndex : pipelineDesc._shaderIndex)
+        for (const u32 shaderIndex : pipelineDesc.shaderIndex)
         {
             Shader shader = resources->shaders[shaderIndex];
 
             D3D12_SHADER_BYTECODE cShaderBytecode{};
-            cShaderBytecode.BytecodeLength = shader._pBlob->GetBufferSize();
-            cShaderBytecode.pShaderBytecode = shader._pBlob->GetBufferPointer();
+            cShaderBytecode.BytecodeLength = shader.pBlob->GetBufferSize();
+            cShaderBytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
             csoDesc.CS = cShaderBytecode;
         }
         csoDesc.NodeMask = 0;
-        csoDesc.pRootSignature = pipeline._rootSignature.Get();
-        DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline._pipelineState)));
+        csoDesc.pRootSignature = pipeline.rootSignature.Get();
+        DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
 }
 
-Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, Resources* resources, PipelineDesc& pipelineDesc)
+Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc& pipelineDesc)
 {
     Pipeline pipeline{};
 
-    CompilePipelineInternal(gfxDevice, swapChain, pipeline, resources, pipelineDesc);
+    CompilePipelineInternal(gfxDevice, swapChain, pipeline, pipelineDesc);
 
     resources->pipelines.push_back(pipeline);
     resources->pipelineParams.push_back(pipelineDesc);

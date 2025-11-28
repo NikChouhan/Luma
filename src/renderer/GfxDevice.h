@@ -28,4 +28,4 @@ GfxDevice CreateDevice(GfxDeviceDesc desc);
 void DestroyDevice(GfxDevice& gfxDevice);
 
 ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(GfxDevice& gfxDevice);
-void ImmediateSubmit(GfxDevice& gfxDevice, FrameSync& framesync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback);
+void ImmediateSubmit(const GfxDevice& gfxDevice, FrameSync& framesync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback);

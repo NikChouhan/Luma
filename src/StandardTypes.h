@@ -16,5 +16,3 @@ using f64 = double;
 using byte = uint8_t;
 
 using cstring = const char*;
-
-typedef u32 ResourceHandle;

@@ -33,12 +33,12 @@ static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model
 
         Texture texture = CreateTexture(gfxDevice, frameSync,
             {
-            ._texWidth = u32(width),
-            ._texHeight = u32(height),
-            ._texPixelSize = u32(4),
-            ._pContents = imgData,
-            ._textureType = TextureResourceType::SAMPLE,
-            ._type = type
+            .texWidth = u32(width),
+            .texHeight = u32(height),
+            .texPixelSize = u32(4),
+            .pContents = imgData,
+            .textureType = TextureViewType::SAMPLE,
+            .type = type
             });
 
         stbi_image_free(imgData);
@@ -89,7 +89,7 @@ static void OptimiseMesh(Model& model, MeshInfo& meshInfo, Mesh& mesh)
     meshopt_optimizeVertexCache(optIndices.data(), optIndices.data(), indexCount, optVertexCount);
 
     // Optimization 3 - reduce pixel overdraw
-    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &(optVertices[0]._position.x), optVertexCount, sizeof(Vertex), static_cast<float>(1.05));
+    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &(optVertices[0].position.x), optVertexCount, sizeof(Vertex), static_cast<float>(1.05));
 
     // Optimization 4 - optimize access to the vertex buffer
     meshopt_optimizeVertexFetch(optVertices.data(), optIndices.data(), indexCount, optVertices.data(), optVertexCount, sizeof(Vertex));
@@ -101,7 +101,7 @@ static void OptimiseMesh(Model& model, MeshInfo& meshInfo, Mesh& mesh)
 
     std::vector<u32> simplifiedIndices(optIndices.size());
     size_t optIndexCount = meshopt_simplify(simplifiedIndices.data(), optIndices.data(), indexCount,
-        &(optVertices[0]._position.x), optVertexCount, sizeof(Vertex), targetIndexCount,
+        &(optVertices[0].position.x), optVertexCount, sizeof(Vertex), targetIndexCount,
         targetError);
     simplifiedIndices.resize(optIndexCount);
 
@@ -184,15 +184,15 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
         Vertex vertex = {};
 
         // Read original vertex data
-        if (cgltf_accessor_read_float(pos_attribute->data, i, &vertex._position.x, 3) == 0)
+        if (cgltf_accessor_read_float(pos_attribute->data, i, &vertex.position.x, 3) == 0)
         {
             printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Position attributes!");
         }
-        if (cgltf_accessor_read_float(tex_attribute->data, i, &vertex._texCoord.x, 2) == 0)
+        if (cgltf_accessor_read_float(tex_attribute->data, i, &vertex.texCoord.x, 2) == 0)
         {
             printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Texture attributes!");
         }
-        if (cgltf_accessor_read_float(norm_attribute->data, i, &vertex._normal.x, 3) == 0)
+        if (cgltf_accessor_read_float(norm_attribute->data, i, &vertex.normal.x, 3) == 0)
         {
             printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Normal attributes!");
         }
@@ -370,15 +370,15 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
 {
     model._vertexBuffer = CreateBuffer(gfxDevice,
         {
-        ._bufferSize = u32(sizeof(Vertex) * model._vertices.size()),
-        ._bufferType = BufferType::VERTEX,
-        ._pContents = model._vertices.data() });
+        .bufferSize = u32(sizeof(Vertex) * model._vertices.size()),
+        .bufferType = BufferType::VERTEX,
+        .pContents = model._vertices.data() });
 
     model._indexBuffer = CreateBuffer(gfxDevice,
         {
-        ._bufferSize = u32(sizeof(Index) * model._indices.size()),
-		._bufferType = BufferType::INDEX,
-        ._pContents = model._indices.data() });
+        .bufferSize = u32(sizeof(Index) * model._indices.size()),
+		.bufferType = BufferType::INDEX,
+        .pContents = model._indices.data() });
 
     // acceleration structures
     {
@@ -386,15 +386,15 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             nullptr));
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Triangles.IndexBuffer = model._indexBuffer._resource->GetGPUVirtualAddress();
-        geometryDesc.Triangles.IndexCount = (u32)(model._indexBuffer._resource->GetDesc().Width) / sizeof(Index);
+        geometryDesc.Triangles.IndexBuffer = model._indexBuffer.resource->GetGPUVirtualAddress();
+        geometryDesc.Triangles.IndexCount = (u32)(model._indexBuffer.resource->GetDesc().Width) / sizeof(Index);
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.Transform3x4 = NULL;
 
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-        geometryDesc.Triangles.VertexBuffer.StartAddress = model._vertexBuffer._resource->GetGPUVirtualAddress();
+        geometryDesc.Triangles.VertexBuffer.StartAddress = model._vertexBuffer.resource->GetGPUVirtualAddress();
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-        geometryDesc.Triangles.VertexCount = u32(model._vertexBuffer._resource->GetDesc().Width) / sizeof(Vertex);
+        geometryDesc.Triangles.VertexCount = u32(model._vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
 
         // will keep the flag as RT opaque cuz I am not managing transparent/translucent objects for now
         geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
@@ -475,21 +475,21 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
     {
         model._normalUAV = CreateTexture(gfxDevice, frameSync,
             {
-            ._texWidth = static_cast<u32>(swapchain._width),
-            ._texHeight = static_cast<u32>(swapchain._height),
-            ._texPixelSize = 0,
-            ._pContents = nullptr,
-            ._textureType = TextureResourceType::UAV,
-            ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+            .texWidth = static_cast<u32>(swapchain._width),
+            .texHeight = static_cast<u32>(swapchain._height),
+            .texPixelSize = 0,
+            .pContents = nullptr,
+            .textureType = TextureViewType::UAV,
+            .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
 
         model._rtaoUAV = CreateTexture(gfxDevice, frameSync,
             {
-            ._texWidth = static_cast<u32>(swapchain._width),
-            ._texHeight = static_cast<u32>(swapchain._height),
-            ._texPixelSize = 0,
-            ._pContents = nullptr,
-            ._textureType = TextureResourceType::UAV,
-            ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+            .texWidth = static_cast<u32>(swapchain._width),
+            .texHeight = static_cast<u32>(swapchain._height),
+            .texPixelSize = 0,
+            .pContents = nullptr,
+            .textureType = TextureViewType::UAV,
+            .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
     }
     
     // common heap for all textures
@@ -511,11 +511,11 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             {
                 D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
                 srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.Format = texture._resource->GetDesc().Format;
+                srvDesc.Format = texture.resource->GetDesc().Format;
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Texture2D.MipLevels = texture._resource->GetDesc().MipLevels;
+                srvDesc.Texture2D.MipLevels = texture.resource->GetDesc().MipLevels;
 
-                gfxDevice._device->CreateShaderResourceView(texture._resource.Get(), &srvDesc, heapHandle);
+                gfxDevice._device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, heapHandle);
                 heapHandle.Offset(descriptorSize);
             }
         }
@@ -528,7 +528,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             gfxDevice._device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
         	heapHandle.Offset(descriptorSize);
 
-            GlobalStorage::index._accelerationStructureIndex = model._modelTextures.size();
+            GlobalStorage::index.accelerationStructureIndex = model._modelTextures.size();
         }
         // compute shader bg effects
         {
@@ -540,7 +540,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 
-            GlobalStorage::index._computeShaderBgIndex = model._modelTextures.size() + 1;
+            GlobalStorage::index.computeShaderBgIndex = model._modelTextures.size() + 1;
         }
         // depth srv for calculating world space pos from depth buffer
         {
@@ -553,7 +553,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, heapHandle);
             heapHandle.Offset(descriptorSize);
 
-            GlobalStorage::index._depthSRV = model._modelTextures.size() + 2;
+            GlobalStorage::index.depthSRV = model._modelTextures.size() + 2;
         }
         // normal uav
         {
@@ -565,7 +565,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 
-            GlobalStorage::index._normalUAV = model._modelTextures.size() + 3;
+            GlobalStorage::index.normalUAV = model._modelTextures.size() + 3;
         }
         // rtao uav
         {
@@ -577,7 +577,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 
-            GlobalStorage::index._rtaoUAV = model._modelTextures.size() + 4;
+            GlobalStorage::index.rtaoUAV = model._modelTextures.size() + 4;
         }
     }
 }

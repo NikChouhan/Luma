@@ -97,32 +97,32 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
             // Recreate UAV with new dimensions
             _uavBgShaderEffects = CreateTexture(*_gfxDevice, *_frameSync,
                 {
-                ._texWidth = static_cast<u32>(_width),
-                ._texHeight = static_cast<u32>(_height),
-                ._texPixelSize = 0,
-                ._pContents = nullptr,
-                ._textureType = TextureResourceType::UAV,
-                ._format = DXGI_FORMAT_R8G8B8A8_UNORM })._resource;
+                .texWidth = static_cast<u32>(_width),
+                .texHeight = static_cast<u32>(_height),
+                .texPixelSize = 0,
+                .pContents = nullptr,
+                .textureType = TextureViewType::UAV,
+                .format = DXGI_FORMAT_R8G8B8A8_UNORM }).resource;
 
             model->_normalUAV.Reset();
             model->_normalUAV = CreateTexture(*_gfxDevice, *_frameSync,
                 {
-                ._texWidth = static_cast<u32>(_width),
-                ._texHeight = static_cast<u32>(_height),
-                ._texPixelSize = 0,
-                ._pContents = nullptr,
-                ._textureType = TextureResourceType::UAV,
-                ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+                .texWidth = static_cast<u32>(_width),
+                .texHeight = static_cast<u32>(_height),
+                .texPixelSize = 0,
+                .pContents = nullptr,
+                .textureType = TextureViewType::UAV,
+                .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
 
             model->_rtaoUAV.Reset();
             model->_rtaoUAV = CreateTexture(*_gfxDevice, *_frameSync,
                 {
-                ._texWidth = static_cast<u32>(_width),
-                ._texHeight = static_cast<u32>(_height),
-                ._texPixelSize = 0,
-                ._pContents = nullptr,
-                ._textureType = TextureResourceType::UAV,
-                ._format = DXGI_FORMAT_R11G11B10_FLOAT })._resource;
+                .texWidth = static_cast<u32>(_width),
+                .texHeight = static_cast<u32>(_height),
+                .texPixelSize = 0,
+                .pContents = nullptr,
+                .textureType = TextureViewType::UAV,
+                .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
 
         };
     ResizeSizeDependentResources();
@@ -131,7 +131,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
     CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(
         model->_commonHeap->GetCPUDescriptorHandleForHeapStart());
 
-    heapHandle.Offset((int)GlobalStorage::index._computeShaderBgIndex, descriptorSize);
+    heapHandle.Offset((int)GlobalStorage::index.computeShaderBgIndex, descriptorSize);
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
     uavDesc.Format = _uavBgShaderEffects->GetDesc().Format;
@@ -297,12 +297,12 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
     {
         swapchain._uavBgShaderEffects = CreateTexture(gfxDevice, frameSync,
             {
-            ._texWidth = u32(swapchain._width),
-            ._texHeight = u32(swapchain._height),
-            ._texPixelSize = 0,
-            ._pContents = nullptr,
-            ._textureType = TextureResourceType::UAV,
-            ._format = DXGI_FORMAT_R8G8B8A8_UNORM})._resource;
+            .texWidth = u32(swapchain._width),
+            .texHeight = u32(swapchain._height),
+            .texPixelSize = 0,
+            .pContents = nullptr,
+            .textureType = TextureViewType::UAV,
+            .format = DXGI_FORMAT_R8G8B8A8_UNORM}).resource;
 
         DX_ASSERT(swapchain._uavBgShaderEffects->SetName(L"UAV Shader Effect Resource"));
     }
@@ -329,11 +329,11 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
     // compute pass for space bg shader
     {
-        commandList->SetPipelineState(pipelines[0]._pipelineState.Get());
+        commandList->SetPipelineState(pipelines[0].pipelineState.Get());
         ID3D12DescriptorHeap* ppHeaps[] = {model._commonHeap.Get() };
 
         commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-        commandList->SetComputeRootSignature(pipelines[0]._rootSignature.Get());
+        commandList->SetComputeRootSignature(pipelines[0].rootSignature.Get());
         CD3DX12_RESOURCE_BARRIER rBarriers[2];
 
         rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(swapchain._uavBgShaderEffects.Get(),
@@ -342,14 +342,14 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         commandList->ResourceBarrier(1, &rBarriers[0]);
 
         ShaderEffects pushConstants{};
-        pushConstants._resolution[0] = (float)swapchain._width;
-        pushConstants._resolution[1] = (float)swapchain._height;
+        pushConstants.resolution[0] = (float)swapchain._width;
+        pushConstants.resolution[1] = (float)swapchain._height;
 
-        pushConstants._time = camera._time;
-        pushConstants._cameraYaw = camera._yaw;
-        pushConstants._cameraPitch = camera._pitch;
-        pushConstants._cameraPos = camera._pos;
-        pushConstants._uavIndex = GlobalStorage::index._computeShaderBgIndex;
+        pushConstants.time = camera._time;
+        pushConstants.cameraYaw = camera._yaw;
+        pushConstants.cameraPitch = camera._pitch;
+        pushConstants.cameraPos = camera._pos;
+        pushConstants.uavIndex = GlobalStorage::index.computeShaderBgIndex;
 
         commandList->SetComputeRoot32BitConstants(0, sizeof(ShaderEffects) / 4, &pushConstants, 0);
         u16 dispatchX = (swapchain._width + 7) / 8;
@@ -378,8 +378,8 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
     // depth pre-pass
 	{
-        commandList->SetPipelineState(pipelines[1]._pipelineState.Get());
-        commandList->SetGraphicsRootSignature(pipelines[1]._rootSignature.Get());
+        commandList->SetPipelineState(pipelines[1].pipelineState.Get());
+        commandList->SetGraphicsRootSignature(pipelines[1].rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
@@ -398,8 +398,8 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
             XMMATRIX worldViewProj = world * view * proj;
             DepthPPBuffer pushConstants{};
-            pushConstants._worldViewProj = worldViewProj;
-            pushConstants._worldMatrix = (world);
+            pushConstants.worldViewProj = worldViewProj;
+            pushConstants.worldMatrix = (world);
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPPBuffer) / 4, &pushConstants, 0);
 
             commandList->DrawIndexedInstanced(mesh._indexCount,
@@ -408,9 +408,9 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
     }
     // Normal buffer and RTAO pass
     {
-        commandList->SetPipelineState(pipelines[2]._pipelineState.Get());
+        commandList->SetPipelineState(pipelines[2].pipelineState.Get());
 
-        commandList->SetComputeRootSignature(pipelines[2]._rootSignature.Get());
+        commandList->SetComputeRootSignature(pipelines[2].rootSignature.Get());
         CD3DX12_RESOURCE_BARRIER rBarriers[2];
         rBarriers[0] = { CD3DX12_RESOURCE_BARRIER::Transition(model._normalUAV.Get(),
             D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
@@ -420,20 +420,20 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
         };
         commandList->ResourceBarrier(_countof(rBarriers), rBarriers);
 
-        GlobalStorage::_projMatrixInv = XMMatrixInverse(nullptr, camera._projection);
-        GlobalStorage::_viewMatrixInv = XMMatrixInverse(nullptr, camera._view);
+        GlobalStorage::projMatrixInv = XMMatrixInverse(nullptr, camera._projection);
+        GlobalStorage::viewMatrixInv = XMMatrixInverse(nullptr, camera._view);
 
         RTAO pushConstants{};
-        pushConstants._projMatrixInv = GlobalStorage::_projMatrixInv;
-        pushConstants.viewMatrixInv = GlobalStorage::_viewMatrixInv;
+        pushConstants.projMatrixInv = GlobalStorage::projMatrixInv;
+        pushConstants.viewMatrixInv = GlobalStorage::viewMatrixInv;
 
-        pushConstants._accelerationStructureIndex = GlobalStorage::index._accelerationStructureIndex;
-        pushConstants._rtUAVIndex = GlobalStorage::index._rtaoUAV;
-        pushConstants._depthIndex = GlobalStorage::index._depthSRV;
-        pushConstants._normalUAVIndex = GlobalStorage::index._normalUAV;
+        pushConstants.accelerationStructureIndex = GlobalStorage::index.accelerationStructureIndex;
+        pushConstants.rtUavIndex = GlobalStorage::index.rtaoUAV;
+        pushConstants.depthIndex = GlobalStorage::index.depthSRV;
+        pushConstants.normalUavIndex = GlobalStorage::index.normalUAV;
 
-        pushConstants._isEnabled = TRUE;
-        pushConstants._samplesPerPixel = 3;
+        pushConstants.isEnabled = TRUE;
+        pushConstants.samplesPerPixel = 3;
 
         commandList->SetComputeRoot32BitConstants(0, sizeof(RTAO) / 4, &pushConstants, 0);
         u16 dispatchX = (swapchain._width + 7) / 8;
@@ -451,9 +451,9 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
     // forward RT path
     {
-        commandList->SetPipelineState(pipelines[3]._pipelineState.Get());
+        commandList->SetPipelineState(pipelines[3].pipelineState.Get());
 
-        commandList->SetGraphicsRootSignature(pipelines[3]._rootSignature.Get());
+        commandList->SetGraphicsRootSignature(pipelines[3].rootSignature.Get());
 
         commandList->RSSetViewports(1, &swapchain._viewport);
         commandList->RSSetScissorRects(1, &swapchain._scissorRect);
@@ -473,32 +473,32 @@ void SubmitPasses(ComPtr<ID3D12GraphicsCommandList> commandList,
 
             XMMATRIX worldViewProj = world * view * proj;
             RenderPass pushConstants{};
-            pushConstants._worldViewProj = worldViewProj;
+            pushConstants.worldViewProj = worldViewProj;
 
-            pushConstants._worldMatrix = (world);
+            pushConstants.worldMatrix = (world);
 
-            pushConstants._albedoIndex = currentMaterial._albedoIndex;
-            pushConstants._normalIndex = currentMaterial._normalIndex;
-            pushConstants._metallicRoughnessIndex = currentMaterial._metallicRoughnessIndex;
-            pushConstants._emissiveIndex = currentMaterial._emmisiveIndex;
+            pushConstants.albedoIndex = currentMaterial._albedoIndex;
+            pushConstants.normalIndex = currentMaterial._normalIndex;
+            pushConstants.metallicRoughnessIndex = currentMaterial._metallicRoughnessIndex;
+            pushConstants.emissiveIndex = currentMaterial._emmisiveIndex;
             
-            pushConstants._accelerationStructureIndex = GlobalStorage::index._accelerationStructureIndex;
+            pushConstants.accelerationStructureIndex = GlobalStorage::index.accelerationStructureIndex;
             //SM::Vector3 dirLightDir = SM::Vector3(-0.59628606, 6.0584383, -0.014198627) - SM::Vector3(-0.40488148, 13.129597, -0.81999177);
 
-            pushConstants._dirLightDir = direction;
+            pushConstants.dirLightDir = direction;
 
-            pushConstants._dirLightIntensity = GlobalStorage::g_lightSettings.dirIntensity;
-            pushConstants._dirLightColor[0] = GlobalStorage::g_lightSettings.dirColor[0];
-            pushConstants._dirLightColor[1] = GlobalStorage::g_lightSettings.dirColor[1];
-            pushConstants._dirLightColor[2] = GlobalStorage::g_lightSettings.dirColor[2];
+            pushConstants.dirLightIntensity = GlobalStorage::g_lightSettings.dirIntensity;
+            pushConstants.dirLightColor[0] = GlobalStorage::g_lightSettings.dirColor[0];
+            pushConstants.dirLightColor[1] = GlobalStorage::g_lightSettings.dirColor[1];
+            pushConstants.dirLightColor[2] = GlobalStorage::g_lightSettings.dirColor[2];
 
-            pushConstants._pointLightIntensity = GlobalStorage::g_lightSettings.pointIntensity;
-        	pushConstants._cameraPos = camera._pos;
+            pushConstants.pointLightIntensity = GlobalStorage::g_lightSettings.pointIntensity;
+        	pushConstants.cameraPos = camera._pos;
 
-            pushConstants._pointLightRadius = GlobalStorage::g_lightSettings.pointRadius;
-            pushConstants._pointLightColor[0] = GlobalStorage::g_lightSettings.pointColor[0];
-            pushConstants._pointLightColor[1] = GlobalStorage::g_lightSettings.pointColor[1];
-            pushConstants._pointLightColor[2] = GlobalStorage::g_lightSettings.pointColor[2];
+            pushConstants.pointLightRadius = GlobalStorage::g_lightSettings.pointRadius;
+            pushConstants.pointLightColor[0] = GlobalStorage::g_lightSettings.pointColor[0];
+            pushConstants.pointLightColor[1] = GlobalStorage::g_lightSettings.pointColor[1];
+            pushConstants.pointLightColor[2] = GlobalStorage::g_lightSettings.pointColor[2];
 
             commandList->SetGraphicsRoot32BitConstants(0, sizeof(RenderPass)/4, &pushConstants, 0);
 

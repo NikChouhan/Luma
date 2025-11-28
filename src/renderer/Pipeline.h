@@ -15,8 +15,8 @@ enum class PipelineType : u8
 typedef std::initializer_list<u32> Shaders;
 struct Pipeline
 {
-    ComPtr<ID3D12PipelineState> _pipelineState;
-    ComPtr<ID3D12RootSignature> _rootSignature;
+    ComPtr<ID3D12PipelineState> pipelineState;
+    ComPtr<ID3D12RootSignature> rootSignature;
 
     void Release();
 };
@@ -24,14 +24,14 @@ struct Pipeline
 
 struct PipelineDesc
 {
-    PipelineType _pipelineType{};
-    RootSignDesc::RSType _rootSignType;
-    Shaders _shaderIndex;
-    BOOL _enableDepthTest;
-    BOOL _enableStencilTest{};
-    BOOL _isDepthPrePass = false;
+    PipelineType pipelineType{};
+    RootSignDesc::RSType rootSignType;
+    Shaders shaderIndex;
+    BOOL enableDepthTest;
+    BOOL enableStencilTest{};
+    BOOL isDepthPrePass = false;
 };
 
-void CompilePipelineInternal(const GfxDevice& gfxDevice, const Swapchain& swapChain, Pipeline& pipeline, Resources* resources, PipelineDesc& pipelineDesc);
-Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, Resources* resources, PipelineDesc& pipelineDesc);
+void CompilePipelineInternal(const GfxDevice& gfxDevice, const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc);
+Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc& pipelineDesc);
 void DestroyPipeline(GfxDevice& gfxDevice, Pipeline& pipeline);

@@ -150,7 +150,7 @@ ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(GfxDevice& gfxDevice)
     return commandList;
 }
 
-void ImmediateSubmit(GfxDevice& gfxDevice, FrameSync& frameSync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback)
+void ImmediateSubmit(const GfxDevice& gfxDevice, FrameSync& frameSync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback)
 {
 	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
 

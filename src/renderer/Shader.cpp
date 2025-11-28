@@ -5,40 +5,40 @@
 
 void Shader::Release()
 {
-    if (_pBlobEnc) {
-        _pBlobEnc.Reset();
+    if (pBlobEnc) {
+        pBlobEnc.Reset();
     }
-    if (_pBlob) {
-        _pBlob.Reset();
+    if (pBlob) {
+        pBlob.Reset();
     }
-    if (_result) {
-        _result.Reset();
+    if (result) {
+        result.Reset();
     }
 
-    _source.Ptr = nullptr;
-    _source.Size = 0;
-    _source.Encoding = 0;
+    source.Ptr = nullptr;
+    source.Size = 0;
+    source.Encoding = 0;
 }
 DXCRes ShaderCompiler()
 {
     DXCRes dxcRes;
 
-    DX_ASSERT(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(dxcRes._pUtils.GetAddressOf())));
-    DX_ASSERT(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(dxcRes._pCompiler.GetAddressOf())));
-    DX_ASSERT(dxcRes._pUtils->CreateDefaultIncludeHandler(dxcRes._pIncludeHandler.GetAddressOf()));
+    DX_ASSERT(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(dxcRes.pUtils.GetAddressOf())));
+    DX_ASSERT(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(dxcRes.pCompiler.GetAddressOf())));
+    DX_ASSERT(dxcRes.pUtils->CreateDefaultIncludeHandler(dxcRes.pIncludeHandler.GetAddressOf()));
 	return dxcRes;
 }
 
 void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& shader, const ShaderDesc& shaderDesc)
 {
-    if (shaderDesc._type == Type::VERTEX)
-        shader._type = Type::VERTEX;
-    else if (shaderDesc._type == Type::PIXEL)
-        shader._type = Type::PIXEL;
-    else if (shaderDesc._type == Type::COMPUTE)
-        shader._type = Type::COMPUTE;
+    if (shaderDesc.type == Type::VERTEX)
+        shader.type = Type::VERTEX;
+    else if (shaderDesc.type == Type::PIXEL)
+        shader.type = Type::PIXEL;
+    else if (shaderDesc.type == Type::COMPUTE)
+        shader.type = Type::COMPUTE;
 
-    const wchar_t* path = shaderDesc._shaderPath;
+    const wchar_t* path = shaderDesc.shaderPath;
     const wchar_t* filename = wcsrchr(path, L'/');
     if (filename != nullptr)
     {
@@ -54,10 +54,10 @@ void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& s
 
     LPCWSTR pszArgs[] =
     {
-        shaderDesc._shaderPath,         // Optional shader source file name for error reporting
+        shaderDesc.shaderPath,         // Optional shader source file name for error reporting
         // and for PIX shader source view.  
-        L"-E", shaderDesc._pEntryPoint,
-        L"-T", shaderDesc._pTarget,
+        L"-E", shaderDesc.pEntryPoint,
+        L"-T", shaderDesc.pTarget,
         L"-Zs",                         // Enable debug information (slim format)
         /*L"-D", L"myTex2DSpace=0",*/   // A single define.
         L"-Fo", binName.c_str(),         // Optional. Stored in the pdb. 
@@ -67,25 +67,25 @@ void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& s
     };
 
     // open source file
-    DX_ASSERT(dxcRes._pUtils->LoadFile(shaderDesc._shaderPath, nullptr, shader._pBlobEnc.GetAddressOf()));
-    shader._source.Ptr = shader._pBlobEnc->GetBufferPointer();
-    shader._source.Size = shader._pBlobEnc->GetBufferSize();
-    shader._source.Encoding = DXC_CP_ACP;
+    DX_ASSERT(dxcRes.pUtils->LoadFile(shaderDesc.shaderPath, nullptr, shader.pBlobEnc.GetAddressOf()));
+    shader.source.Ptr = shader.pBlobEnc->GetBufferPointer();
+    shader.source.Size = shader.pBlobEnc->GetBufferSize();
+    shader.source.Encoding = DXC_CP_ACP;
 
     // compile it with the arguments
-    DX_ASSERT(dxcRes._pCompiler->Compile(&shader._source,
+    DX_ASSERT(dxcRes.pCompiler->Compile(&shader.source,
         pszArgs,
         _countof(pszArgs),
-        dxcRes._pIncludeHandler.Get(),
-        IID_PPV_ARGS(&shader._result)));
+        dxcRes.pIncludeHandler.Get(),
+        IID_PPV_ARGS(&shader.result)));
     ComPtr<IDxcBlobUtf16> pShaderName = nullptr;
 
     HRESULT resultCode;
-    shader._result->GetStatus(&resultCode);
+    shader.result->GetStatus(&resultCode);
     if (FAILED(resultCode))
     {
         ComPtr<IDxcBlobEncoding> pError;
-        if (SUCCEEDED(shader._result->GetErrorBuffer(&pError)) && pError)
+        if (SUCCEEDED(shader.result->GetErrorBuffer(&pError)) && pError)
         {
             OutputDebugStringA("\n--- SHADER COMPILATION ERROR ---\n");
             printl(Log::LogLevel::Error, "Errors: {}", (const char*)pError->GetBufferPointer());
@@ -94,19 +94,19 @@ void CompileShaderInternal(const GfxDevice& gfxDevice, DXCRes& dxcRes, Shader& s
         DX_ASSERT(false);
     }
 
-    DX_ASSERT(shader._result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shader._pBlob), &pShaderName));
-    if (shader._pBlob != nullptr)
+    DX_ASSERT(shader.result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shader.pBlob), &pShaderName));
+    if (shader.pBlob != nullptr)
     {
         FILE* fp = NULL;
 
         _wfopen_s(&fp, pShaderName->GetStringPointer(), L"wb");
-        fwrite(shader._pBlob->GetBufferPointer(), shader._pBlob->GetBufferSize(), 1, fp);
+        fwrite(shader.pBlob->GetBufferPointer(), shader.pBlob->GetBufferSize(), 1, fp);
         fclose(fp);
     }
 
     ComPtr<IDxcBlob> pPDB = nullptr;
     ComPtr<IDxcBlobUtf16> pPDBName = nullptr;
-    shader._result->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(&pPDB), &pPDBName);
+    shader.result->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(&pPDB), &pPDBName);
     {
         FILE* fp = NULL;
 

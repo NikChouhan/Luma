@@ -42,19 +42,20 @@ static constexpr ResourceHandle g_invalidResourceHandle = { 0xFFFFFF, 0xFF };
 //	DSV
 //};
 
-using ResourceDesc = std::variant<TextureDesc, BufferDesc>;
+using ResourceDesc = std::variant<TextureCreateInfo, BufferCreateInfo>;
 using Resource = std::variant<Texture, Buffer>;
 
 struct ResourceCreator
 {
 	GfxDevice& gfxDevice;
 	FrameSync& frameSync;
-
-	Resource operator() (const TextureDesc& desc) const
+	// TODO: Change the ResourceDesc variant to take in TextureCreateInfo instead of TextureDesc
+	// TextureCreateInfo just like BufferCreateInfo will be a variant itself, for different types of textures
+	Resource operator() (const TextureCreateInfo& desc) const
 	{
 		return CreateTexture(gfxDevice, frameSync, desc);
 	}
-	Resource operator() (const BufferDesc& desc) const
+	Resource operator() (const BufferCreateInfo& desc) const
 	{
 		return CreateBuffer(gfxDevice, desc);
 	}
