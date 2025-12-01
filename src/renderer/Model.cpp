@@ -217,12 +217,10 @@ static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync,
         // map texture types to their respective textures
         std::unordered_map<TextureType, cgltf_texture_view*> textureMap;
 
-        // the following code for materials is very much unoptimised.
-        // It should only look for materials once, make a texture, sampler and save it in a map, not per primitive
-        // TODO -- RESOLVED
-
-        // it still is prolly unoptimised due to too much use of hashmaps and string ops everywhere
-        // need to find a better solution (nvtt3?)
+        /*TODO: its pretty unoptimised due to too much use of hashmaps and string ops everywhere
+        need to find a better solution (nvtt3?).
+        Also need to write custom arena, with vector, string, maps, etc
+		*/
 
         if (material->has_pbr_metallic_roughness)
         {
@@ -382,7 +380,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
 
     // acceleration structures
     {
-        DX_ASSERT(commandList->Reset(gfxDevice._commandAllocators[frameSync._frameIndex].Get(),
+        DX_ASSERT(commandList->Reset(gfxDevice.commandAllocators[frameSync._frameIndex].Get(),
             nullptr));
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -408,18 +406,18 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
         topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
-        gfxDevice._device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+        gfxDevice.device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
         assert(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
         bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
         bottomLevelInputs.pGeometryDescs = &geometryDesc;
-        gfxDevice._device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+        gfxDevice.device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
         assert(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
         ComPtr<ID3D12Resource> scratchResource;
-        AllocateUAVBuffer(gfxDevice._device.Get(),
+        AllocateUAVBuffer(gfxDevice.device.Get(),
             std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes),
             &scratchResource,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -428,9 +426,9 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
         {
             D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 
-            AllocateUAVBuffer(gfxDevice._device.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+            AllocateUAVBuffer(gfxDevice.device.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
                 &model._bottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure");
-            AllocateUAVBuffer(gfxDevice._device.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+            AllocateUAVBuffer(gfxDevice.device.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
                 &model._topLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure");
         }
         ComPtr<ID3D12Resource> instanceDescs;
@@ -443,7 +441,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
 
         instanceDesc.InstanceMask = 1;
         instanceDesc.AccelerationStructure = model._bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-        AllocateUploadBuffer(gfxDevice._device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
+        AllocateUploadBuffer(gfxDevice.device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
 
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
         {
@@ -468,7 +466,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
         }
         commandList->Close();
         ID3D12CommandList* pCommandLists = {commandList};
-        gfxDevice._commandQueue->ExecuteCommandLists(1, &pCommandLists);
+        gfxDevice.commandQueue->ExecuteCommandLists(1, &pCommandLists);
         WaitForGPU(gfxDevice, frameSync);
     }
     // normal and rtao textures
@@ -500,9 +498,9 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
         srvTextureHeap.NumDescriptors = MAX_TEXTURES;
         srvTextureHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         srvTextureHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&srvTextureHeap, IID_PPV_ARGS(&model._commonHeap)));
+        DX_ASSERT(gfxDevice.device->CreateDescriptorHeap(&srvTextureHeap, IID_PPV_ARGS(&model._commonHeap)));
 
-        const u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        const u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(model._commonHeap->GetCPUDescriptorHandleForHeapStart());
 
         // textures
@@ -515,7 +513,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                 srvDesc.Texture2D.MipLevels = texture.resource->GetDesc().MipLevels;
 
-                gfxDevice._device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, heapHandle);
+                gfxDevice.device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, heapHandle);
                 heapHandle.Offset(descriptorSize);
             }
         }
@@ -525,7 +523,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.RaytracingAccelerationStructure.Location = model._topLevelAccelerationStructure->GetGPUVirtualAddress();
-            gfxDevice._device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
+            gfxDevice.device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
         	heapHandle.Offset(descriptorSize);
 
             GlobalStorage::index.accelerationStructureIndex = model._modelTextures.size();
@@ -536,7 +534,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; 
 
-            gfxDevice._device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
+            gfxDevice.device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 
@@ -550,7 +548,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             depthSRV.Texture2D.MipLevels = 1;
 
-            gfxDevice._device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, heapHandle);
+            gfxDevice.device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, heapHandle);
             heapHandle.Offset(descriptorSize);
 
             GlobalStorage::index.depthSRV = model._modelTextures.size() + 2;
@@ -561,7 +559,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             uavDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-            gfxDevice._device->CreateUnorderedAccessView(model._normalUAV.Get(),
+            gfxDevice.device->CreateUnorderedAccessView(model._normalUAV.Get(),
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 
@@ -573,7 +571,7 @@ static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& 
             uavDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-            gfxDevice._device->CreateUnorderedAccessView(model._rtaoUAV.Get(),
+            gfxDevice.device->CreateUnorderedAccessView(model._rtaoUAV.Get(),
                 nullptr, &uavDesc, heapHandle);
             heapHandle.Offset(descriptorSize);
 

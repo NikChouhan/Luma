@@ -16,29 +16,29 @@ enum class Type : u32
 
 struct DXCRes
 {
-    ComPtr<IDxcUtils> _pUtils;
-    ComPtr<IDxcCompiler3> _pCompiler;
-    ComPtr<IDxcIncludeHandler> _pIncludeHandler;
+    ComPtr<IDxcUtils> pUtils;
+    ComPtr<IDxcCompiler3> pCompiler;
+    ComPtr<IDxcIncludeHandler> pIncludeHandler;
 };
 
 struct Shader
 {
-    ComPtr<IDxcBlobEncoding> _pBlobEnc;
-    ComPtr<IDxcBlob> _pBlob;
-    DxcBuffer _source;
-    ComPtr<IDxcResult> _result;
-    Type _type{};
-    u32 _index;
+    ComPtr<IDxcBlobEncoding> pBlobEnc;
+    ComPtr<IDxcBlob> pBlob;
+    DxcBuffer source;
+    ComPtr<IDxcResult> result;
+    Type type{};
+    u32 index;
 
     void Release();
 };
 
 struct ShaderDesc
 {
-    const wchar_t* _shaderPath{};
-    const wchar_t* _pEntryPoint;
-    const wchar_t* _pTarget;
-    Type _type{};
+    const wchar_t* shaderPath{};
+    const wchar_t* pEntryPoint;
+    const wchar_t* pTarget;
+    Type type{};
 };
 
 DXCRes ShaderCompiler();

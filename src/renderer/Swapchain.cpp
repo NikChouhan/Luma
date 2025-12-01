@@ -49,7 +49,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
     for (u32 i = 0; i < frameCount; i++)
     {
         DX_ASSERT(_swapchain->GetBuffer(i, IID_PPV_ARGS(&_renderTargets[i])));
-        _gfxDevice->_device->CreateRenderTargetView(_renderTargets[i].Get(), nullptr, rtvHandle);
+        _gfxDevice->device->CreateRenderTargetView(_renderTargets[i].Get(), nullptr, rtvHandle);
         rtvHandle.Offset(1, _rtvDescriptorSize);
     }
 
@@ -72,7 +72,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
     );
 
-    DX_ASSERT(_gfxDevice->_device->CreateCommittedResource(
+    DX_ASSERT(_gfxDevice->device->CreateCommittedResource(
         &depthStencilHeapProps,
         D3D12_HEAP_FLAG_NONE,
         &depthStencilTextureDesc,
@@ -81,13 +81,13 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         IID_PPV_ARGS(&_depthStencil)
     ));
 
-    _gfxDevice->_device->CreateDepthStencilView(
+    _gfxDevice->device->CreateDepthStencilView(
         _depthStencil.Get(),
         &depthStencilViewDesc,
         _dsvDepthHeap->GetCPUDescriptorHandleForHeapStart()
     );
 
-    const u32 descriptorSize = _gfxDevice->_device->GetDescriptorHandleIncrementSize(
+    const u32 descriptorSize = _gfxDevice->device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // recreate render size dependent resources
@@ -137,7 +137,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
     uavDesc.Format = _uavBgShaderEffects->GetDesc().Format;
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-    _gfxDevice->_device->CreateUnorderedAccessView(
+    _gfxDevice->device->CreateUnorderedAccessView(
         _uavBgShaderEffects.Get(),
         nullptr,
         &uavDesc,
@@ -152,7 +152,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         depthSRV.Texture2D.MipLevels = 1;
 
         D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = model->_commonHeap->GetCPUDescriptorHandleForHeapStart();
-        _gfxDevice->_device->CreateShaderResourceView(_depthStencil.Get(), &depthSRV, srvHandle);
+        _gfxDevice->device->CreateShaderResourceView(_depthStencil.Get(), &depthSRV, srvHandle);
     }
     // recreate normal UAV
     {
@@ -162,7 +162,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
 
         heapHandle.Offset(descriptorSize);
 
-        _gfxDevice->_device->CreateUnorderedAccessView(model->_normalUAV.Get(),
+        _gfxDevice->device->CreateUnorderedAccessView(model->_normalUAV.Get(),
             nullptr, &uavDesc, heapHandle);
     }
     // recreate rtao UAV
@@ -172,7 +172,7 @@ void Swapchain::ResizeSwapChain(u16 width, u16 height, Model* model)
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
         heapHandle.Offset(descriptorSize);
 
-        _gfxDevice->_device->CreateUnorderedAccessView(model->_rtaoUAV.Get(),
+        _gfxDevice->device->CreateUnorderedAccessView(model->_rtaoUAV.Get(),
             nullptr, &uavDesc, heapHandle);
     }
 }
@@ -215,7 +215,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
 
     ComPtr<IDXGISwapChain1> swapChain;
     DX_ASSERT(gfxDevice._factory->CreateSwapChainForHwnd(
-        gfxDevice._commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
+        gfxDevice.commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
         swapchain._hwnd,
         &swapChainDesc,
         nullptr,
@@ -234,17 +234,17 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
             rtvHeapDesc.NumDescriptors = frameCount;
             rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
             rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-            DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&swapchain._rtvHeap)));
+            DX_ASSERT(gfxDevice.device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&swapchain._rtvHeap)));
 	    }
 
-	    swapchain._rtvDescriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+	    swapchain._rtvDescriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
 		    D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	    // depth buffer DSV heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
         dsvHeapDesc.NumDescriptors = 1;
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
         dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&swapchain._dsvDepthHeap)));
+        DX_ASSERT(gfxDevice.device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&swapchain._dsvDepthHeap)));
     }
 
     // create frame resources
@@ -259,7 +259,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
         for (u32 i = 0; i< frameCount; i++)
         {
             DX_ASSERT(swapchain._swapchain->GetBuffer(i, IID_PPV_ARGS(&swapchain._renderTargets[i])));
-            gfxDevice._device->CreateRenderTargetView(swapchain._renderTargets[i].Get(),
+            gfxDevice.device->CreateRenderTargetView(swapchain._renderTargets[i].Get(),
                 &rtvDesc, rtvHandle);
             rtvHandle.Offset(1, swapchain._rtvDescriptorSize);
         }
@@ -281,7 +281,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
             u64(desc._width), u64(desc._height),
             1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
-        DX_ASSERT(gfxDevice._device->CreateCommittedResource(
+        DX_ASSERT(gfxDevice.device->CreateCommittedResource(
             &depthStencilHeapProps,
             D3D12_HEAP_FLAG_NONE,
             &depthStencilTextureDesc,
@@ -289,7 +289,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
             &depthOptimisedClearValue,
             IID_PPV_ARGS(&swapchain._depthStencil)));
 
-        gfxDevice._device->CreateDepthStencilView(swapchain._depthStencil.Get(), &depthStencilViewDesc,
+        gfxDevice.device->CreateDepthStencilView(swapchain._depthStencil.Get(), &depthStencilViewDesc,
             swapchain._dsvDepthHeap->GetCPUDescriptorHandleForHeapStart());
     }
 

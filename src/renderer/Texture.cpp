@@ -6,8 +6,8 @@
 
 static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync, 
     const ComPtr<ID3D12Resource>& resource, 
-    const Texture2DDesc& desc, 
-    TextureUsage usage)
+    const Texture2DDesc& desc,
+    const TextureUsage usage)
 {
     auto heapProps = CD3DX12_HEAP_PROPERTIES((usage == TextureUsage::UPLOAD) ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_GPU_UPLOAD);
 
@@ -15,17 +15,16 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
     {
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(resource.Get(),
             0, 1);
-        ComPtr<ID3D12Resource> textureUploadHeap;
+        ComPtr<ID3D12Resource> textureUploadHeapResource;
         auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-        // Create the GPU upload buffer.
-        DX_ASSERT(gfxDevice._device->CreateCommittedResource(
+        DX_ASSERT(gfxDevice.device->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &bufferDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&textureUploadHeap)));
+            IID_PPV_ARGS(&textureUploadHeapResource)));
 
 
         D3D12_SUBRESOURCE_DATA textureData = {};
@@ -33,13 +32,13 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
         textureData.RowPitch = desc.width * desc.texPixelSize;
         textureData.SlicePitch = textureData.RowPitch * desc.height;
 
-        ImmediateSubmit(gfxDevice, frameSync, [&](const ComPtr<ID3D12GraphicsCommandList1>& commandList)
+        ImmediateSubmit(gfxDevice, &frameSync.immediateContext, [&]()
             {
-                UpdateSubresources(commandList.Get(), resource.Get(),
-                    textureUploadHeap.Get(), 0, 0, 1, &textureData);
+                UpdateSubresources(frameSync.immediateContext.commandList.Get(), resource.Get(),
+                    textureUploadHeapResource.Get(), 0, 0, 1, &textureData);
                 auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
                     D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                commandList->ResourceBarrier(1, &pBarrier);
+                frameSync.immediateContext.commandList->ResourceBarrier(1, &pBarrier);
             });
     }
     else if (usage == TextureUsage::GPU_UPLOAD)
@@ -47,6 +46,8 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
 	    
     }
 }
+
+// TODO: Have a function to upload multiple textures at once (i don't need it rn, but may in the future)
 
 static ComPtr<ID3D12Resource> CreateTextureResource(
     const GfxDevice& gfxDevice,
@@ -111,7 +112,7 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 
     D3D12MA::Allocation* allocation;
-    DX_ASSERT(gfxDevice._allocator->CreateResource(
+    DX_ASSERT(gfxDevice.allocator->CreateResource(
         &allocDesc,
         &resourceDesc,
         initialState,
@@ -125,9 +126,7 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
         UploadTextureData(gfxDevice, frameSync, resource, desc, usage);
     }
 
-    // Note: Store allocation somewhere if you need to free it later
-    // For now we're leaking it (texture lifetime = app lifetime typically)
-    allocation->Release();
+    // allocation->Release();
 
     return resource;
 }
@@ -149,11 +148,11 @@ static u32 CreateTextureSRV(
     srvDesc.Texture2D.MostDetailedMip = 0;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice._device->CreateShaderResourceView(resource.Get(), &srvDesc, cpuHandle);
+    gfxDevice.device->CreateShaderResourceView(resource.Get(), &srvDesc, cpuHandle);
 
     return index;
 }
@@ -173,11 +172,11 @@ static u32 CreateTextureRTV(
     rtvDesc.Texture2D.MipSlice = 0;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice._device->CreateRenderTargetView(resource.Get(), &rtvDesc, cpuHandle);
+    gfxDevice.device->CreateRenderTargetView(resource.Get(), &rtvDesc, cpuHandle);
 
     return index;
 }
@@ -199,11 +198,11 @@ static u32 CreateTextureUAV(
     uavDesc.Texture2D.MipSlice = mipLevel;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice._device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, cpuHandle);
+    gfxDevice.device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, cpuHandle);
 
     return index;
 }
@@ -248,7 +247,9 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
             desc);
     }
 
-    // RTV needs separate heap!
+    /* RTV needs separate heap! (currently only RTVs I have are swapchain images
+     * TODO: when i need i will create and pass a separate heap all for RTVs
+     */
     //if (HasFlag(desc.viewFlags, TextureViewFlags::RTV)) 
     //{
     //    texture.rtvIndex = CreateTextureRTV(gfxDevice, rtvHeap, nextRTVIndex, texture.resource, desc);
@@ -285,6 +286,5 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
                 0);
         }
     }
-
     return texture;
 }

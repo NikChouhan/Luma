@@ -114,7 +114,7 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.SampleDesc.Count = 1;
-        DX_ASSERT(gfxDevice._device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
+        DX_ASSERT(gfxDevice.device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
 
     if (pipelineDesc.pipelineType == PipelineType::COMPUTE)
@@ -133,7 +133,7 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         }
         csoDesc.NodeMask = 0;
         csoDesc.pRootSignature = pipeline.rootSignature.Get();
-        DX_ASSERT(gfxDevice._device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
+        DX_ASSERT(gfxDevice.device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
 }
 

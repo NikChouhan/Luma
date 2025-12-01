@@ -14,8 +14,8 @@ void Inspector::CreateImguiHeap(const GfxDevice& gfxDevice)
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     desc.NumDescriptors = APP_SRV_HEAP_SIZE;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    DX_ASSERT(gfxDevice._device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(_imguiHeap.GetAddressOf())));
-    g_ImGuiHeapAllocator->Create(gfxDevice._device.Get(), _imguiHeap.Get());
+    DX_ASSERT(gfxDevice.device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(_imguiHeap.GetAddressOf())));
+    g_ImGuiHeapAllocator->Create(gfxDevice.device.Get(), _imguiHeap.Get());
 }
 
 void Inspector::CreateInspector(GfxDevice& gfxDevice, Swapchain& swapchain, FrameSync& frameSync)
@@ -36,8 +36,8 @@ void Inspector::CreateInspector(GfxDevice& gfxDevice, Swapchain& swapchain, Fram
     ImGui_ImplWin32_Init(swapchain._hwnd);
 
     ImGui_ImplDX12_InitInfo initInfo = {};
-    initInfo.Device = gfxDevice._device.Get();
-    initInfo.CommandQueue = gfxDevice._commandQueue.Get();
+    initInfo.Device = gfxDevice.device.Get();
+    initInfo.CommandQueue = gfxDevice.commandQueue.Get();
     initInfo.NumFramesInFlight = frameCount;
     initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;

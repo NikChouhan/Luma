@@ -84,6 +84,8 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
     GfxDevice gfxDevice{};
 
     u32 dxgiFactoryFlags = 0;
+    ComPtr<IDXGIFactory2> factory;
+
 
 #if defined(DEBUG)
     ComPtr<ID3D12Debug6> debugController;
@@ -93,71 +95,83 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
         dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
     }
 #endif
-    DX_ASSERT(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&gfxDevice._factory)));
+    DX_ASSERT(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     ComPtr<IDXGIAdapter1> hwAdapter;
-    GetHardwareAdapter(gfxDevice._factory.Get(), &hwAdapter, true);
+    GetHardwareAdapter(factory.Get(), &hwAdapter, true);
 
-    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice._device)));
+    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice.device)));
     // ray tracing stuff
-    IsDirectXRayTracingSuppported(gfxDevice._device.Get());
+    IsDirectXRayTracingSuppported(gfxDevice.device.Get());
 #ifdef DEBUG
     ComPtr<ID3D12DebugDevice2> debugDevice;
-    DX_ASSERT(gfxDevice._device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
+    DX_ASSERT(gfxDevice.device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
 #endif
 
     // create d3d12 memory allocator
     D3D12MA::ALLOCATOR_DESC allocatorDesc{};
-    allocatorDesc.pDevice = gfxDevice._device.Get();
+    allocatorDesc.pDevice = gfxDevice.device.Get();
     allocatorDesc.pAdapter = hwAdapter.Get();
 
-    DX_ASSERT(D3D12MA::CreateAllocator(&allocatorDesc, &gfxDevice._allocator));
+    DX_ASSERT(D3D12MA::CreateAllocator(&allocatorDesc, &gfxDevice.allocator));
 
     // describe and create command queue
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    DX_ASSERT(gfxDevice._device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&gfxDevice._commandQueue)));
+    DX_ASSERT(gfxDevice.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&gfxDevice.commandQueue)));
 
     for (u32 i = 0; i < frameCount; i++)
     {
         DX_ASSERT(
-        gfxDevice._device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
-            _commandAllocators[i])));
+        gfxDevice.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
+            commandAllocators[i])));
     }
 
     CD3DX12FeatureSupport features;
-    features.Init(gfxDevice._device.Get());
+    features.Init(gfxDevice.device.Get());
     D3D_SHADER_MODEL shaderModel = features.HighestShaderModel();   // shader_model_6_7 for me
+
     
     return gfxDevice;
 }
 
 void DestroyDevice(GfxDevice& gfxDevice)
 {
-		
+
 }
 
-ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(GfxDevice& gfxDevice)
+ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(const GfxDevice& gfxDevice)
 {
     ComPtr<ID3D12GraphicsCommandList10> commandList;
 
-    DX_ASSERT(gfxDevice._device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gfxDevice._commandAllocators->Get(),
+    DX_ASSERT(gfxDevice.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gfxDevice.commandAllocators->Get(),
         nullptr,
         IID_PPV_ARGS(&commandList)));
 
     return commandList;
 }
 
-void ImmediateSubmit(const GfxDevice& gfxDevice, FrameSync& frameSync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback)
+void ImmediateSubmit(const GfxDevice& gfxDevice, ImmediateContext* immediateCtx, LAMBDA() callback)
 {
-	ComPtr<ID3D12GraphicsCommandList1> commandList = CreateCommandList(gfxDevice);
+    DX_ASSERT(immediateCtx->cmdAllocator->Reset());
+    DX_ASSERT(immediateCtx->commandList->Reset(
+        immediateCtx->cmdAllocator.Get(),
+        nullptr));
 
-    callback(commandList);
-    DX_ASSERT(commandList->Close());
+    callback();
+    DX_ASSERT(immediateCtx->commandList->Close());
 
-    ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-    gfxDevice._commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-    WaitForGPU(gfxDevice, frameSync);
+    ID3D12CommandList* ppCommandLists[] = { immediateCtx->commandList.Get() };
+    gfxDevice.commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    const u64 currentFenceValue = ++immediateCtx->fenceValue;
+    DX_ASSERT(gfxDevice.commandQueue->Signal(immediateCtx->fence.Get(), currentFenceValue));
+
+    if (immediateCtx->fence->GetCompletedValue() < currentFenceValue)
+    {
+        DX_ASSERT(immediateCtx->fence->SetEventOnCompletion(currentFenceValue, immediateCtx->fenceEvent));
+        WaitForSingleObject(immediateCtx->fenceEvent, INFINITE);
+    }
 }

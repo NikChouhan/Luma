@@ -63,7 +63,7 @@ struct TextureCreateInfo
     Texture2DDesc desc;
     const wchar_t* debugName = nullptr;
 
-    TextureUsage usage; // mostly for ReBar on/off
+    TextureUsage usage;
     ID3D12DescriptorHeap* heap = nullptr;
     u32* nextHeapIndex = nullptr;
 };

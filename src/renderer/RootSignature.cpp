@@ -10,7 +10,7 @@ RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
     D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
     featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
 
-    if (FAILED(gfxDevice._device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE,
+    if (FAILED(gfxDevice.device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE,
         &featureData, sizeof(featureData))))
     {
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -70,7 +70,7 @@ RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
         ComPtr<ID3DBlob> error;
         DX_ASSERT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc,
             featureData.HighestVersion, &signature, &error));
-        DX_ASSERT(gfxDevice._device->CreateRootSignature(0,
+        DX_ASSERT(gfxDevice.device->CreateRootSignature(0,
             signature->GetBufferPointer(), signature->GetBufferSize(),
             IID_PPV_ARGS(&rootSign._rootSignature)));
     }
@@ -92,7 +92,7 @@ RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
         ComPtr<ID3DBlob> error;
         DX_ASSERT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc,
             featureData.HighestVersion, &signature, &error));
-        DX_ASSERT(gfxDevice._device->CreateRootSignature(0,
+        DX_ASSERT(gfxDevice.device->CreateRootSignature(0,
             signature->GetBufferPointer(), signature->GetBufferSize(),
             IID_PPV_ARGS(&rootSign._rootSignature)));
     }
@@ -133,7 +133,7 @@ RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
         ComPtr<ID3DBlob> error;
         DX_ASSERT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc,
             featureData.HighestVersion, &signature, &error));
-        DX_ASSERT(gfxDevice._device->CreateRootSignature(0,
+        DX_ASSERT(gfxDevice.device->CreateRootSignature(0,
             signature->GetBufferPointer(), signature->GetBufferSize(),
             IID_PPV_ARGS(&rootSign._rootSignature)));
     }

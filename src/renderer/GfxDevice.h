@@ -3,6 +3,8 @@
 #include "Common.h"
 #include <functional>
 
+#include "ImmediateContext.h"
+
 struct Pipeline;
 struct FrameSync;
 
@@ -13,12 +15,11 @@ namespace D3D12MA
 
 struct GfxDevice
 {
-	ComPtr<IDXGIFactory2> _factory;
-	ComPtr<ID3D12Device14> _device;
-	ComPtr<ID3D12CommandAllocator> _commandAllocators[frameCount];
-	ComPtr<ID3D12CommandQueue> _commandQueue;
-	D3D12MA::Allocator* _allocator;
-};	
+	ComPtr<ID3D12Device14> device;
+	ComPtr<ID3D12CommandAllocator> commandAllocators[frameCount];
+	ComPtr<ID3D12CommandQueue> commandQueue;
+	D3D12MA::Allocator* allocator;
+};
 
 struct GfxDeviceDesc
 {
@@ -27,5 +28,5 @@ struct GfxDeviceDesc
 GfxDevice CreateDevice(GfxDeviceDesc desc);
 void DestroyDevice(GfxDevice& gfxDevice);
 
-ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(GfxDevice& gfxDevice);
-void ImmediateSubmit(const GfxDevice& gfxDevice, FrameSync& framesync, LAMBDA(ComPtr<ID3D12GraphicsCommandList1>) callback);
+ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(const GfxDevice& gfxDevice);
+void ImmediateSubmit(const GfxDevice& gfxDevice, ImmediateContext* immediateCtx, LAMBDA() callback);

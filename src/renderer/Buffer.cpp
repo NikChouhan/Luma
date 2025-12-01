@@ -34,7 +34,7 @@ struct BufferViewCreator
 		if (desc.createView && createInfo.bindlessHeap && createInfo.nextHeapIndex)
 		{
             heapIdx = (*createInfo.nextHeapIndex)++;
-            u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+            u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
             cbvDesc.BufferLocation = buffer.resource->GetGPUVirtualAddress();
@@ -42,17 +42,17 @@ struct BufferViewCreator
 
             CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(createInfo.bindlessHeap->GetCPUDescriptorHandleForHeapStart());
             cpuHandle.Offset(*heapIdx, descriptorSize);
-            gfxDevice._device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+            gfxDevice.device->CreateConstantBufferView(&cbvDesc, cpuHandle);
 		}
 
         return ConstantBufferView{ .gpuAddress = buffer.resource->GetGPUVirtualAddress(),
             .sizeInBytes = GetBufferSize(desc),
             .heapIndex = *heapIdx };
     }
-    BufferView operator()(const StructuredBufferDesc& desc)
-	{
+    BufferView operator()(const StructuredBufferDesc& desc) const
+    {
         if (createInfo.bindlessHeap && createInfo.nextHeapIndex) {
-            u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+            u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
             D3D12_CPU_DESCRIPTOR_HANDLE baseHandle =
@@ -75,7 +75,7 @@ struct BufferViewCreator
                 CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(baseHandle);
                 srvHandle.Offset(*srvIndex, descriptorSize);
 
-                gfxDevice._device->CreateShaderResourceView(
+                gfxDevice.device->CreateShaderResourceView(
                     buffer.resource.Get(), &srvDesc, srvHandle);
 
                 return ShaderResourceView{
@@ -102,7 +102,7 @@ struct BufferViewCreator
                 CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(baseHandle);
                 uavHandle.Offset(*uavIndex, descriptorSize);
 
-                gfxDevice._device->CreateUnorderedAccessView(
+                gfxDevice.device->CreateUnorderedAccessView(
                     buffer.resource.Get(), nullptr, &uavDesc, uavHandle);
 
                 return UnorderedAccessView{
@@ -120,7 +120,7 @@ struct BufferViewCreator
     {
         if (createInfo.bindlessHeap && createInfo.nextHeapIndex) 
         {
-            u32 descriptorSize = gfxDevice._device->GetDescriptorHandleIncrementSize(
+            u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
             D3D12_CPU_DESCRIPTOR_HANDLE baseHandle =
@@ -144,7 +144,7 @@ struct BufferViewCreator
                 CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(baseHandle);
                 srvHandle.Offset(*srvIndex, descriptorSize);
 
-                gfxDevice._device->CreateShaderResourceView(
+                gfxDevice.device->CreateShaderResourceView(
                     buffer.resource.Get(), &srvDesc, srvHandle);
 
                 return ShaderResourceView{
@@ -172,7 +172,7 @@ struct BufferViewCreator
                 CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(baseHandle);
                 uavHandle.Offset(*uavIndex, descriptorSize);
 
-                gfxDevice._device->CreateUnorderedAccessView(
+                gfxDevice.device->CreateUnorderedAccessView(
                     buffer.resource.Get(), nullptr, &uavDesc, uavHandle);
 
                 return UnorderedAccessView{
@@ -223,7 +223,7 @@ Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createIn
     allocDesc.HeapType = heapType;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 
-    DX_ASSERT(gfxDevice._allocator->CreateResource(
+    DX_ASSERT(gfxDevice.allocator->CreateResource(
         &allocDesc,
         &bufferDesc,
         initialState,

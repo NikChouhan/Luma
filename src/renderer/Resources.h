@@ -49,8 +49,6 @@ struct ResourceCreator
 {
 	GfxDevice& gfxDevice;
 	FrameSync& frameSync;
-	// TODO: Change the ResourceDesc variant to take in TextureCreateInfo instead of TextureDesc
-	// TextureCreateInfo just like BufferCreateInfo will be a variant itself, for different types of textures
 	Resource operator() (const TextureCreateInfo& desc) const
 	{
 		return CreateTexture(gfxDevice, frameSync, desc);
