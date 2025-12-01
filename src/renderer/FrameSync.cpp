@@ -5,7 +5,7 @@ FrameSync CreateFrameSyncResources(GfxDevice& gfxDevice)
 {
     FrameSync frameSync{};
 
-    DX_ASSERT(gfxDevice._device->CreateFence(frameSync._fenceValues[frameSync._frameIndex],
+    DX_ASSERT(gfxDevice.device->CreateFence(frameSync._fenceValues[frameSync._frameIndex],
         D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frameSync._fence)));
     frameSync._fenceValues[frameSync._frameIndex]++;
 
@@ -15,10 +15,12 @@ FrameSync CreateFrameSyncResources(GfxDevice& gfxDevice)
     {
         DX_ASSERT(HRESULT_FROM_WIN32(GetLastError()));
     }
+
+    frameSync.immediateContext = CreateImmediateContext(gfxDevice);
     return frameSync;
 }
 
-void WaitForGPU(GfxDevice& gfxDevice, FrameSync& frameSync)
+void WaitForGPU(const GfxDevice& gfxDevice, FrameSync& frameSync)
 {
     /* commandQueue->Signal processes the GPU side command to set the fence to the fence value at the particular index
      * then fence->SetEventOnCompletion sets the event the same (set the fence value at frame index)
@@ -33,7 +35,7 @@ void WaitForGPU(GfxDevice& gfxDevice, FrameSync& frameSync)
     */
     
     // schedule signal command in the queue
-    DX_ASSERT(gfxDevice._commandQueue->Signal(frameSync._fence.Get(), frameSync._fenceValues[frameSync._frameIndex]));
+    DX_ASSERT(gfxDevice.commandQueue->Signal(frameSync._fence.Get(), frameSync._fenceValues[frameSync._frameIndex]));
 
     // wait until the fence has been processed
     /* the fence->SetEventOnCompletion fn checks the value of the fence with the fenceValue and stalls the CPU main thread
@@ -46,11 +48,11 @@ void WaitForGPU(GfxDevice& gfxDevice, FrameSync& frameSync)
     frameSync._fenceValues[frameSync._frameIndex]++;
 }
 
-void MoveToNextFrame(GfxDevice& gfxDevice, Swapchain& swapchain, FrameSync& frameSync)  
+void MoveToNextFrame(const GfxDevice& gfxDevice, const Swapchain& swapchain, FrameSync& frameSync)  
 {
     // schedule a Signal command in the queue
     const u64 currentFenceValue = frameSync._fenceValues[frameSync._frameIndex];
-    DX_ASSERT(gfxDevice._commandQueue->Signal(frameSync._fence.Get(), currentFenceValue));
+    DX_ASSERT(gfxDevice.commandQueue->Signal(frameSync._fence.Get(), currentFenceValue));
 
     // update the frame index
     frameSync._frameIndex = swapchain._swapchain->GetCurrentBackBufferIndex();
