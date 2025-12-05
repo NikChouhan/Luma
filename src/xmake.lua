@@ -1,7 +1,0 @@
-target("Luma")
-    set_kind("static")
-    set_pcxxheader("pch.h", {public = true})
-    add_headerfiles("core/*.h", "includes/*.h", "includes/*.hpp", "passes/*.h", "renderer/*.h")
-    add_files("core/*.cpp", "includes/*.cpp", "passes/*.cpp", "renderer/*.cpp")
-    add_packages("d3d12-memory-allocator", "stb", "cgltf", "directxshadercompiler", "meshoptimizer", "imgui", {public = true})
-target_end()

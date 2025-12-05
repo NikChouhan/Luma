@@ -1,7 +1,7 @@
 set_xmakever("3.0.0")
 
 includes("scripts/packages.lua")
-includes("src/xmake.lua")
+includes("Luma/xmake.lua")
 includes("shaders/xmake.lua")
 
 add_rules("mode.debug", "mode.release")
@@ -23,12 +23,12 @@ elseif(is_mode("release")) then
     set_runtimes("MD")
 end
 
-add_includedirs("src", "src/core", "D3D12/include", "src/includes", "src/renderer")
+add_includedirs("Luma", "D3D12/include")
 
 target("game")
     set_default(true)
     set_kind("binary")
-    add_files("src/*.cpp")
-    add_headerfiles("src/*.h")
+    add_files("Luma/*.cpp")
+    add_headerfiles("Luma/*.h")
     add_deps("Luma")
 target_end()
