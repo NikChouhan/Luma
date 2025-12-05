@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GfxDevice.h"
+#include "ImmediateContext.h"
 
 struct Swapchain;
 struct FrameSync

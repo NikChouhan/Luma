@@ -3,10 +3,9 @@
 #include "Common.h"
 #include <functional>
 
-#include "ImmediateContext.h"
-
 struct Pipeline;
 struct FrameSync;
+struct ImmediateContext;
 
 namespace D3D12MA
 {
