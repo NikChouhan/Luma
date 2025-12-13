@@ -3,11 +3,13 @@
 #include "Graphics/FrameSync.h"
 #include <D3D12MemAlloc.h>
 
+#include "Graphics/Globals.h"
+
 
 static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync, 
-    const ComPtr<ID3D12Resource>& resource, 
-    const Texture2DDesc& desc,
-    const TextureUsage usage)
+                              const ComPtr<ID3D12Resource>& resource, 
+                              const Texture2DDesc& desc,
+                              const TextureUsage usage)
 {
     auto heapProps = CD3DX12_HEAP_PROPERTIES((usage == TextureUsage::UPLOAD) ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_GPU_UPLOAD);
 
@@ -18,7 +20,7 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
         ComPtr<ID3D12Resource> textureUploadHeapResource;
         auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-        DX_ASSERT(gfxDevice.device->CreateCommittedResource(
+        DX_ASSERT(gfxDevice.device_->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &bufferDesc,
@@ -32,13 +34,13 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
         textureData.RowPitch = desc.width * desc.texPixelSize;
         textureData.SlicePitch = textureData.RowPitch * desc.height;
 
-        ImmediateSubmit(gfxDevice, &frameSync.immediateContext, [&]()
+        ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
             {
-                UpdateSubresources(frameSync.immediateContext.commandList.Get(), resource.Get(),
+                UpdateSubresources(frameSync.immediateContext_.commandList.Get(), resource.Get(),
                     textureUploadHeapResource.Get(), 0, 0, 1, &textureData);
                 auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
                     D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                frameSync.immediateContext.commandList->ResourceBarrier(1, &pBarrier);
+                frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);
             });
     }
     else if (usage == TextureUsage::GPU_UPLOAD)
@@ -112,7 +114,7 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 
     D3D12MA::Allocation* allocation;
-    DX_ASSERT(gfxDevice.allocator->CreateResource(
+    DX_ASSERT(gfxDevice.allocator_->CreateResource(
         &allocDesc,
         &resourceDesc,
         initialState,
@@ -148,11 +150,11 @@ static u32 CreateTextureSRV(
     srvDesc.Texture2D.MostDetailedMip = 0;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice.device->CreateShaderResourceView(resource.Get(), &srvDesc, cpuHandle);
+    gfxDevice.device_->CreateShaderResourceView(resource.Get(), &srvDesc, cpuHandle);
 
     return index;
 }
@@ -172,11 +174,11 @@ static u32 CreateTextureRTV(
     rtvDesc.Texture2D.MipSlice = 0;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice.device->CreateRenderTargetView(resource.Get(), &rtvDesc, cpuHandle);
+    gfxDevice.device_->CreateRenderTargetView(resource.Get(), &rtvDesc, cpuHandle);
 
     return index;
 }
@@ -198,11 +200,11 @@ static u32 CreateTextureUAV(
     uavDesc.Texture2D.MipSlice = mipLevel;
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
-    u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(
+    u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     cpuHandle.Offset(index, descriptorSize);
 
-    gfxDevice.device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, cpuHandle);
+    gfxDevice.device_->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, cpuHandle);
 
     return index;
 }
@@ -242,7 +244,7 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
         texture.srvIndex = CreateTextureSRV(
             gfxDevice,
             createInfo.heap,
-            createInfo.nextHeapIndex,
+            createInfo.,
             texture.resource,
             desc);
     }
@@ -267,7 +269,7 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
                 u32 uavIdx = CreateTextureUAV(
                     gfxDevice,
                     createInfo.heap,
-                    createInfo.nextHeapIndex,
+                    &GlobalStorage::bindlessHeapIndex.nextIndex,
                     texture.resource,
                     desc,
                     mip);
@@ -280,7 +282,7 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
             texture.uavIndex = CreateTextureUAV(
                 gfxDevice,
                 createInfo.heap,
-                createInfo.nextHeapIndex,
+                &GlobalStorage::bindlessHeapIndex.nextIndex,
                 texture.resource,
                 desc,
                 0);

@@ -150,7 +150,6 @@ struct BufferCreateInfo {
     const wchar_t* debugName = nullptr;
 
     ID3D12DescriptorHeap* bindlessHeap = nullptr;
-    u32* nextHeapIndex = nullptr; // global heap index passed, it is set and counter increased in CreateBuffer func
 };
 Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createInfo);
 

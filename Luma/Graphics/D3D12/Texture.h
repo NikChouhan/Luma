@@ -65,7 +65,6 @@ struct TextureCreateInfo
 
     TextureUsage usage;
     ID3D12DescriptorHeap* heap = nullptr;
-    u32* nextHeapIndex = nullptr;
 };
 
 // never use GPU_UPLOAD. I haven't implemented it yet
