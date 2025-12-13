@@ -90,7 +90,7 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
     }
 
     Pipeline pipeline{};
-    CompilePipelineInternal(gfxDevice_, swapchain_, pipeline, desc);
+    CompilePipelineInternal(this, gfxDevice_, swapchain_, pipeline, desc);
 
     if (index >= pipelines_.size())
     {
@@ -105,7 +105,8 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
 	    .shaderHandles = shaderHandles
     };
 
-    if (!name.empty()) {
+    if (!name.empty()) 
+    {
         pipelineNameMap_[name] = handle;
     }
 

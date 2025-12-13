@@ -26,22 +26,8 @@ static constexpr ResourceHandle g_invalidResourceHandle = { 0xFFFFFF, 0xFF };
 // and then pass them to resourceManager.CreateResource(desc, "name").
 // Same with Pipelines and Shaders handled in PipelineCache.h/cpp
 
-//enum class ResourceType : u8
-//{
-//	TEXTURE,
-//	BUFFER
-//};
-//
-//enum class ResourceUsage : u8
-//{
-//	SRV,
-//	UAV,
-//	CBV,
-//	RTV,
-//	DSV
-//};
 
-using ResourceDesc = std::variant<TextureCreateInfo, BufferCreateInfo>;
+using ResourceCreateInfo = std::variant<TextureCreateInfo, BufferCreateInfo>;
 using Resource = std::variant<Texture, Buffer>;
 
 struct ResourceCreator
@@ -58,7 +44,8 @@ struct ResourceCreator
 	}
 };
 
-struct ManagedResource {
+struct ManagedResource
+{
 	Resource resource;
 	ResourceHandle handle;
 	std::string name;  // for frame graph
@@ -72,16 +59,19 @@ struct ResourceManager
 	ResourceManager operator=(const ResourceManager& resourceManager) = delete;
 	~ResourceManager();
 
-	[[nodiscard]] ResourceHandle CreateResource(ResourceDesc desc, const std::string& name = "");
+	[[nodiscard]] ResourceHandle CreateResource(ResourceCreateInfo desc, const std::string& name);
 
 	Resource* GetResource(ResourceHandle handle);
 	const Resource* GetResource(ResourceHandle handle) const;
-	ResourceHandle GetResourceHandleByName(const std::string name = "");
+	ResourceHandle GetResourceHandleByName(const std::string& name);
 	void ReleaseResource(ResourceHandle handle);
+
+	ComPtr<ID3D12DescriptorHeap> GetBindlessHeap() { return bindlessHeap_; }
 
 private:
 	GfxDevice gfxDevice_;
 	FrameSync frameSync_;
+	ComPtr<ID3D12DescriptorHeap> bindlessHeap_;
 
 	std::vector<ManagedResource> resources_;
 	std::vector<u8> generations_;
@@ -91,4 +81,6 @@ private:
 	[[nodiscard]] ResourceHandle AllocateResourceHandle();
 	[[nodiscard]] u32 GetResourceIndex(ResourceHandle handle) const;
 	[[nodiscard]] bool IsResourceHandleValid(ResourceHandle handle) const;
+
+	void ResourceManager::CreateBindlessHeap();
 };

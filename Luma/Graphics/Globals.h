@@ -8,30 +8,9 @@
 
 namespace SM = DirectX::SimpleMath;
 
-struct HeapTextureIndex
+struct BindlessHeapIndex
 {
-    u32 accelerationStructureIndex{};
-    u32 computeShaderBgIndex{};
-    u32 depthSRV{};
-    u32 normalUAV{};
-    u32 rtaoUAV{};
-};
-struct PipelineIndex
-{
-    u8 BGComputePass{};
-    u8 DepthPrePass{};
-    u8 RTAOPass{};
-    u8 ImguiPass{};
-    u8 RenderPass{};
-};
-struct ShaderIndex
-{
-    u8 bgComputeShader{};
-    u8 depthPPShader{};
-    u8 rtaoShader{};
-
-    u8 renderPassVSShader{};
-    u8 renderPassPSShader{};
+    u32 nextIndex;
 };
 struct LightSettings
 {
@@ -45,9 +24,7 @@ struct LightSettings
 
 namespace GlobalStorage
 {
-    inline HeapTextureIndex index{};
-    inline PipelineIndex pipelineIndex{};
-    inline ShaderIndex shaderIndex{};
+    inline BindlessHeapIndex bindlessHeapIndex{};
 
     inline DirectX::XMMATRIX projMatrixInv{};
     inline DirectX::XMMATRIX viewMatrixInv{};

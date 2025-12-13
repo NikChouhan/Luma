@@ -6,12 +6,12 @@
 struct Swapchain;
 struct FrameSync
 {
-    u32 _frameIndex;
-    HANDLE _fenceEvent;
-    ComPtr<ID3D12Fence> _fence;
-    u64 _fenceValues[2];
+    u32 frameIndex_;
+    HANDLE fenceEvent_;
+    ComPtr<ID3D12Fence> fence_;
+    u64 fenceValues_[2];
 
-    ImmediateContext immediateContext;
+    ImmediateContext immediateContext_;
 };
 
 FrameSync CreateFrameSyncResources(GfxDevice& gfxDevice);

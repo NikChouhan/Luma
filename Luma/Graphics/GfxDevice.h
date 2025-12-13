@@ -13,10 +13,12 @@ namespace D3D12MA
 
 struct GfxDevice
 {
-	ComPtr<ID3D12Device14> device;
-	ComPtr<ID3D12CommandAllocator> commandAllocators[frameCount];
-	ComPtr<ID3D12CommandQueue> commandQueue;
-	D3D12MA::Allocator* allocator;
+	ComPtr<ID3D12Device14> device_;
+	ComPtr<ID3D12CommandAllocator> commandAllocators_[frameCount];
+	ComPtr<ID3D12CommandQueue> commandQueue_;
+	D3D12MA::Allocator* allocator_;
+
+	ComPtr<IDXGIFactory2> factory_;
 };
 
 struct GfxDeviceDesc
@@ -26,5 +28,4 @@ struct GfxDeviceDesc
 GfxDevice CreateDevice(GfxDeviceDesc desc);
 void DestroyDevice(GfxDevice& gfxDevice);
 
-ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(const GfxDevice& gfxDevice);
 void ImmediateSubmit(const GfxDevice& gfxDevice, ImmediateContext* immediateCtx, LAMBDA() callback);

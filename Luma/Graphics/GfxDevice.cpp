@@ -1,6 +1,7 @@
 #include "Graphics/GfxDevice.h"
 #include <D3D12MemAlloc.h>
 
+#include "D3D12/CommandList.h"
 #include "Graphics/FrameSync.h"
 
 static void GetHardwareAdapter(
@@ -84,8 +85,6 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
     GfxDevice gfxDevice{};
 
     u32 dxgiFactoryFlags = 0;
-    ComPtr<IDXGIFactory2> factory;
-
 
 #if defined(DEBUG)
     ComPtr<ID3D12Debug6> debugController;
@@ -95,44 +94,43 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
         dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
     }
 #endif
-    DX_ASSERT(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
+    DX_ASSERT(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&gfxDevice.factory_)));
 
     ComPtr<IDXGIAdapter1> hwAdapter;
-    GetHardwareAdapter(factory.Get(), &hwAdapter, true);
+    GetHardwareAdapter(gfxDevice.factory_.Get(), &hwAdapter, true);
 
-    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice.device)));
+    DX_ASSERT(D3D12CreateDevice(hwAdapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&gfxDevice.device_)));
     // ray tracing stuff
-    IsDirectXRayTracingSuppported(gfxDevice.device.Get());
+    IsDirectXRayTracingSuppported(gfxDevice.device_.Get());
 #ifdef DEBUG
     ComPtr<ID3D12DebugDevice2> debugDevice;
-    DX_ASSERT(gfxDevice.device->QueryInterface(IID_PPV_ARGS(&debugDevice)));
+    DX_ASSERT(gfxDevice.device_->QueryInterface(IID_PPV_ARGS(&debugDevice)));
 #endif
 
     // create d3d12 memory allocator
     D3D12MA::ALLOCATOR_DESC allocatorDesc{};
-    allocatorDesc.pDevice = gfxDevice.device.Get();
+    allocatorDesc.pDevice = gfxDevice.device_.Get();
     allocatorDesc.pAdapter = hwAdapter.Get();
 
-    DX_ASSERT(D3D12MA::CreateAllocator(&allocatorDesc, &gfxDevice.allocator));
+    DX_ASSERT(D3D12MA::CreateAllocator(&allocatorDesc, &gfxDevice.allocator_));
 
     // describe and create command queue
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-    DX_ASSERT(gfxDevice.device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&gfxDevice.commandQueue)));
+    DX_ASSERT(gfxDevice.device_->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&gfxDevice.commandQueue_)));
 
     for (u32 i = 0; i < frameCount; i++)
     {
         DX_ASSERT(
-        gfxDevice.device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
-            commandAllocators[i])));
+        gfxDevice.device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gfxDevice.
+            commandAllocators_[i])));
     }
 
     CD3DX12FeatureSupport features;
-    features.Init(gfxDevice.device.Get());
+    features.Init(gfxDevice.device_.Get());
     D3D_SHADER_MODEL shaderModel = features.HighestShaderModel();   // shader_model_6_7 for me
-
     
     return gfxDevice;
 }
@@ -140,17 +138,6 @@ GfxDevice CreateDevice(GfxDeviceDesc desc)
 void DestroyDevice(GfxDevice& gfxDevice)
 {
 
-}
-
-ComPtr<ID3D12GraphicsCommandList10> CreateCommandList(const GfxDevice& gfxDevice)
-{
-    ComPtr<ID3D12GraphicsCommandList10> commandList;
-
-    DX_ASSERT(gfxDevice.device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, gfxDevice.commandAllocators->Get(),
-        nullptr,
-        IID_PPV_ARGS(&commandList)));
-
-    return commandList;
 }
 
 void ImmediateSubmit(const GfxDevice& gfxDevice, ImmediateContext* immediateCtx, LAMBDA() callback)
@@ -164,10 +151,10 @@ void ImmediateSubmit(const GfxDevice& gfxDevice, ImmediateContext* immediateCtx,
     DX_ASSERT(immediateCtx->commandList->Close());
 
     ID3D12CommandList* ppCommandLists[] = { immediateCtx->commandList.Get() };
-    gfxDevice.commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    gfxDevice.commandQueue_->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     const u64 currentFenceValue = ++immediateCtx->fenceValue;
-    DX_ASSERT(gfxDevice.commandQueue->Signal(immediateCtx->fence.Get(), currentFenceValue));
+    DX_ASSERT(gfxDevice.commandQueue_->Signal(immediateCtx->fence.Get(), currentFenceValue));
 
     if (immediateCtx->fence->GetCompletedValue() < currentFenceValue)
     {

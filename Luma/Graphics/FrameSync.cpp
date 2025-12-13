@@ -5,18 +5,18 @@ FrameSync CreateFrameSyncResources(GfxDevice& gfxDevice)
 {
     FrameSync frameSync{};
 
-    DX_ASSERT(gfxDevice.device->CreateFence(frameSync._fenceValues[frameSync._frameIndex],
-        D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frameSync._fence)));
-    frameSync._fenceValues[frameSync._frameIndex]++;
+    DX_ASSERT(gfxDevice.device_->CreateFence(frameSync.fenceValues_[frameSync.frameIndex_],
+        D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frameSync.fence_)));
+    frameSync.fenceValues_[frameSync.frameIndex_]++;
 
     // create event handle to use for frame sync
-    frameSync._fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (frameSync._fenceEvent == nullptr)
+    frameSync.fenceEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (frameSync.fenceEvent_ == nullptr)
     {
         DX_ASSERT(HRESULT_FROM_WIN32(GetLastError()));
     }
 
-    frameSync.immediateContext = CreateImmediateContext(gfxDevice);
+    frameSync.immediateContext_ = CreateImmediateContext(gfxDevice);
     return frameSync;
 }
 
@@ -35,36 +35,36 @@ void WaitForGPU(const GfxDevice& gfxDevice, FrameSync& frameSync)
     */
     
     // schedule signal command in the queue
-    DX_ASSERT(gfxDevice.commandQueue->Signal(frameSync._fence.Get(), frameSync._fenceValues[frameSync._frameIndex]));
+    DX_ASSERT(gfxDevice.commandQueue_->Signal(frameSync.fence_.Get(), frameSync.fenceValues_[frameSync.frameIndex_]));
 
     // wait until the fence has been processed
     /* the fence->SetEventOnCompletion fn checks the value of the fence with the fenceValue and stalls the CPU main thread
     * until the value is reached
     */
-    DX_ASSERT(frameSync._fence->SetEventOnCompletion(frameSync._fenceValues[frameSync._frameIndex], frameSync._fenceEvent));
-    WaitForSingleObjectEx(frameSync._fenceEvent, INFINITE, FALSE);
+    DX_ASSERT(frameSync.fence_->SetEventOnCompletion(frameSync.fenceValues_[frameSync.frameIndex_], frameSync.fenceEvent_));
+    WaitForSingleObjectEx(frameSync.fenceEvent_, INFINITE, FALSE);
 
     // increment the fence value for the current frame
-    frameSync._fenceValues[frameSync._frameIndex]++;
+    frameSync.fenceValues_[frameSync.frameIndex_]++;
 }
 
 void MoveToNextFrame(const GfxDevice& gfxDevice, const Swapchain& swapchain, FrameSync& frameSync)  
 {
     // schedule a Signal command in the queue
-    const u64 currentFenceValue = frameSync._fenceValues[frameSync._frameIndex];
-    DX_ASSERT(gfxDevice.commandQueue->Signal(frameSync._fence.Get(), currentFenceValue));
+    const u64 currentFenceValue = frameSync.fenceValues_[frameSync.frameIndex_];
+    DX_ASSERT(gfxDevice.commandQueue_->Signal(frameSync.fence_.Get(), currentFenceValue));
 
     // update the frame index
-    frameSync._frameIndex = swapchain._swapchain->GetCurrentBackBufferIndex();
+    frameSync.frameIndex_ = swapchain.swapchain_->GetCurrentBackBufferIndex();
     
     // CPU side code
     // if the next frame is not ready to be rendered yet, wait until its ready
-    if (frameSync._fence->GetCompletedValue() < frameSync._fenceValues[frameSync._frameIndex])
+    if (frameSync.fence_->GetCompletedValue() < frameSync.fenceValues_[frameSync.frameIndex_])
     {
-        DX_ASSERT(frameSync._fence->SetEventOnCompletion(frameSync._fenceValues[frameSync._frameIndex], frameSync._fenceEvent));
-        WaitForSingleObjectEx(frameSync._fenceEvent, INFINITE, FALSE);
+        DX_ASSERT(frameSync.fence_->SetEventOnCompletion(frameSync.fenceValues_[frameSync.frameIndex_], frameSync.fenceEvent_));
+        WaitForSingleObjectEx(frameSync.fenceEvent_, INFINITE, FALSE);
     }
 
     // set the fence value for the next frame
-    frameSync._fenceValues[frameSync._frameIndex] = currentFenceValue + 1;
+    frameSync.fenceValues_[frameSync.frameIndex_] = currentFenceValue + 1;
 }

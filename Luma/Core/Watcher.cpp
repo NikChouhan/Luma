@@ -4,7 +4,7 @@
 
 #include "Log.h"
 #include "Graphics/D3D12/Shader.h"
-#include "Renderer/Resources.h"
+#include "Renderer/Core/Resources.h"
 
 void Watcher::StartWatching()
 {

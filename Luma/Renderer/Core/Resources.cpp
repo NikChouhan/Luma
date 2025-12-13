@@ -1,14 +1,12 @@
-#include "Renderer/Resources.h"
+#include "Resources.h"
 
-ResourceManager::ResourceManager(const GfxDevice& lgfxDevice, FrameSync& lframeSync) : gfxDevice_(lgfxDevice), frameSync_(lframeSync)
-{
-
-}
+ResourceManager::ResourceManager(const GfxDevice& lgfxDevice, FrameSync& lframeSync)
+	: gfxDevice_(lgfxDevice), frameSync_(lframeSync){}
 
 ResourceManager::~ResourceManager()
 = default;
 
-ResourceHandle ResourceManager::CreateResource(ResourceDesc desc, const std::string& name)
+ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const std::string& name)
 {
 	if (!name.empty())
 	{
@@ -47,7 +45,8 @@ Resource* ResourceManager::GetResource(ResourceHandle handle)
 
 const Resource* ResourceManager::GetResource(ResourceHandle handle) const
 {
-	if (!IsResourceHandleValid(handle)) {
+	if (!IsResourceHandleValid(handle)) 
+	{
 		return nullptr;
 	}
 
@@ -55,7 +54,7 @@ const Resource* ResourceManager::GetResource(ResourceHandle handle) const
 	return &resources_.at(index).resource;
 }
 
-ResourceHandle ResourceManager::GetResourceHandleByName(const std::string name)
+ResourceHandle ResourceManager::GetResourceHandleByName(const std::string& name)
 {
 	if (!name.empty())
 	{
@@ -108,4 +107,13 @@ u32 ResourceManager::GetResourceIndex(ResourceHandle handle) const
 bool ResourceManager::IsResourceHandleValid(ResourceHandle handle) const
 {
 	return handle.index < generations_.size() && generations_[handle.index] == handle.generation;
+}
+
+void ResourceManager::CreateBindlessHeap()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC srvTextureHeap{};
+	srvTextureHeap.NumDescriptors = MAX_TEXTURES;
+	srvTextureHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvTextureHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	(gfxDevice_.device_->CreateDescriptorHeap(&srvTextureHeap, IID_PPV_ARGS(&bindlessHeap_)));
 }
