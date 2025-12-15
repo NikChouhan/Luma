@@ -1,10 +1,10 @@
 #pragma once
 #include "Core/RenderContext.h"
 #include "Graphics/GfxDevice.h"
+#include "Renderer/Core/RenderPass.h"
 
 struct Swapchain;
 struct Scene;
-struct RenderPass;
 struct PipelineCache;
 struct ResourceManager;
 

@@ -30,7 +30,7 @@ void Renderer::RenderFrame(const Scene& scene)
 {
 	RenderContext ctx = BeginFrame();
 
-	for (const auto& pass : passes_)
+	for (auto& pass : passes_)
 	{
 		pass->Execute(ctx, scene);
 	}
@@ -43,7 +43,7 @@ RenderContext Renderer::BeginFrame() const
 	WaitForGPU(gfxDevice_, frameSync_);
 	u32 frameIdx = frameSync_.frameIndex_;
 
-	auto& allocator = gfxDevice_.commandAllocators_[frameIdx];
+	auto allocator = gfxDevice_.commandAllocators_[frameIdx];
 	DX_ASSERT(allocator->Reset());
 	DX_ASSERT(commandList->Reset(allocator.Get(), nullptr));
 
