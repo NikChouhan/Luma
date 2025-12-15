@@ -1,11 +1,12 @@
 #include "Graphics/D3D12/Pipeline.h"
 
 #include "Graphics/D3D12/Buffer.h"
-#include "Renderer/Resources.h"
+#include "Renderer/Core/Resources.h"
 #include "Graphics/D3D12/Swapchain.h"
 
 #include "Graphics/D3D12/RootSignature.h"
 #include "Graphics/D3D12/Shader.h"
+#include "Renderer/Core/PipelineCache.h"
 
 void Pipeline::Release()
 {
@@ -17,7 +18,7 @@ void Pipeline::Release()
     }
 }
 
-void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc)
+void CompilePipelineInternal(PipelineCache* pipelineCache, const GfxDevice& gfxDevice,const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc)
 {
     pipeline.rootSignature = CreateRootSignature(gfxDevice, { ._type = pipelineDesc.rootSignType })._rootSignature;
 
@@ -48,21 +49,21 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         psoDesc.InputLayout = { .pInputElementDescs = inputElementDescs, .NumElements = _countof(inputElementDescs) };
         psoDesc.pRootSignature = pipeline.rootSignature.Get();
 
-        for (const u32 shaderIndex : pipelineDesc.shaderIndex)
+        for (const auto& shaderHandle : pipelineDesc.shaders)
         {
-            Shader shader = resources->shaders[shaderIndex];
-            if (shader.type == Type::VERTEX)
+            Shader* shader = pipelineCache->GetShader(shaderHandle);
+            if (shader->type == Type::VERTEX)
             {
                 D3D12_SHADER_BYTECODE bytecode{};
-                bytecode.BytecodeLength = shader.pBlob->GetBufferSize();
-                bytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
+                bytecode.BytecodeLength = shader->pBlob->GetBufferSize();
+                bytecode.pShaderBytecode = shader->pBlob->GetBufferPointer();
                 psoDesc.VS = bytecode;
             }
-            else if (shader.type == Type::PIXEL)
+            else if (shader->type == Type::PIXEL)
             {
                 D3D12_SHADER_BYTECODE bytecode{};
-                bytecode.BytecodeLength = shader.pBlob->GetBufferSize();
-                bytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
+                bytecode.BytecodeLength = shader->pBlob->GetBufferSize();
+                bytecode.pShaderBytecode = shader->pBlob->GetBufferPointer();
                 psoDesc.PS = bytecode;
             }
         }
@@ -98,7 +99,7 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
             psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
             psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = swapChain._renderTargets[0]->GetDesc().Format;
+            psoDesc.RTVFormats[0] = swapChain.renderTargets_[0]->GetDesc().Format;
         }
 
         psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -111,11 +112,11 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
 
         psoDesc.DepthStencilState.DepthEnable = pipelineDesc.enableDepthTest;
         psoDesc.DepthStencilState.StencilEnable = pipelineDesc.enableStencilTest;
-        psoDesc.DSVFormat = swapChain._depthStencil->GetDesc().Format;
+        psoDesc.DSVFormat = swapChain.depthStencil_->GetDesc().Format;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
         psoDesc.SampleDesc.Count = 1;
-        DX_ASSERT(gfxDevice.device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
+        DX_ASSERT(gfxDevice.device_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
 
     if (pipelineDesc.pipelineType == PipelineType::COMPUTE)
@@ -123,28 +124,17 @@ void CompilePipelineInternal(const GfxDevice& gfxDevice,const Swapchain& swapCha
         D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
         /*assert(pipelineDesc._shaders.begin()->_type == Type::COMPUTE && pipelineDesc._shaders.size() == 1);*/
 
-        for (const u32 shaderIndex : pipelineDesc.shaderIndex)
+        for (const auto& shaderHandle : pipelineDesc.shaders)
         {
-            Shader shader = resources->shaders[shaderIndex];
+            Shader* shader = pipelineCache->GetShader(shaderHandle);
 
             D3D12_SHADER_BYTECODE cShaderBytecode{};
-            cShaderBytecode.BytecodeLength = shader.pBlob->GetBufferSize();
-            cShaderBytecode.pShaderBytecode = shader.pBlob->GetBufferPointer();
+            cShaderBytecode.BytecodeLength = shader->pBlob->GetBufferSize();
+            cShaderBytecode.pShaderBytecode = shader->pBlob->GetBufferPointer();
             csoDesc.CS = cShaderBytecode;
         }
         csoDesc.NodeMask = 0;
         csoDesc.pRootSignature = pipeline.rootSignature.Get();
-        DX_ASSERT(gfxDevice.device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
+        DX_ASSERT(gfxDevice.device_->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pipelineState)));
     }
-}
-
-Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc& pipelineDesc)
-{
-    Pipeline pipeline{};
-
-    CompilePipelineInternal(gfxDevice, swapChain, pipeline, pipelineDesc);
-
-    resources->pipelines.push_back(pipeline);
-    resources->pipelineParams.push_back(pipelineDesc);
-    return pipeline;
 }

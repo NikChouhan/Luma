@@ -3,6 +3,8 @@
 
 #include "RootSignature.h"
 
+struct PipelineCache;
+struct ShaderHandle;
 struct Swapchain;
 
 enum class PipelineType : u8
@@ -11,7 +13,7 @@ enum class PipelineType : u8
     COMPUTE
 };
 
-typedef std::initializer_list<u32> Shaders;
+typedef std::initializer_list<ShaderHandle> Shaders;
 struct Pipeline
 {
     ComPtr<ID3D12PipelineState> pipelineState;
@@ -25,12 +27,12 @@ struct PipelineDesc
 {
     PipelineType pipelineType{};
     RootSignDesc::RSType rootSignType;
-    Shaders shaderIndex;
+    Shaders shaders;
     BOOL enableDepthTest;
     BOOL enableStencilTest{};
     BOOL isDepthPrePass = false;
 };
 
-void CompilePipelineInternal(const GfxDevice& gfxDevice, const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc);
+void CompilePipelineInternal(PipelineCache* pipelineCache, const GfxDevice& gfxDevice, const Swapchain& swapChain, Pipeline& pipeline, const PipelineDesc& pipelineDesc);
 Pipeline CreatePipeline(const GfxDevice& gfxDevice, Swapchain& swapChain, PipelineDesc& pipelineDesc);
 void DestroyPipeline(GfxDevice& gfxDevice, Pipeline& pipeline);
