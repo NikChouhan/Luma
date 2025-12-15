@@ -62,14 +62,14 @@ void Model::Load(const std::string& path)
     {
         BufferCreateInfo vbInfo = {
             .desc = VertexBufferDesc{.vertices = allVertices.data(), .vertexCount = (u32)allVertices.size(), .vertexStride = sizeof(Vertex)},
-            .usage = BufferUsage::GPU_UPLOAD, // Or DEFAULT if you implement staging
+            .usage = BufferUsage::UPLOAD, 
             .debugName = L"Model_GlobalVB"
         };
         globalVertexBuffer_ = resourceManager_->CreateResource(vbInfo, path + "_VB");
 
         BufferCreateInfo ibInfo = {
             .desc = IndexBufferDesc{.indices = allIndices.data(), .indexCount = (u32)allIndices.size(), .indexFormat = DXGI_FORMAT_R32_UINT},
-            .usage = BufferUsage::GPU_UPLOAD,
+            .usage = BufferUsage::UPLOAD,
             .debugName = L"Model_GlobalIB"
         };
         globalIndexBuffer_ = resourceManager_->CreateResource(ibInfo, path + "_IB");
@@ -237,7 +237,7 @@ ResourceHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRG
             .initialData = data
         },
         .debugName = debugName.c_str(),
-        .usage = TextureUsage::UPLOAD,
+        .usage = TextureUsage::DEFAULT,
         .heap = resourceManager_->GetBindlessHeap().Get()
     };
 
