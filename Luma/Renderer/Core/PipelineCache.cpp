@@ -83,11 +83,7 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
     PipelineHandle handle = AllocatePipelineHandle();
     u32 index = handle.index;
 
-    std::vector<ShaderHandle> shaderHandles;
-    for (auto shaderHandle : GetShaderByName(name))
-    {
-        shaderHandles.push_back(shaderHandle);
-    }
+    std::vector<ShaderHandle> shaderHandles = desc.shaders;
 
     Pipeline pipeline{};
     CompilePipelineInternal(this, gfxDevice_, swapchain_, pipeline, desc);
@@ -192,7 +188,7 @@ void PipelineCache::ReloadPipeline(PipelineHandle handle) {
     auto& managed = pipelines_[handle.index];
 
     managed.pipeline.Release();
-    CompilePipelineInternal(gfxDevice_, swapchain_, managed.pipeline, managed.desc);
+    CompilePipelineInternal(this, gfxDevice_, swapchain_, managed.pipeline, managed.desc);
 }
 
 ShaderHandle PipelineCache::AllocateShaderHandle()
