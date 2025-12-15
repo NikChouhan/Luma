@@ -19,14 +19,13 @@ void Renderer::Init()
 {
 	commandList = CommandList(gfxDevice_).commandList_;
 
-	passes_.push_back(std::make_unique<GeometryPass>());
 	for (const auto& pass : passes_)
 	{
 		pass->Init(resourceManager_, pipelineCache_);
 	}
 }
 
-void Renderer::RenderFrame(const Scene& scene)
+void Renderer::RenderFrame(const Scene& scene) const
 {
 	RenderContext ctx = BeginFrame();
 
@@ -60,10 +59,18 @@ RenderContext Renderer::BeginFrame() const
 	);
 	commandList->ResourceBarrier(1, &barrier);
 
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain_.rtvHeap_->GetCPUDescriptorHandleForHeapStart(),
+		frameSync_.frameIndex_, swapchain_.rtvDescriptorSize_);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain_.dsvDepthHeap_->GetCPUDescriptorHandleForHeapStart());
+
 	return RenderContext{
 		.cmdList_ = commandList.Get(),
 		.frameIndex_ = frameIdx,
-		.gfxDevice_ = gfxDevice_
+		.gfxDevice_ = gfxDevice_,
+		.currentRtv = rtvHandle,
+		.currentDsv = dsvHandle,
+		.viewport = swapchain_.viewport_,
+		.scissorRect = swapchain_.scissorRect_
 	};
 }
 

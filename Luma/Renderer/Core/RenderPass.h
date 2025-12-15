@@ -12,4 +12,7 @@ struct RenderPass
 
 	virtual void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) = 0;
 	virtual void Execute(RenderContext& ctx, const Scene& scene) = 0;
+
+	ResourceManager* resourceManager_;
+	PipelineCache* pipelineCache_;
 };

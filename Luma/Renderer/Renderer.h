@@ -16,8 +16,10 @@ struct Renderer
 		ResourceManager* resourceManager,
 		PipelineCache* pipelineCache);
 	~Renderer() = default;
+	template<typename T>
+	void AddPass();
 	void Init();
-	void RenderFrame(const Scene& scene);
+	void RenderFrame(const Scene& scene) const;
 
 private:
 	const GfxDevice& gfxDevice_;
@@ -32,3 +34,9 @@ private:
 	RenderContext BeginFrame() const;
 	void EndFrame(const RenderContext& ctx) const;
 };
+
+template <typename T>
+void Renderer::AddPass()
+{
+	passes_.push_back(std::make_unique<T>());
+}
