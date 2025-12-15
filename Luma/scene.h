@@ -1,55 +1,45 @@
 #pragma once
-#include <d3d12.h>
-#include <imgui.h>
-#include <string>
+
 #include <wrl/client.h>
 #include "StandardTypes.h"
-#include "Inspector.h"
-#include "Model.h"
-#include "Watcher.h"
+#include "Core/Camera.h"
+#include "Renderer/Model.h"
 
-#include <json.hpp>
-using json = nlohmann::json;
-
-
-struct Inspector;
-using namespace Microsoft::WRL;
-
-struct Camera;
-struct Swapchain;
-struct FrameSync;
-struct GfxDevice;
-struct Device;
-
-enum class SceneType : u8
+struct RenderObject
 {
-	SPONZA,
-	BISTRO
+	Model* model = nullptr;
+	SM::Matrix transform = SM::Matrix::Identity;
+	u32 id;
 };
 
-struct SceneDesc
+struct DirectionalLight
 {
-	Model* model{};
+	SM::Vector3 direction_{ 0.,0,0. };
+	SM::Vector3 color_{1.,1.,1.};
+	float intensity_ = 1.f;
 };
 
 struct Scene
 {
-	std::string modelPath{};
-	ComPtr<ID3D12GraphicsCommandList10> commandList;
-	DXCRes dxcRes = {};
-	ResourceManager* resourceManager;
-	Inspector inspector = {};
-	Model model = {};
-	Watcher watcher{};
+	Scene(const GfxDevice& gfxDevice, ResourceManager& resourceManager);
+	~Scene() = default;
 
-	json renderGraphData{};
+	void Load();
+	void Update(float deltaTime);
 
-	void ParseRenderGraph();
-	void Render(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, Camera& camera);
+	[[nodiscard]] const Camera& GetCamera() const { return camera_;}
+	Camera& GetCamera() { return  camera_;}
+
+	[[nodiscard]] const std::vector<RenderObject>& GetRenderObjects() const { return renderObjects_; }
+	[[nodiscard]] const DirectionalLight& GetSun() const { return sun_; }
+
+private:
+	const GfxDevice& gfxDevice_;
+	ResourceManager& resourceManager_;
+
+	Camera camera_;
+	DirectionalLight sun_;
+
+	std::vector<std::unique_ptr<Model>> loadedModels_;
+	std::vector<RenderObject> renderObjects_;
 };
-
-Scene CreateScene(GfxDevice& gfxDevice, 
-	FrameSync& frameSync, 
-	Swapchain& swapchain, 
-	Camera& camera, 
-	SceneDesc sceneDesc);
