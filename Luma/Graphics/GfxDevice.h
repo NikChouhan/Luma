@@ -23,6 +23,7 @@ struct GfxDevice
 
 struct GfxDeviceDesc
 {
+	bool something = true;
 };
 
 GfxDevice CreateDevice(GfxDeviceDesc desc);

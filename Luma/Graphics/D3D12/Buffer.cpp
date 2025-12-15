@@ -122,7 +122,7 @@ struct BufferViewCreator
 
     BufferView operator()(const RawBufferDesc& desc) const
     {
-        if (createInfo.bindlessHeap && createInfo.) 
+        if (createInfo.bindlessHeap) 
         {
             u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

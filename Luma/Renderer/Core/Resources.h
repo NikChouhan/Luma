@@ -82,5 +82,5 @@ private:
 	[[nodiscard]] ResourceHandle AllocateResourceHandle();
 	[[nodiscard]] u32 GetResourceIndex(ResourceHandle handle) const;
 
-	void ResourceManager::CreateBindlessHeap();
+	void CreateBindlessHeap();
 };
