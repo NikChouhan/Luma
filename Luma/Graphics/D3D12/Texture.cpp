@@ -49,11 +49,13 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
     }
 }
 
+
 // TODO: Have a function to upload multiple textures at once (i don't need it rn, but may in the future)
 
 static ComPtr<ID3D12Resource> CreateTextureResource(
     const GfxDevice& gfxDevice,
     FrameSync& frameSync,
+    D3D12MA::Allocation* allocation,
     const Texture2DDesc& desc,
     const TextureUsage& usage,
     const D3D12_RESOURCE_FLAGS resourceFlags)
@@ -86,34 +88,11 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
         clearValue.Color[3] = 1.0f;
         pClearValue = &clearValue;
     }
-    D3D12_HEAP_TYPE heapType{};
-    switch (usage)
-    {
-    case TextureUsage::UPLOAD:
-        heapType = D3D12_HEAP_TYPE_UPLOAD;
-        initialState = D3D12_RESOURCE_STATE_GENERIC_READ;
-        break;
 
-    case TextureUsage::DEFAULT:
-        heapType = D3D12_HEAP_TYPE_DEFAULT;
-        initialState = D3D12_RESOURCE_STATE_COMMON;
-        break;
-    case TextureUsage::READBACK:
-        heapType = D3D12_HEAP_TYPE_READBACK;
-        initialState = D3D12_RESOURCE_STATE_COPY_DEST;
-        break;
-
-    case TextureUsage::GPU_UPLOAD:
-        heapType = D3D12_HEAP_TYPE_GPU_UPLOAD;
-        initialState = D3D12_RESOURCE_STATE_COMMON;
-        break;
-    }
-
-	D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = heapType;
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 
-    D3D12MA::Allocation* allocation;
     DX_ASSERT(gfxDevice.allocator_->CreateResource(
         &allocDesc,
         &resourceDesc,
@@ -122,16 +101,15 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
         &allocation,
         IID_PPV_ARGS(&resource)));
 
-    assert(desc.initialData);
-    if (usage == TextureUsage::UPLOAD || usage == TextureUsage::GPU_UPLOAD) 
+    if (desc.initialData && (usage == TextureUsage::UPLOAD || usage == TextureUsage::GPU_UPLOAD))
     {
         UploadTextureData(gfxDevice, frameSync, resource, desc, usage);
     }
-
     // allocation->Release();
 
     return resource;
 }
+
 
 static u32 CreateTextureSRV(
     const GfxDevice& gfxDevice,
@@ -227,8 +205,9 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
     {
         resourceFlags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     }
-
-	texture.resource = CreateTextureResource(gfxDevice, frameSync, desc, createInfo.usage, resourceFlags);
+    
+    texture.resource = CreateTextureResource(gfxDevice, frameSync, 
+        texture.allocation, desc, createInfo.usage, resourceFlags);
 
     if (createInfo.debugName) 
     {
@@ -277,7 +256,7 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
             }
             texture.uavIndex = texture.mipUAVIndices[0];
         }
-        else 
+        else
         {
             texture.uavIndex = CreateTextureUAV(
                 gfxDevice,

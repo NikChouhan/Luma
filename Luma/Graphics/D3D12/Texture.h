@@ -4,6 +4,11 @@
 
 #include "Graphics/GfxDevice.h"
 
+namespace D3D12MA
+{
+	class Allocation;
+}
+
 enum class TextureUsage : u8
 {
 	UPLOAD,
@@ -29,6 +34,8 @@ inline bool HasFlag(TextureViewFlags flags, TextureViewFlags check)
 {
     return (static_cast<u32>(flags) & static_cast<u32>(check)) != 0;
 }
+
+// allow having |ing with TextureUsage as well, required when you need a upload buffer
 
 struct Texture2DDesc
 {
@@ -56,6 +63,8 @@ struct Texture
 
     // if createMipUAVs is true
     std::vector<u32> mipUAVIndices;
+
+    D3D12MA::Allocation* allocation;
 };
 
 struct TextureCreateInfo
