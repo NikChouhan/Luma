@@ -2,9 +2,19 @@
 
 struct Timer
 {
-	LARGE_INTEGER _perfFrequency;
-	LARGE_INTEGER _lastFrameTime;
-};
+	Timer();
+	void Reset();
+	void Tick();
 
-Timer CreateTimer();
-void PerFrameTimer(Timer& timer);
+	// returns total time in Milliseconds
+	float DeltaTime() const;
+	u64 TotalTime() const;
+
+private:
+	LARGE_INTEGER perfFrequency_;
+	LARGE_INTEGER lastFrameTime_;
+
+	LARGE_INTEGER startTime_;
+	double secondsPerTick_ = 0.0;
+	float deltaTime_ = 0.0f;
+};
