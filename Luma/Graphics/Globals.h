@@ -76,3 +76,16 @@ inline void SetupLightSettingsHandler()
 
     ImGui::GetCurrentContext()->SettingsHandlers.push_back(ini_handler);
 }
+
+struct InputGlobalState
+{
+	inline static bool keys[256];
+    inline static int lastMouseX;
+    inline static int lastMouseY;
+    inline static int currentMouseX;
+    inline static int currentMouseY;
+
+	inline static bool isMouseCaptured;
+};
+
+typedef InputGlobalState IGS;
