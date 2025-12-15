@@ -1,125 +1,64 @@
 #pragma once
+#include <vector>
+#include <string>
+#include <External/SimpleMath/SimpleMath.h>
+#include "Core/Resources.h"
 
-#include <unordered_map>
-#include <unordered_set>
+struct cgltf_node;
+struct cgltf_primitive;
+struct cgltf_texture_view;
 
-#include <cgltf.h>
 
-#include "Graphics/GfxDevice.h"
-#include "Graphics/D3D12/Buffer.h"
-
-struct Swapchain;
-struct Texture;
-struct Vertex;
-struct Buffer;
-using namespace DirectX;
-namespace SM = DirectX::SimpleMath;
-
-struct ModelDesc
+struct SubMesh
 {
-    std::string _path;
-};
+    u32 indexCount = 0;
+    u32 startIndex = 0;
+    i32 baseVertex = 0;
+    u32 materialIndex = 0;
 
-enum class TextureType
-{
-    ALBEDO = 1,
-    NORMAL = 2,
-    METALLIC_ROUGHNESS = 4,
-    EMISSIVE = 8,
-    SPECULAR = 16
-};
-
-struct Transformation
-{
-    SM::Matrix _matrix = XMMatrixIdentity();
-    SM::Vector3 _position = SM::Vector3();
-    SM::Vector3 _rotation = SM::Vector3();
-    SM::Vector3 _scale = SM::Vector3();
+    SM::Matrix transform = SM::Matrix::Identity; // local transform from glTF node
+    DirectX::BoundingBox bounds;         // for frustum culling
 };
 
 struct Material
 {
-    XMFLOAT4 _globalAmbientColor;
+    SM::Vector4 baseColorFactor = SM::Vector4::One;
+    float metallicFactor = 1.0f;
+    float roughnessFactor = 1.0f;
+    float emissiveFactor = 1.0f;
 
-    float _opacity;
-    float _specularPower;
-    float _indexOfRefraction;
-    BOOL  _hasAmbientTexture = FALSE;
-
-    BOOL _hasEmissive = FALSE;
-    BOOL _hasAlbedo = FALSE;
-    BOOL _hasSpecular = FALSE;
-    BOOL _hasSpecularPower = FALSE;
-
-    BOOL _hasNormal = FALSE;
-    BOOL _hasBump = FALSE;
-    BOOL _hasOpacity = FALSE;
-    float _bumpIntensity;
-
-    u32 _albedoIndex = -1;
-    u32 _normalIndex = -1;
-    u32 _emmisiveIndex = -1;
-    u32 _metallicRoughnessIndex = -1;
-
-    u32 _roughnessIndex = -1;
-    BOOL _hasAo = FALSE;
-    float _specularScale;
-    float _alphaThreshold;
-
-    // no texture views unlike in vulkan
-    // cuz the views are created with
-    // the texture heaps and aren't separate.
-    // can be accessed with cpudescriptorhandle
+    ResourceHandle albedoTexture = g_invalidResourceHandle;
+    ResourceHandle normalTexture = g_invalidResourceHandle;
+    ResourceHandle metallicRoughnessTexture = g_invalidResourceHandle;
+    ResourceHandle emissiveTexture = g_invalidResourceHandle;
 };
 
-struct Mesh
+class Model
 {
-    std::vector<Vertex> _vertices;
-    std::vector<u32> _indices;
-    u32 _vertexCount;
-    u32 _indexCount;
+public:
+    Model(const GfxDevice& gfxDevice, ResourceManager* resourceManager);
+    ~Model() = default;
+
+    void Load(const std::string& path);
+
+    [[nodiscard]] const std::vector<SubMesh>& GetSubMeshes() const { return subMeshes_; }
+    [[nodiscard]] const std::vector<Material>& GetMaterials() const { return materials_; }
+
+    ResourceHandle GetVertexBuffer() const { return globalVertexBuffer_; }
+    ResourceHandle GetIndexBuffer() const { return globalIndexBuffer_; }
+
+private:
+    const GfxDevice& gfxDevice_;
+    ResourceManager* resourceManager_;
+    std::string directory_;
+
+	ResourceHandle globalVertexBuffer_ = g_invalidResourceHandle;
+    ResourceHandle globalIndexBuffer_ = g_invalidResourceHandle;
+
+    std::vector<SubMesh> subMeshes_;
+    std::vector<Material> materials_;
+
+    void ProcessNode(cgltf_node* node, const SM::Matrix& parentTransform, std::vector<Vertex>& allVertices, std::vector<u32>& allIndices);
+    void ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& transform, std::vector<Vertex>& allVertices, std::vector<u32>& allIndices);
+    ResourceHandle LoadTexture(const cgltf_texture_view* view, bool sRGB) const;
 };
-
-struct MeshInfo
-{
-    size_t _vertexCount = 0;
-    size_t _indexCount = 0;
-    u32 _materialIndex = -1;
-    uint32_t _startIndex = 0;
-    uint32_t _startVertex = 0;
-    Transformation _transform{};
-    SM::Matrix _normalMatrix{};
-};
-
-struct Model
-{
-    std::string _dirPath{};
-    std::vector<Vertex> _vertices{};
-    std::vector<u32> _indices{};
-    std::vector< MeshInfo> _meshes{};
-    std::vector<Material> _materials{};
-
-    Buffer _vertexBuffer;
-    Buffer _indexBuffer;
-
-    std::vector<Texture> _modelTextures;
-    ComPtr<ID3D12DescriptorHeap> _commonHeap;
-    ComPtr<ID3D12DescriptorHeap> _samplerHeap;
-    
-    // acceleration structures
-    ComPtr<ID3D12Resource> _bottomLevelAccelerationStructure;
-    ComPtr<ID3D12Resource> _topLevelAccelerationStructure;
-    // normal and rt uav
-    ComPtr<ID3D12Resource> _normalUAV;
-    ComPtr<ID3D12Resource> _rtaoUAV;
-
-    std::unordered_set<std::string> _loadedTextures; // To track loaded textures
-    std::unordered_map<cgltf_material*, size_t> _materialLookup;
-    std::unordered_map<std::string, size_t> _textureIndexLookup;
-
-    auto begin() { return _meshes.begin(); }
-    auto end() { return _meshes.end(); }
-};
-
-Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10 *commandList, ModelDesc desc);
-void DestroyModel(GfxDevice& gfxDevice, Model& model);

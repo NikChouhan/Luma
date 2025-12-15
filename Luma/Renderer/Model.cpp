@@ -2,634 +2,247 @@
 #include <meshoptimizer.h>
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
-
 #include <stb_image.h>
-#include "Graphics/D3D12/Buffer.h"
-
-#include "Graphics/FrameSync.h"
-#include "Graphics/D3D12/Texture.h"
-
 #include "Core/Log.h"
-#include "Graphics/D3D12/Swapchain.h"
 
-
-static i32 LoadMaterialTexture(GfxDevice& gfxDevice, FrameSync& frameSync, Model& model, const cgltf_texture_view* textureView, TextureType type)
+static SM::Matrix NodeToMatrix(cgltf_node* node)
 {
-    if (textureView && textureView->texture && textureView->texture->image)
+    SM::Matrix m = SM::Matrix::Identity;
+    if (node->has_matrix)
     {
-        cgltf_image* image = textureView->texture->image;
-        std::string path = model._dirPath + "/" + std::string(image->uri);
-
-        int width, height, channels;
-        unsigned char* imgData = stbi_load(path.c_str(), &width, &height,
-            &channels, STBI_rgb_alpha);
-
-
-        if (imgData == nullptr)
-        {
-            printl(Log::LogLevel::Warn, "[Texture] FAILED to load texture: {}", path);
-            return -1;
-        }
-
-        Texture texture = CreateTexture(gfxDevice, frameSync,
-            {
-            .texWidth = u32(width),
-            .texHeight = u32(height),
-            .texPixelSize = u32(4),
-            .pContents = imgData,
-            .textureType = TextureViewType::SAMPLE,
-            .type = type
-            });
-
-        stbi_image_free(imgData);
-        // Push the texture and return its new index
-        model._modelTextures.push_back(texture);
-        i32 newIndex = model._modelTextures.size() - 1;
-
-        // in d3d12 heap is used to create the heap, and handled by the texture class,
-        // and not model
-
-        //if (type == TextureType::ALBEDO) mat.AlbedoView = tex._imageView;
-        //if (type == TextureType::NORMAL) mat.NormalView = tex._imageView;
-        //if (type == TextureType::METALLIC_ROUGHNESS) mat.MetallicRoughnessView = tex._imageView;
-        //if (type == TextureType::EMISSIVE) mat.EmissiveView = tex._imageView;
-
-        return newIndex;
-
-        // case TextureType::AO:
-        //     mat.AOView = tex.m_texImageView;
-        //     mat.HasAO = true;
-        //     mat.AOPath = path;
-        //     modelTextures.push_back(tex);
-
+        memcpy(&m, node->matrix, sizeof(float) * 16);
     }
-    // Handle missing texture or image
-    printl(Log::LogLevel::Warn, "[Texture] Texture or image not found for material : {}", std::to_string(static_cast<int>(type)));
-    return -1;
-}
-
-static void OptimiseMesh(Model& model, MeshInfo& meshInfo, Mesh& mesh)
-{
-    size_t indexCount = meshInfo._indexCount;
-    size_t vertexCount = meshInfo._vertexCount;
-
-    std::vector<unsigned int> remap(indexCount);
-    size_t optVertexCount = meshopt_generateVertexRemap(remap.data(), mesh._indices.data(), indexCount, mesh._vertices.data(), vertexCount, sizeof(Vertex));
-
-    std::vector<u32> optIndices;
-    std::vector<Vertex> optVertices;
-    optIndices.resize(indexCount);
-    optVertices.resize(optVertexCount);
-
-    // Optimisation 1 - Remove duplicate vertices
-    meshopt_remapIndexBuffer(optIndices.data(), mesh._indices.data(), indexCount, remap.data());
-    meshopt_remapVertexBuffer(optVertices.data(), mesh._vertices.data(), vertexCount, sizeof(Vertex), remap.data());
-
-    // Optimisation 2 - improve the locality of the vertices
-    meshopt_optimizeVertexCache(optIndices.data(), optIndices.data(), indexCount, optVertexCount);
-
-    // Optimization 3 - reduce pixel overdraw
-    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &(optVertices[0].position.x), optVertexCount, sizeof(Vertex), static_cast<float>(1.05));
-
-    // Optimization 4 - optimize access to the vertex buffer
-    meshopt_optimizeVertexFetch(optVertices.data(), optIndices.data(), indexCount, optVertices.data(), optVertexCount, sizeof(Vertex));
-
-    // Optimization 5 - create simplified version of the model
-    float threshold = 0.5f;
-    size_t targetIndexCount = (size_t)(threshold * indexCount);
-    float targetError = 0.3f;
-
-    std::vector<u32> simplifiedIndices(optIndices.size());
-    size_t optIndexCount = meshopt_simplify(simplifiedIndices.data(), optIndices.data(), indexCount,
-        &(optVertices[0].position.x), optVertexCount, sizeof(Vertex), targetIndexCount,
-        targetError);
-    simplifiedIndices.resize(optIndexCount);
-
-    model._indices.insert(model._indices.end(), simplifiedIndices.begin(), simplifiedIndices.end());
-    model._vertices.insert(model._vertices.end(), optVertices.begin(), optVertices.end());
-
-    meshInfo._indexCount = optIndexCount;
-    meshInfo._vertexCount = optVertexCount;
-
-    mesh._vertices = optVertices;
-    mesh._indices = optIndices;
-    mesh._vertexCount = static_cast<u32>(optVertexCount);
-    mesh._indexCount = static_cast<u32>(optIndexCount);
-}
-
-static void ProcessPrimitive(GfxDevice& gfxDevice, FrameSync& frameSync, 
-    cgltf_primitive* primitive, Model& model, Transformation& parentTransform)
-{
-    u32 vertexOffset = model._vertices.size();
-    u32 indexOffset = model._indices.size();
-
-    std::vector<Vertex> tempVertices;
-    std::vector<u32> tempIndices;
-
-    if (primitive->type != cgltf_primitive_type_triangles)
+    else
     {
-        printl(Log::LogLevel::Error, "[CGLTF] Primitive type is not triangles");
+        SM::Vector3 t = node->has_translation ? SM::Vector3(node->translation) : SM::Vector3::Zero;
+        SM::Quaternion r = node->has_rotation ? SM::Quaternion(node->rotation) : SM::Quaternion::Identity;
+        SM::Vector3 s = node->has_scale ? SM::Vector3(node->scale) : SM::Vector3::One;
+        m = SM::Matrix::CreateScale(s) * SM::Matrix::CreateFromQuaternion(r) * SM::Matrix::CreateTranslation(t);
+    }
+    return m;
+}
+
+Model::Model(const GfxDevice& gfxDevice, ResourceManager* resourceManager)
+	: gfxDevice_(gfxDevice), resourceManager_(resourceManager) {}
+
+void Model::Load(const std::string& path)
+{
+    cgltf_options options = {};
+    cgltf_data* data = nullptr;
+
+    if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success)
+    {
+        printl(Log::LogLevel::Error, "[Model] Failed to parse: {}", path);
         return;
     }
 
-    if (primitive->indices == nullptr)
+    if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
     {
-        printl(Log::LogLevel::Error, "[CGLTF] Primitive has no indices");
+        printl(Log::LogLevel::Error, "[Model] Failed to load buffers: {}", path);
+        cgltf_free(data);
         return;
     }
 
-    if (primitive->material == nullptr)
+    directory_ = path.substr(0, path.find_last_of("/\\"));
+
+    std::vector<Vertex> allVertices;
+    std::vector<u32> allIndices;
+
+    // Reserve to prevent frequent reallocs, 10k vertex per mesh is sufficient for me
+    allVertices.reserve(100000);
+    allIndices.reserve(300000);
+
+    cgltf_scene* scene = data->scene;
+    for (size_t i = 0; i < scene->nodes_count; ++i)
     {
-        printl(Log::LogLevel::Error, "[CGLTF] Primitive has no material");
-        return;
+        ProcessNode(scene->nodes[i], SM::Matrix::Identity, allVertices, allIndices);
     }
 
-
-    MeshInfo meshInfo;
-
-    meshInfo._transform = parentTransform;
-
-    // Get attributes
-    cgltf_attribute* pos_attribute = nullptr;
-    cgltf_attribute* tex_attribute = nullptr;
-    cgltf_attribute* norm_attribute = nullptr;
-
-    for (size_t i = 0; i < primitive->attributes_count; i++)
+    if (!allVertices.empty())
     {
-        if (strcmp(primitive->attributes[i].name, "POSITION") == 0)
-        {
-            pos_attribute = &primitive->attributes[i];
-        }
-        if (strcmp(primitive->attributes[i].name, "TEXCOORD_0") == 0)
-        {
-            tex_attribute = &primitive->attributes[i];
-        }
-        if (strcmp(primitive->attributes[i].name, "NORMAL") == 0)
-        {
-            norm_attribute = &primitive->attributes[i];
-        }
+        BufferCreateInfo vbInfo = {
+            .desc = VertexBufferDesc{.vertices = allVertices.data(), .vertexCount = (u32)allVertices.size(), .vertexStride = sizeof(Vertex)},
+            .usage = BufferUsage::GPU_UPLOAD, // Or DEFAULT if you implement staging
+            .debugName = L"Model_GlobalVB"
+        };
+        globalVertexBuffer_ = resourceManager_->CreateResource(vbInfo, path + "_VB");
+
+        BufferCreateInfo ibInfo = {
+            .desc = IndexBufferDesc{.indices = allIndices.data(), .indexCount = (u32)allIndices.size(), .indexFormat = DXGI_FORMAT_R32_UINT},
+            .usage = BufferUsage::GPU_UPLOAD,
+            .debugName = L"Model_GlobalIB"
+        };
+        globalIndexBuffer_ = resourceManager_->CreateResource(ibInfo, path + "_IB");
+
+        printl(Log::LogLevel::Info, "[Model] Loaded {} with {} submeshes. Total Verts: {}", path, subMeshes_.size(), allVertices.size());
     }
 
-    if (!pos_attribute || !tex_attribute || !norm_attribute)
-    {
-        printl(Log::LogLevel::Warn, "[CGLTF] Missing attributes in primitive");
-        //return;
-    }
-
-    size_t vertexCount = pos_attribute->data->count;
-    size_t indexCount = primitive->indices->count;
-
-    for (size_t i = 0; i < vertexCount; i++)
-    {
-        Vertex vertex = {};
-
-        // Read original vertex data
-        if (cgltf_accessor_read_float(pos_attribute->data, i, &vertex.position.x, 3) == 0)
-        {
-            printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Position attributes!");
-        }
-        if (cgltf_accessor_read_float(tex_attribute->data, i, &vertex.texCoord.x, 2) == 0)
-        {
-            printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Texture attributes!");
-        }
-        if (cgltf_accessor_read_float(norm_attribute->data, i, &vertex.normal.x, 3) == 0)
-        {
-            printl(Log::LogLevel::Warn, "[CGLTF] Unable to read Normal attributes!");
-        }
-
-        tempVertices.push_back(vertex);
-    }
-
-    for (int i = 0; i < indexCount; i++)
-    {
-        tempIndices.push_back(cgltf_accessor_read_index(primitive->indices, i));
-    }
-
-    // material
-
-    cgltf_material* material = primitive->material;
-    if (!model._materialLookup.contains(material)) // if the hash table doesn't have the material hash
-    {
-        Material mat = {};
-
-        HRESULT hr = E_FAIL;
-
-        // map texture types to their respective textures
-        std::unordered_map<TextureType, cgltf_texture_view*> textureMap;
-
-        /*TODO: its pretty unoptimised due to too much use of hashmaps and string ops everywhere
-        need to find a better solution (nvtt3?).
-        Also need to write custom arena, with vector, string, maps, etc
-		*/
-
-        if (material->has_pbr_metallic_roughness)
-        {
-            cgltf_pbr_metallic_roughness* pbr = &material->pbr_metallic_roughness;
-            // Map base color texture (albedo)
-            if (pbr->base_color_texture.texture)
-            {
-                textureMap[TextureType::ALBEDO] = &pbr->base_color_texture;
-            }
-            if (pbr->metallic_roughness_texture.texture)
-            {
-                // Map metallic-roughness texture
-                textureMap[TextureType::METALLIC_ROUGHNESS] = &pbr->metallic_roughness_texture;
-            }
-        }
-
-        if (material->normal_texture.texture)
-        {
-            // Map normal texture
-            textureMap[TextureType::NORMAL] = &material->normal_texture;
-        }
-        if (material->emissive_texture.texture)
-        {
-            // Map emissive texture
-            textureMap[TextureType::EMISSIVE] = &material->emissive_texture;
-        }
-        if (material->has_pbr_specular_glossiness)
-        {
-            cgltf_pbr_specular_glossiness* pbr = &material->pbr_specular_glossiness;
-            if (pbr->specular_glossiness_texture.texture)
-            {
-                //textureMap[TextureType::SPECULAR_GLOSSINESS] = &material->tex
-            }
-        }
-
-        // Load all textures from the map if they haven't been loaded before
-        for (const auto& [type, view] : textureMap)
-        {
-            std::string imageName = view->texture->image->uri;
-            i32 textureIndex = -1;
-
-            if (!model._loadedTextures.contains(imageName)) // If texture file is new
-            {
-                textureIndex = LoadMaterialTexture(gfxDevice, frameSync, model, view, type);
-
-                if (textureIndex == -1)
-                {
-                    printl(Log::LogLevel::Error, "[Texture] FAILED to load texture: {}", imageName, textureIndex);
-                }
-
-                // Cache the index for this image file
-                model._loadedTextures.insert(imageName);
-                model._textureIndexLookup[imageName] = textureIndex;
-                printl(Log::LogLevel::Info, "[Texture] Loaded texture {} with index {}", imageName, textureIndex);
-            }
-            else
-            {
-                textureIndex = model._textureIndexLookup[imageName];
-                printl(Log::LogLevel::Warn, "[Texture] Reusing texture {} with index {}", imageName, textureIndex);
-            }
-
-            if (type == TextureType::ALBEDO) mat._albedoIndex = textureIndex;
-            if (type == TextureType::NORMAL) mat._normalIndex = textureIndex;
-            if (type == TextureType::METALLIC_ROUGHNESS)
-            {
-                mat._metallicRoughnessIndex = textureIndex;
-            }
-            if (type == TextureType::EMISSIVE) mat._emmisiveIndex = textureIndex;
-        }
-
-        model._materials.push_back(mat);
-        model._materialLookup[material] = model._materials.size() - 1;
-    }
-    meshInfo._materialIndex = static_cast<u32>(model._materialLookup[material]);
-    meshInfo._transform = parentTransform;
-    meshInfo._startIndex = indexOffset;
-    meshInfo._startVertex = vertexOffset;
-    meshInfo._vertexCount = vertexCount;
-    meshInfo._indexCount = indexCount;
-
-    Mesh mesh;
-    mesh._vertices = tempVertices;
-    mesh._indices = tempIndices;
-    mesh._vertexCount = static_cast<u32>(vertexCount);
-    mesh._indexCount = static_cast<u32>(indexCount);
-
-    // for non optimised meshes
-    /*for (int i = 0; i < tempVertices.size(); i++) model._vertices.push_back(tempVertices[i]);
-    for (int i = 0; i < tempIndices.size(); i++) model._indices.push_back(tempIndices[i]);*/
-
-    OptimiseMesh(model, meshInfo, mesh);
-#if MESH_SHADING
-    ProcessMeshlets(mesh);
-#endif
-    model._meshes.push_back(meshInfo);
+    cgltf_free(data);
 }
-
-static void ProcessNode(GfxDevice& gfxDevice, FrameSync& frameSync, cgltf_node* node,
-    Model& model, Transformation& parentTransform)
+void Model::ProcessNode(cgltf_node* node, const SM::Matrix& parentTransform, 
+    std::vector<Vertex>& allVertices, std::vector<u32>& allIndices)
 {
-    Transformation localTransform{};
-    localTransform._matrix = parentTransform._matrix;
-
-    if (node->has_matrix) 
-    {
-        //localTransform._matrix *= //make matrix from node->matrix;
-    }
-    else 
-    {
-        if (node->has_scale)
-        {
-            localTransform._matrix *= DirectX::XMMatrixScaling(node->scale[0], node->scale[1],
-                node->scale[2]);
-        }
-        if (node->has_rotation)
-        {
-            DirectX::XMVECTOR quat = DirectX::XMVectorSet( node->rotation[0],
-                node->rotation[1], node->rotation[2], node->rotation[3]);
-            localTransform._matrix *= DirectX::XMMatrixRotationQuaternion(quat);
-        }
-        
-        if (node->has_translation)
-        {
-            localTransform._matrix *= DirectX::XMMatrixTranslation(node->translation[0],
-                node->translation[1], node->translation[2]);
-        }
-    }
+    SM::Matrix localTransform = NodeToMatrix(node);
+    SM::Matrix globalTransform = localTransform * parentTransform;
 
     if (node->mesh)
     {
-        for (size_t i = 0; i < (node->mesh->primitives_count); i++)
+        for (size_t i = 0; i < node->mesh->primitives_count; ++i)
         {
-            ProcessPrimitive(gfxDevice, frameSync, &node->mesh->primitives[i], model, localTransform);
+            ProcessPrimitive(&node->mesh->primitives[i], globalTransform, allVertices, allIndices);
         }
     }
 
-    // Recursively process child nodes
-    for (size_t i = 0; i < node->children_count; i++)
+    for (size_t i = 0; i < node->children_count; ++i)
     {
-        ProcessNode(gfxDevice, frameSync, node->children[i], model, localTransform);
+        ProcessNode(node->children[i], globalTransform, allVertices, allIndices);
     }
 }
 
-static void SetResources(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10* commandList, Model& model)
+void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& transform, std::vector<Vertex>& allVertices, std::vector<u32>& allIndices)
 {
-    model._vertexBuffer = CreateBuffer(gfxDevice,
-        {
-        .bufferSize = u32(sizeof(Vertex) * model._vertices.size()),
-        .bufferType = BufferType::VERTEX,
-        .pContents = model._vertices.data() });
+    if (primitive->type != cgltf_primitive_type_triangles) return;
 
-    model._indexBuffer = CreateBuffer(gfxDevice,
-        {
-        .bufferSize = u32(sizeof(Index) * model._indices.size()),
-		.bufferType = BufferType::INDEX,
-        .pContents = model._indices.data() });
+    cgltf_attribute* posAttr = nullptr;
+    cgltf_attribute* normAttr = nullptr;
+    cgltf_attribute* texAttr = nullptr;
 
-    // acceleration structures
+    for (size_t i = 0; i < primitive->attributes_count; ++i)
     {
-        DX_ASSERT(commandList->Reset(gfxDevice.commandAllocators[frameSync._frameIndex].Get(),
-            nullptr));
-        D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
-        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Triangles.IndexBuffer = model._indexBuffer.resource->GetGPUVirtualAddress();
-        geometryDesc.Triangles.IndexCount = (u32)(model._indexBuffer.resource->GetDesc().Width) / sizeof(Index);
-        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-        geometryDesc.Triangles.Transform3x4 = NULL;
-
-        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-        geometryDesc.Triangles.VertexBuffer.StartAddress = model._vertexBuffer.resource->GetGPUVirtualAddress();
-        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-        geometryDesc.Triangles.VertexCount = u32(model._vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
-
-        // will keep the flag as RT opaque cuz I am not managing transparent/translucent objects for now
-        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-        // TLAS desc
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
-        topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-        topLevelInputs.Flags = buildFlags;
-        topLevelInputs.NumDescs = 1;
-        topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
-        gfxDevice.device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-        assert(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
-
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
-        bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-        bottomLevelInputs.pGeometryDescs = &geometryDesc;
-        gfxDevice.device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-        assert(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
-
-        ComPtr<ID3D12Resource> scratchResource;
-        AllocateUAVBuffer(gfxDevice.device.Get(),
-            std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes),
-            &scratchResource,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            L"ScratchUAV");
-
-        {
-            D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-
-            AllocateUAVBuffer(gfxDevice.device.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
-                &model._bottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure");
-            AllocateUAVBuffer(gfxDevice.device.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes,
-                &model._topLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure");
-        }
-        ComPtr<ID3D12Resource> instanceDescs;
-        D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-
-        XMMATRIX matrix = model._meshes[0]._transform._matrix;
-        XMFLOAT3X4 transform3x4;
-        XMStoreFloat3x4(&transform3x4, matrix);
-        memcpy(instanceDesc.Transform, &transform3x4, sizeof(transform3x4));
-
-        instanceDesc.InstanceMask = 1;
-        instanceDesc.AccelerationStructure = model._bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-        AllocateUploadBuffer(gfxDevice.device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
-
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-        {
-            bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-            bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-            bottomLevelBuildDesc.DestAccelerationStructureData = model._bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-        }
-
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
-        {
-            topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
-            topLevelBuildDesc.Inputs = topLevelInputs;
-            topLevelBuildDesc.DestAccelerationStructureData = model._topLevelAccelerationStructure->GetGPUVirtualAddress();
-            topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-        }
-        // build acceleration structure
-        {
-            auto rbarrier = CD3DX12_RESOURCE_BARRIER::UAV(model._bottomLevelAccelerationStructure.Get());
-            commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-            commandList->ResourceBarrier(1, &rbarrier);
-            commandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
-        }
-        commandList->Close();
-        ID3D12CommandList* pCommandLists = {commandList};
-        gfxDevice.commandQueue->ExecuteCommandLists(1, &pCommandLists);
-        WaitForGPU(gfxDevice, frameSync);
+        if (strcmp(primitive->attributes[i].name, "POSITION") == 0) posAttr = &primitive->attributes[i];
+        if (strcmp(primitive->attributes[i].name, "NORMAL") == 0) normAttr = &primitive->attributes[i];
+        if (strcmp(primitive->attributes[i].name, "TEXCOORD_0") == 0) texAttr = &primitive->attributes[i];
     }
-    // normal and rtao textures
+
+    if (!posAttr || !primitive->indices) return;
+
+    size_t vertexCount = posAttr->data->count;
+    size_t indexCount = primitive->indices->count;
+
+    SubMesh subMesh;
+    subMesh.baseVertex = (i32)allVertices.size();
+    subMesh.startIndex = (u32)allIndices.size();
+    subMesh.indexCount = (u32)indexCount;
+    subMesh.transform = transform; 
+
+    std::vector<Vertex> tempVertices(vertexCount);
+    for (size_t i = 0; i < vertexCount; ++i)
     {
-        model._normalUAV = CreateTexture(gfxDevice, frameSync,
-            {
-            .texWidth = static_cast<u32>(swapchain._width),
-            .texHeight = static_cast<u32>(swapchain._height),
-            .texPixelSize = 0,
-            .pContents = nullptr,
-            .textureType = TextureViewType::UAV,
-            .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
+        cgltf_accessor_read_float(posAttr->data, i, &tempVertices[i].position_.x, 3);
 
-        model._rtaoUAV = CreateTexture(gfxDevice, frameSync,
-            {
-            .texWidth = static_cast<u32>(swapchain._width),
-            .texHeight = static_cast<u32>(swapchain._height),
-            .texPixelSize = 0,
-            .pContents = nullptr,
-            .textureType = TextureViewType::UAV,
-            .format = DXGI_FORMAT_R11G11B10_FLOAT }).resource;
+        if (texAttr) cgltf_accessor_read_float(texAttr->data, i, &tempVertices[i].texCoord_.x, 2);
+        else tempVertices[i].texCoord_ = { 0, 0 };
+
+        if (normAttr) cgltf_accessor_read_float(normAttr->data, i, &tempVertices[i].normal_.x, 3);
+        else tempVertices[i].normal_ = { 0, 1, 0 };
     }
-    
-    // common heap for all textures
+
+    std::vector<u32> tempIndices(indexCount);
+    for (size_t i = 0; i < indexCount; ++i)
     {
-		// common heap
-
-        D3D12_DESCRIPTOR_HEAP_DESC srvTextureHeap{};
-        srvTextureHeap.NumDescriptors = MAX_TEXTURES;
-        srvTextureHeap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        srvTextureHeap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        DX_ASSERT(gfxDevice.device->CreateDescriptorHeap(&srvTextureHeap, IID_PPV_ARGS(&model._commonHeap)));
-
-        const u32 descriptorSize = gfxDevice.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE heapHandle(model._commonHeap->GetCPUDescriptorHandleForHeapStart());
-
-        // textures
-        {
-            for (auto& texture : model._modelTextures)
-            {
-                D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-                srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                srvDesc.Format = texture.resource->GetDesc().Format;
-                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                srvDesc.Texture2D.MipLevels = texture.resource->GetDesc().MipLevels;
-
-                gfxDevice.device->CreateShaderResourceView(texture.resource.Get(), &srvDesc, heapHandle);
-                heapHandle.Offset(descriptorSize);
-            }
-        }
-        // accel structures
-        {
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.RaytracingAccelerationStructure.Location = model._topLevelAccelerationStructure->GetGPUVirtualAddress();
-            gfxDevice.device->CreateShaderResourceView(nullptr, &srvDesc, heapHandle);
-        	heapHandle.Offset(descriptorSize);
-
-            GlobalStorage::index.accelerationStructureIndex = model._modelTextures.size();
-        }
-        // compute shader bg effects
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = swapchain._uavBgShaderEffects->GetDesc().Format;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; 
-
-            gfxDevice.device->CreateUnorderedAccessView(swapchain._uavBgShaderEffects.Get(),
-                nullptr, &uavDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
-
-            GlobalStorage::index.computeShaderBgIndex = model._modelTextures.size() + 1;
-        }
-        // depth srv for calculating world space pos from depth buffer
-        {
-            D3D12_SHADER_RESOURCE_VIEW_DESC depthSRV{};
-            depthSRV.Format = DXGI_FORMAT_R32_FLOAT;
-            depthSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            depthSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            depthSRV.Texture2D.MipLevels = 1;
-
-            gfxDevice.device->CreateShaderResourceView(swapchain._depthStencil.Get(), &depthSRV, heapHandle);
-            heapHandle.Offset(descriptorSize);
-
-            GlobalStorage::index.depthSRV = model._modelTextures.size() + 2;
-        }
-        // normal uav
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-            gfxDevice.device->CreateUnorderedAccessView(model._normalUAV.Get(),
-                nullptr, &uavDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
-
-            GlobalStorage::index.normalUAV = model._modelTextures.size() + 3;
-        }
-        // rtao uav
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-            gfxDevice.device->CreateUnorderedAccessView(model._rtaoUAV.Get(),
-                nullptr, &uavDesc, heapHandle);
-            heapHandle.Offset(descriptorSize);
-
-            GlobalStorage::index.rtaoUAV = model._modelTextures.size() + 4;
-        }
+        tempIndices[i] = (u32)cgltf_accessor_read_index(primitive->indices, i);
     }
+    // Meshoptimizer stuff
+
+    // Create remap table
+    std::vector<u32> remap(indexCount);
+    size_t uniqueVertexCount = meshopt_generateVertexRemap(remap.data(), tempIndices.data(),
+        indexCount, tempVertices.data(), vertexCount, sizeof(Vertex));
+
+    // Reindex
+    std::vector<u32> optIndices(indexCount);
+    std::vector<Vertex> optVertices(uniqueVertexCount);
+
+    // Optimisation 1 - Remove duplicate vertices
+    meshopt_remapIndexBuffer(optIndices.data(), tempIndices.data(), indexCount, remap.data());
+    meshopt_remapVertexBuffer(optVertices.data(), tempVertices.data(), vertexCount, 
+        sizeof(Vertex), remap.data());
+
+    // Optimisation 2 - Optimize cache for locality
+    meshopt_optimizeVertexCache(optIndices.data(), optIndices.data(), indexCount, uniqueVertexCount);
+    // Optimisation 3 - Optimize overdraw
+    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &optVertices[0].position_.x, 
+        uniqueVertexCount, sizeof(Vertex), 1.05f);
+    // Optimization 4 - optimize access to the vertex buffer
+    meshopt_optimizeVertexFetch(optVertices.data(), optIndices.data(), indexCount, 
+        optVertices.data(), uniqueVertexCount, sizeof(Vertex));
+
+    // Calculate Bounds (AABB) (will be used when I perform culling)
+    SM::Vector3 min(FLT_MAX);
+    SM::Vector3 max(-FLT_MAX);
+    for (const auto& v : optVertices)
+    {
+        SM::Vector3 pos = XMLoadFloat3(&v.position_);
+        min = SM::Vector3::Min(min, pos);
+        max = SM::Vector3::Max(max, pos);
+    }
+    SM::Vector3 center = min + ((max - min) * 0.5);
+    SM::Vector3 extents = (max - min) * 0.5;
+    subMesh.bounds = DirectX::BoundingBox(center, extents);
+
+    // Material Loading
+    if (primitive->material)
+    {
+        Material mat = {};
+        cgltf_pbr_metallic_roughness& pbr = primitive->material->pbr_metallic_roughness;
+
+        mat.baseColorFactor = SM::Vector4(pbr.base_color_factor);
+        mat.metallicFactor = pbr.metallic_factor;
+        mat.roughnessFactor = pbr.roughness_factor;
+
+        mat.albedoTexture = LoadTexture(&pbr.base_color_texture, true);
+        mat.metallicRoughnessTexture = LoadTexture(&pbr.metallic_roughness_texture, false);
+        mat.normalTexture = LoadTexture(&primitive->material->normal_texture, false);
+        mat.emissiveTexture = LoadTexture(&primitive->material->emissive_texture, true);
+
+        subMesh.materialIndex = (u32)materials_.size();
+        materials_.push_back(mat);
+    }
+
+    allVertices.insert(allVertices.end(), optVertices.begin(), optVertices.end());
+    allIndices.insert(allIndices.end(), optIndices.begin(), optIndices.end());
+
+    subMeshes_.push_back(subMesh);
 }
 
-Model LoadModel(GfxDevice& gfxDevice, FrameSync& frameSync, Swapchain& swapchain, ID3D12GraphicsCommandList10* commandList, ModelDesc desc)
+ResourceHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRGB) const
 {
-	Model model{};
+    if (!view || !view->texture || !view->texture->image || !view->texture->image->uri)
+        return g_invalidResourceHandle;
 
-	cgltf_options options{};
-	cgltf_data* data = nullptr;
-	cgltf_result result = cgltf_parse_file(&options, desc._path.c_str(), &data);
+    const char* uri = view->texture->image->uri;
+    std::string fullPath = directory_ + "/" + uri;
 
-    if (result != cgltf_result_success)
-        printl(Log::LogLevel::Error, "[CGLTF] Failed to parse gltf file");
-    else
-        printl(Log::LogLevel::Info, "[CGLTF] Successfully parsed gltf file");
+    ResourceHandle handle = resourceManager_->GetResourceHandleByName(uri);
+    if (resourceManager_->IsResourceHandleValid(handle))
+        return handle;
 
-    result = cgltf_load_buffers(&options, data, desc._path.c_str());
-
-    if (result != cgltf_result_success)
+    int w, h, c;
+    unsigned char* data = stbi_load(fullPath.c_str(), &w, &h, &c, STBI_rgb_alpha);
+    if (!data)
     {
-        cgltf_free(data);
-        printl(Log::LogLevel::Error, "[CGLTF] Failed to load buffers");
-    }
-    else
-    {
-        printl(Log::LogLevel::Info, "[CGLTF] Successfully loaded buffers");
+        printl(Log::LogLevel::Warn, "[Model] Texture missing: {}", fullPath);
+        return g_invalidResourceHandle;
     }
 
-    cgltf_scene* scene = data->scene;
+    // msft wide character bs for debug name
+    std::wstring debugName(uri, uri + strlen(uri));
 
-    if (!scene)
-    {
-        printl(Log::LogLevel::Error, "[CGLTF] No scene found in gltf file");
-    }
-    else
-    {
-        printl(Log::LogLevel::Info, "[CGLTF] Scene found in gltf file");
-        model._dirPath = desc._path.substr(0, desc._path.find_last_of("/"));
+    TextureCreateInfo createInfo = {
+        .desc = {
+            .width = (u32)w,
+            .height = (u32)h,
+            .format = sRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
+            .viewFlags = TextureViewFlags::SRV,
+            .initialData = data
+        },
+        .debugName = debugName.c_str(),
+        .usage = TextureUsage::UPLOAD,
+        .heap = resourceManager_->GetBindlessHeap().Get()
+    };
 
-        for (size_t i = 0; i < (scene->nodes_count); i++)
-        {
-            Transformation transform;
-            ProcessNode(gfxDevice, frameSync, scene->nodes[i], model, transform);
-        }
-        // no of nodes
-        printl(Log::LogLevel::InfoDebug, "[CGLTF] No of nodes in the scene: {} ", scene->nodes_count);
+    handle = resourceManager_->CreateResource(createInfo, uri);
 
-        SetResources(gfxDevice, frameSync, swapchain, commandList, model);
-
-        printl(Log::LogLevel::Info, "[CGLTF] Successfully loaded gltf file");
-    }
-    //ValidateResources();
-    cgltf_free(data);
-
-	return model;
+    stbi_image_free(data);
+    return handle;
 }
