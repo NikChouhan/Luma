@@ -26,29 +26,10 @@
 #include "Core/Window.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Core/PipelineCache.h"
+#include "Renderer/Passes/GeometryPass.h"
 
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-static bool isOpen = true;
-static bool keys[256] = {};
-static int lastMouseX = 0;
-static int lastMouseY = 0;
-static int currentMouseX = 0;
-static int currentMouseY = 0;
-
-static bool isMouseCaptured = false;
-
-static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-static void HandleCamera(Camera& camera, f32 deltaTime);
-
-struct AppData
-{
-	GfxDevice* gfxDevice;
-	FrameSync* frameSync;
-	Swapchain* swapchain;
-	Model* model;
-};
 
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -83,7 +64,8 @@ int WINAPI wWinMain(
 	scene.Load();
 
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
-	// Add all passes in the renderer.Init();
+	// Add passes
+	renderer.AddPass<GeometryPass>();
 	renderer.Init();
 
 	timer.Reset();
@@ -96,7 +78,7 @@ int WINAPI wWinMain(
 		scene.Update(dt);
 		renderer.RenderFrame(scene);
 
-		window.SetTitle(std::to_wstring(timer.TotalTime()));
+		window.SetTitle(std::to_wstring(1./dt));
 	}
 	return 0;
 }

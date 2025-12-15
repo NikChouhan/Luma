@@ -2,7 +2,7 @@
 #include "StandardTypes.h"
 #include "Core/Common.h"
 
-struct RenderPass
+struct DrawModel
 {
 	DirectX::XMMATRIX worldViewProj;
 

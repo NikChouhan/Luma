@@ -6,7 +6,6 @@ struct Timer
 	void Reset();
 	void Tick();
 
-	// returns total time in Milliseconds
 	float DeltaTime() const;
 	u64 TotalTime() const;
 

@@ -25,7 +25,7 @@ RootSign CreateRootSignature(const GfxDevice& gfxDevice, RootSignDesc desc)
         rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         rootParameters[0].Constants.RegisterSpace = 0;
         rootParameters[0].Constants.ShaderRegister = 0;
-        rootParameters[0].Constants.Num32BitValues = sizeof(RenderPass) / 4;
+        rootParameters[0].Constants.Num32BitValues = sizeof(DrawModel) / 4;
 
         D3D12_TEXTURE_ADDRESS_MODE mode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 

@@ -145,6 +145,7 @@ enum class BufferUsage : u8 {
 
 struct BufferCreateInfo {
     BufferDesc desc;
+    // never use GPU_UPLOAD, renderdoc crashes, its also broken in my impl
     BufferUsage usage = BufferUsage::UPLOAD;
     bool keepMapped = false;
     const wchar_t* debugName = nullptr;

@@ -1,10 +1,20 @@
 #include "Resources.h"
 
 ResourceManager::ResourceManager(const GfxDevice& lgfxDevice, FrameSync& lframeSync)
-	: gfxDevice_(lgfxDevice), frameSync_(lframeSync){}
+	: gfxDevice_(lgfxDevice), frameSync_(lframeSync)
+{
+	CreateBindlessHeap();
+}
 
 ResourceManager::~ResourceManager()
-= default;
+{
+	/* This destructor will be costly
+	 * the issue is most of these textures should be released all at once
+     * the approach I'm thinking of involves taking each resource handle,
+     * get resource (Texture here) using handles and then release them
+     * one at a time
+	 */
+}
 
 ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const std::string name)
 {
@@ -33,6 +43,11 @@ ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const st
 	resourceNameMap_[name] = handle;
 
 	return handle;
+}
+
+bool ResourceManager::IsResourceHandleValid(ResourceHandle handle) const
+{
+	return handle.index < generations_.size() && generations_[handle.index] == handle.generation;
 }
 
 Resource* ResourceManager::GetResource(ResourceHandle handle)
@@ -82,33 +97,28 @@ void ResourceManager::ReleaseResource(ResourceHandle handle)
 
 ResourceHandle ResourceManager::AllocateResourceHandle()
 {
-    u32 index;
+	u32 index;
 
-    if (!freeList_.empty()) 
+	if (!freeList_.empty()) 
 	{
-        index = freeList_.back();
-        freeList_.pop_back();
-    }
-    else 
+		index = freeList_.back();
+		freeList_.pop_back();
+	}
+	else 
 	{
-        index = static_cast<u32>(generations_.size());
-        generations_.push_back(0);
-    }
+		index = static_cast<u32>(generations_.size());
+		generations_.push_back(0);
+	}
 
-    return ResourceHandle{
-        .index = index,
-        .generation = generations_[index]
-    };
+	return ResourceHandle{
+		.index = index,
+		.generation = generations_[index]
+	};
 }
 
 u32 ResourceManager::GetResourceIndex(ResourceHandle handle) const
 {
 	return handle.index;
-}
-
-bool ResourceManager::IsResourceHandleValid(ResourceHandle handle) const
-{
-	return handle.index < generations_.size() && generations_[handle.index] == handle.generation;
 }
 
 void ResourceManager::CreateBindlessHeap()
