@@ -8,6 +8,8 @@ target("Luma")
      "Graphics/*.h",
      "Graphics/D3D12/*.h",
      "Renderer/*.h",
+     "Renderer/Core/*.h",
+     "Renderer/Passes/*.h",
      "RenderGraph/*.h"
      )
 
@@ -17,6 +19,8 @@ target("Luma")
      "Graphics/*.cpp",
      "Graphics/D3D12/*.cpp",
      "Renderer/*.cpp",
+     "Renderer/Core/*cpp",
+     "Renderer/Passes/*cpp",
      "RenderGraph/*.cpp"
     )
 
