@@ -15,7 +15,7 @@ struct ResourceHandle {
 	u32 generation : 8;  // Generation counter
 };
 
-static constexpr ResourceHandle g_invalidResourceHandle = { 0xFFFFFF, 0xFF };
+static constexpr ResourceHandle g_invalidResourceHandle = {.index = 0xFFFFFF, .generation = 0xFF };
 
 // ============================================================================
 // Render graph texture/buffer resources
@@ -59,8 +59,9 @@ struct ResourceManager
 	ResourceManager operator=(const ResourceManager& resourceManager) = delete;
 	~ResourceManager();
 
-	[[nodiscard]] ResourceHandle CreateResource(ResourceCreateInfo desc, const std::string& name);
+	[[nodiscard]] ResourceHandle CreateResource(ResourceCreateInfo desc, const std::string name = "");
 
+	[[nodiscard]] bool IsResourceHandleValid(ResourceHandle handle) const;
 	Resource* GetResource(ResourceHandle handle);
 	const Resource* GetResource(ResourceHandle handle) const;
 	ResourceHandle GetResourceHandleByName(const std::string& name);
@@ -80,7 +81,6 @@ private:
 
 	[[nodiscard]] ResourceHandle AllocateResourceHandle();
 	[[nodiscard]] u32 GetResourceIndex(ResourceHandle handle) const;
-	[[nodiscard]] bool IsResourceHandleValid(ResourceHandle handle) const;
 
 	void ResourceManager::CreateBindlessHeap();
 };

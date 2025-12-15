@@ -16,9 +16,9 @@ namespace D3D12MA
 
 struct Vertex
 {
-	DirectX::XMFLOAT3 position;
-    DirectX::XMFLOAT2 texCoord;
-    DirectX::XMFLOAT3 normal;
+	DirectX::XMFLOAT3 position_;
+    DirectX::XMFLOAT2 texCoord_;
+    DirectX::XMFLOAT3 normal_;
 };
 
 struct VertexBufferView {

@@ -244,7 +244,7 @@ Texture CreateTexture(const GfxDevice& gfxDevice, FrameSync& frameSync, const Te
         texture.srvIndex = CreateTextureSRV(
             gfxDevice,
             createInfo.heap,
-            createInfo.,
+            &GlobalStorage::bindlessHeapIndex.nextIndex,
             texture.resource,
             desc);
     }

@@ -6,7 +6,7 @@ ResourceManager::ResourceManager(const GfxDevice& lgfxDevice, FrameSync& lframeS
 ResourceManager::~ResourceManager()
 = default;
 
-ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const std::string& name)
+ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const std::string name)
 {
 	if (!name.empty())
 	{
@@ -29,6 +29,8 @@ ResourceHandle ResourceManager::CreateResource(ResourceCreateInfo desc, const st
 		.handle = handle,
 		.name = name
 	};
+
+	resourceNameMap_[name] = handle;
 
 	return handle;
 }
