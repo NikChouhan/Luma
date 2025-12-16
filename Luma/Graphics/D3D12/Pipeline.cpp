@@ -82,25 +82,22 @@ void CompilePipelineInternal(PipelineCache* pipelineCache, const GfxDevice& gfxD
              .ForcedSampleCount = 0,
              .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
          };*/
-         //  Will be replacing with proper resources provided directly
-         //  in the CreatePipeline call. For now, this should work
-        if (pipelineDesc.isDepthPrePass == TRUE)
-        {
-            psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-            psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-            psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
-            psoDesc.NumRenderTargets = 0;
-        }
-        else
-        {
-            psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-            psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_EQUAL;
-            psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+        // never attempt to do it this way.
+        //if (pipelineDesc.isDepthPrePass == TRUE)
+        //{
+        //    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+        //    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        //    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
-            psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = swapChain.renderTargets_[0]->GetDesc().Format;
-        }
+        //    psoDesc.NumRenderTargets = 0;
+        //}
+        psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+        psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = swapChain.renderTargets_[0]->GetDesc().Format;
 
         psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
         psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;

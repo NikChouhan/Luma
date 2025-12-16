@@ -48,9 +48,8 @@ void Model::Load(const std::string& path)
     std::vector<Vertex> allVertices;
     std::vector<u32> allIndices;
 
-    // Reserve to prevent frequent reallocs, 10k vertex per mesh is sufficient for me
-    allVertices.reserve(100000);
-    allIndices.reserve(300000);
+    allVertices.reserve(10000000);
+    allIndices.reserve(3000000);
 
     cgltf_scene* scene = data->scene;
     for (size_t i = 0; i < scene->nodes_count; ++i)
@@ -237,7 +236,7 @@ ResourceHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRG
             .initialData = data
         },
         .debugName = debugName.c_str(),
-        .usage = TextureUsage::DEFAULT,
+        .usage = TextureUsage::UPLOAD,
         .heap = resourceManager_->GetBindlessHeap().Get()
     };
 

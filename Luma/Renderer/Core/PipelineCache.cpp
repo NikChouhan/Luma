@@ -48,8 +48,8 @@ Shader* PipelineCache::GetShader(ShaderHandle handle)
 {
     if (!IsShaderHandleValid(handle))
         return nullptr;
-    Shader shader = shaders_.at(handle.index).shader;
-    return &shader;
+    Shader* shader = &shaders_.at(handle.index).shader;
+    return shader;
 }
 
 const Shader* PipelineCache::GetShader(ShaderHandle handle) const
@@ -83,7 +83,6 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
     PipelineHandle handle = AllocatePipelineHandle();
     u32 index = handle.index;
 
-    std::vector<ShaderHandle> shaderHandles = desc.shaders;
 
     Pipeline pipeline{};
     CompilePipelineInternal(this, gfxDevice_, swapchain_, pipeline, desc);
@@ -98,7 +97,7 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
 	    .handle = handle,
 	    .name = name,
 	    .desc = desc,
-	    .shaderHandles = shaderHandles
+	    .shaderHandles = desc.shaders
     };
 
     if (!name.empty()) 

@@ -84,12 +84,35 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 
 		for (const auto& mesh : model->GetSubMeshes())
 		{
+			int materialIndex = mesh.materialIndex;
+			const std::vector materials = model->GetMaterials();
+
+			ResourceHandle albedoHandle = materials.at(materialIndex).albedoTexture;
+			Resource* albedo = resourceManager_->GetResource(albedoHandle);
+			u32 albedoIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+
+			ResourceHandle normalHandle = materials.at(materialIndex).normalTexture;
+			Resource* normal= resourceManager_->GetResource(albedoHandle);
+			u32 normalIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+
+			ResourceHandle metallicRoughnessHandle = materials.at(materialIndex).metallicRoughnessTexture;
+			Resource* metallicRoughness = resourceManager_->GetResource(albedoHandle);
+			u32 metallicRoughnessIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+
+			ResourceHandle emissiveHandle = materials.at(materialIndex).emissiveTexture;
+			Resource* emissive = resourceManager_->GetResource(albedoHandle);
+			u32 emissiveIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+
 			DirectX::XMMATRIX world = mesh.transform * renderObj.transform;
 			DirectX::XMMATRIX wvp = world * view * proj;
 
 			DrawModel constants;
-			constants.worldViewProj = DirectX::XMMatrixTranspose(wvp);
-			constants.worldMatrix = DirectX::XMMatrixTranspose(world);
+			constants.worldViewProj = (wvp);
+			constants.worldMatrix = (world);
+			constants.albedoIndex = albedoIndex;
+			constants.normalIndex = normalIndex;
+			constants.metallicRoughnessIndex = metallicRoughnessIndex;
+			constants.emissiveIndex= emissiveIndex;
 
 			/* TODO: haven't filled most of the structs, too late in the night :/
 			* need to fill asap
