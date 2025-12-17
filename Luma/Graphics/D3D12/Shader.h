@@ -6,6 +6,19 @@
 
 struct Resources;
 
+struct ShaderHandle
+{
+    u32 index : 24;
+    u32 generation : 8;
+
+    bool operator==(const ShaderHandle& other) const
+    {
+        return index == other.index && generation == other.generation;
+    }
+};
+
+static constexpr ShaderHandle g_invalidShaderHandle = { .index = 0xFFFFFF, .generation = 0xFF };
+
 enum class Type : u32
 {
     VERTEX,
