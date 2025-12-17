@@ -28,16 +28,14 @@ void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelin
 	.type = Type::PIXEL };
 
 	ShaderHandle psHandle = pipelineCache->LoadShader(psDesc, "PixelShader");
-
-	pipelineHandle_ = pipelineCache->CreatePipeline(
-		{
-		.pipelineType = PipelineType::GRAPHICS,
-		.rootSignType = RootSignDesc::RSType::RENDER,
-		.shaders = {vsHandle, psHandle},
-		.enableDepthTest = true,
-		.enableStencilTest = true,
-		.isDepthPrePass = false},
-		"GeometryPipeline");
+	GraphicsPipelineDesc desc {
+	.vertexShader = vsHandle,
+	.pixelShader = psHandle,
+	.blendMode = BlendMode::NON_TRANSPARENT,
+	.depthMode = DepthMode::READ_WRITE,
+	.rasterMode = RasterMode::SOLID_BACK_CULL,
+	.topology = Topology::TRIANGLES };
+	pipelineHandle_ = pipelineCache->CreatePipeline(desc, "Geometry Pipeline");
 }
 
 void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
@@ -46,13 +44,13 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 	Pipeline* pipeline = pipelineCache_->GetPipeline(pipelineHandle_);
 
 	// setup frame state
-	cmdList->SetPipelineState(pipeline->pipelineState.Get());
+	cmdList->SetPipelineState(pipeline->pso.Get());
 
 	// already set in renderer.BeginFrame();
 	/*ID3D12DescriptorHeap* ppHeaps[] = { resourceManager_->GetBindlessHeap().Get() };
 	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);*/
 
-	cmdList->SetGraphicsRootSignature(pipeline->rootSignature.Get());
+	cmdList->SetGraphicsRootSignature(pipeline->rootSign.Get());
 
 	cmdList->RSSetViewports(1, &ctx.viewport);
 	cmdList->RSSetScissorRects(1, &ctx.scissorRect);
@@ -93,15 +91,15 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 
 			ResourceHandle normalHandle = materials.at(materialIndex).normalTexture;
 			Resource* normal= resourceManager_->GetResource(albedoHandle);
-			u32 normalIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+			u32 normalIndex = std::get_if<Texture>(normal)->srvIndex.value();
 
 			ResourceHandle metallicRoughnessHandle = materials.at(materialIndex).metallicRoughnessTexture;
 			Resource* metallicRoughness = resourceManager_->GetResource(albedoHandle);
-			u32 metallicRoughnessIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+			u32 metallicRoughnessIndex = std::get_if<Texture>(metallicRoughness)->srvIndex.value();
 
 			ResourceHandle emissiveHandle = materials.at(materialIndex).emissiveTexture;
 			Resource* emissive = resourceManager_->GetResource(albedoHandle);
-			u32 emissiveIndex = std::get_if<Texture>(albedo)->srvIndex.value();
+			u32 emissiveIndex = std::get_if<Texture>(emissive)->srvIndex.value();
 
 			DirectX::XMMATRIX world = mesh.transform * renderObj.transform;
 			DirectX::XMMATRIX wvp = world * view * proj;

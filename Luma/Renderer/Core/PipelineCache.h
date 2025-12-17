@@ -5,34 +5,9 @@
 #include "Graphics/D3D12/Shader.h"
 #include "Graphics/D3D12/Pipeline.h"
 
-struct ShaderHandle
-{
-	u32 index : 24;
-	u32 generation : 8;
-
-	bool operator==(const ShaderHandle& other) const
-	{
-		return index == other.index && generation == other.generation;
-	}
-};
-
-struct PipelineHandle
-{
-	u32 index : 24;
-	u32 generation : 8;
-
-	bool operator==(const PipelineHandle& other) const
-	{
-		return index == other.index && generation == other.generation;
-	}
-};
-
-static constexpr ShaderHandle g_invalidShaderHandle = { 0xFFFFFF, 0xFF };
-static constexpr PipelineHandle g_invalidPipelineHandle = { 0xFFFFFF, 0xFF };
-
 struct PipelineCache
 {
-	PipelineCache(const GfxDevice& gfxDevice, Swapchain& swapchain);
+	PipelineCache(const GfxDevice& gfxDevice);
 	~PipelineCache();
 
 	PipelineCache(const PipelineCache&) = delete;
@@ -45,7 +20,12 @@ struct PipelineCache
 	void UnloadShader(ShaderHandle handle);
 
 	// Pipeline management
-	[[nodiscard]] PipelineHandle CreatePipeline(const PipelineDesc& desc, const std::string& name = "");
+
+	ComPtr<ID3D12RootSignature> CreateRootSignatureFromBlob(const GfxDevice& gfxDevice, IDxcBlob* get);
+
+	[[nodiscard]] PipelineHandle CreatePipeline(const GraphicsPipelineDesc& desc, const std::string& name);
+	[[nodiscard]] PipelineHandle CreatePipeline(const ComputePipelineDesc& desc, const std::string& name);
+
 	Pipeline* GetPipeline(PipelineHandle handle);
 	[[nodiscard]] const Pipeline* GetPipeline(PipelineHandle handle) const;
 	void DestroyPipeline(PipelineHandle handle);
@@ -72,12 +52,15 @@ private:
 		Pipeline pipeline;
 		PipelineHandle handle;
 		std::string name;
-		PipelineDesc desc;
-		std::vector<ShaderHandle> shaderHandles; // track pipeline specific shaders
+
+		std::vector<ShaderHandle> shaderHandles;
+
+		PipelineType type;
+		GraphicsPipelineDesc graphicsDesc;
+		ComputePipelineDesc computeDesc;
 	};
 
 	const GfxDevice& gfxDevice_;
-	const Swapchain& swapchain_;
 	DXCRes dxcRes_;
 
 	// shader storage
@@ -91,6 +74,10 @@ private:
 	std::vector<u8> pipelineGenerations_;
 	std::vector<u32> pipelineFreeList_;
 	std::unordered_map<std::string, PipelineHandle> pipelineNameMap_;
+
+	// internal pipeline creation helpers
+	[[nodiscard]] Pipeline CreateGraphicsPSO(const GraphicsPipelineDesc& graphicsPipelineDesc);
+	[[nodiscard]] Pipeline CreateComputePSO(const ComputePipelineDesc& computePipelineDesc);
 
 	// handle shader/pipeline mgmt
 	[[nodiscard]] ShaderHandle AllocateShaderHandle();

@@ -55,7 +55,19 @@ PSInput VSMain(VSInput input)
     result._worldPos = (mul(float4(input._position, 1.), constBuffer._worldMatrix));
     return result;
 }
+/* add other root constants with macro defined Root Constants
+ * I will be doing it per shader. Won't be sharing root constants among shaders
+ * If I need to I will prolly include it with Common.hlsl and serialize it
+ * to .rso maybe (root signature output file). Then get it read in the c++
+ * code and do whatever is necessary. Won't need it tho
+*/
 
+// #define MainRS \
+// "RootFlags ( ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | ... )," \
+// "DescriptorTable ( SRV(t0), visibility = SHADER_VISIBILITY_PIXEL )," \
+// "DescriptorTable ( Sampler(s0), visibility = SHADER_VISIBILITY_PIXEL )"
+
+// [RootSignature(MainRS)]
 float4 PSMain(PSInput input) : SV_TARGET
 {
     Texture2D albedoTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._albedoIndex)];

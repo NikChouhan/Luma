@@ -18,7 +18,6 @@
 
 #include "Core/Camera.h"
 #include "Renderer/Model.h"
-#include "Graphics/D3D12/RootSignature.h"
 #include "Renderer/Core/Inspector.h"
 
 #include "scene.h"
@@ -58,7 +57,7 @@ int WINAPI wWinMain(
 	//SetupLightSettingsHandler();
 
 	ResourceManager resourceManager(gfxDevice, frameSync);
-	PipelineCache pipelineCache(gfxDevice, swapchain);
+	PipelineCache pipelineCache(gfxDevice);
 
 	Scene scene(gfxDevice, resourceManager);
 	scene.Load();

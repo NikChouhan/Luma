@@ -1,6 +1,25 @@
 #include "PipelineCache.h"
 
-PipelineCache::PipelineCache(const GfxDevice& gfxDevice, Swapchain& swapchain) : gfxDevice_(gfxDevice), swapchain_(swapchain), dxcRes_(ShaderCompiler())
+static D3D12_INPUT_ELEMENT_DESC kStandardInputLayout[] =
+{
+    {
+        .SemanticName = "POSITION", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0,
+        .AlignedByteOffset = 0, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+        .InstanceDataStepRate = 0
+    },
+    {
+        .SemanticName = "TEXCOORD", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32_FLOAT, .InputSlot = 0,
+        .AlignedByteOffset = 12, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+        .InstanceDataStepRate = 0
+    },
+    {
+        .SemanticName = "NORMAL", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0,
+        .AlignedByteOffset = 20, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+        .InstanceDataStepRate = 0
+    },
+};
+
+PipelineCache::PipelineCache(const GfxDevice& gfxDevice) : gfxDevice_(gfxDevice), dxcRes_(ShaderCompiler())
 {
 
 }
@@ -8,7 +27,7 @@ PipelineCache::PipelineCache(const GfxDevice& gfxDevice, Swapchain& swapchain) :
 PipelineCache::~PipelineCache()
 {
     for (auto& managed : pipelines_) {
-        if (managed.pipeline.pipelineState) {
+        if (managed.pipeline.pso) {
             managed.pipeline.Release();
         }
     }
@@ -71,9 +90,34 @@ void PipelineCache::UnloadShader(ShaderHandle handle)
     shaders_.at(index) = ManagedShader{};
 }
 
-PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std::string& name)
+ComPtr<ID3D12RootSignature> PipelineCache::CreateRootSignatureFromBlob(const GfxDevice& gfxDevice, IDxcBlob* shaderBlob)
 {
-    if (!pipelineNameMap_.empty())
+    if (!shaderBlob) return nullptr;
+
+    ComPtr<ID3D12RootSignature> rootSignature;
+
+    // The D3D12 runtime can parse the Root Signature directly from the compiled shader blob
+    HRESULT hr = gfxDevice.device_->CreateRootSignature(
+        0,                                      // NodeMask (0 for single GPU)
+        shaderBlob->GetBufferPointer(),         // Pointer to the shader bytecode
+        shaderBlob->GetBufferSize(),            // Size of the shader bytecode
+        IID_PPV_ARGS(&rootSignature)
+    );
+
+    if (FAILED(hr))
+    {
+        // This usually happens if the shader was compiled WITHOUT a [RootSignature(...)] attribute
+        // or if the embedded signature is invalid.
+        DX_ASSERT(hr);
+        return nullptr;
+    }
+
+    return rootSignature;
+}
+
+PipelineHandle PipelineCache::CreatePipeline(const GraphicsPipelineDesc& desc, const std::string& name)
+{
+    if (!name.empty())
     {
         auto it = pipelineNameMap_.find(name);
         if (it != pipelineNameMap_.end() && IsPipelineHandleValid(it->second))
@@ -83,29 +127,165 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineDesc& desc, const std
     PipelineHandle handle = AllocatePipelineHandle();
     u32 index = handle.index;
 
-
-    Pipeline pipeline{};
-    CompilePipelineInternal(this, gfxDevice_, swapchain_, pipeline, desc);
+    Pipeline newPipeline = CreateGraphicsPSO(desc);
 
     if (index >= pipelines_.size())
     {
         pipelines_.resize(index + 1);
     }
 
+    std::vector<ShaderHandle> shaders;
+    if (IsShaderHandleValid(desc.vertexShader)) shaders.push_back(desc.vertexShader);
+    if (IsShaderHandleValid(desc.pixelShader)) shaders.push_back(desc.pixelShader);
+
     pipelines_.at(index) = ManagedPipeline{
-	    .pipeline = pipeline,
-	    .handle = handle,
-	    .name = name,
-	    .desc = desc,
-	    .shaderHandles = desc.shaders
+        .pipeline = newPipeline,
+        .handle = handle,
+        .name = name,
+        .shaderHandles = shaders,
+        .type = PipelineType::GRAPHICS,
+        .graphicsDesc = desc,
+        .computeDesc = {} // empty
     };
 
-    if (!name.empty()) 
-    {
-        pipelineNameMap_[name] = handle;
-    }
+    if (!name.empty()) pipelineNameMap_[name] = handle;
 
     return handle;
+}
+
+PipelineHandle PipelineCache::CreatePipeline(const ComputePipelineDesc& desc, const std::string& name)
+{
+    if (!name.empty())
+    {
+        auto it = pipelineNameMap_.find(name);
+        if (it != pipelineNameMap_.end() && IsPipelineHandleValid(it->second))
+            return it->second;
+    }
+
+    PipelineHandle handle = AllocatePipelineHandle();
+    u32 index = handle.index;
+
+    Pipeline newPipeline = CreateComputePSO(desc);
+
+    if (index >= pipelines_.size())
+    {
+        pipelines_.resize(index + 1);
+    }
+
+    std::vector<ShaderHandle> shaders;
+    shaders.push_back(desc.computeShader);
+
+    pipelines_.at(index) = ManagedPipeline{
+        .pipeline = newPipeline,
+        .handle = handle,
+        .name = name,
+        .shaderHandles = shaders,
+        .type = PipelineType::COMPUTE,
+        .graphicsDesc = {}, // empty
+        .computeDesc = desc
+    };
+
+    if (!name.empty()) pipelineNameMap_[name] = handle;
+
+    return handle;
+}
+
+Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
+{
+    Pipeline pipeline;
+
+    Shader* vs = this->GetShader(desc.vertexShader);
+    Shader* ps = this->GetShader(desc.pixelShader);
+    assert(vs && "Vertex Shader is mandatory");
+
+    pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, ps->pBlob.Get());
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.pRootSignature = pipeline.rootSign.Get();
+
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE({ vs->pBlob->GetBufferPointer(), vs->pBlob->GetBufferSize()});
+    if (ps) psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->pBlob->GetBufferPointer(), ps->pBlob->GetBufferSize());
+
+    if (desc.inputLayout.empty()) {
+        psoDesc.InputLayout = {.pInputElementDescs = kStandardInputLayout, .NumElements = _countof(kStandardInputLayout) };
+    }
+    else {
+        psoDesc.InputLayout = { desc.inputLayout.data(), (UINT)desc.inputLayout.size() };
+    }
+
+    // this is the opaque blend state i.e default
+    auto& blend = psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    if (desc.blendMode == BlendMode::ALPHA_BLEND) {
+        blend.RenderTarget[0].BlendEnable = TRUE;
+        blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    }
+    // TODO: handle other blend states, don't need it for now so leaving it empty
+
+    // Rasterizer State
+    auto& rast = psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    if (desc.rasterMode == RasterMode::SOLID_NONE_CULL) rast.CullMode = D3D12_CULL_MODE_NONE;
+    if (desc.rasterMode == RasterMode::WIREFRAME) rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    rast.FrontCounterClockwise = TRUE;
+
+    // Depth Stencil
+    auto& depth = psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    if (desc.depthMode == DepthMode::NONE) {
+        depth.DepthEnable = FALSE;
+    }
+    else if (desc.depthMode == DepthMode::READ_ONLY) 
+    {
+        depth.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    }
+
+    // Topology
+    switch (desc.topology)
+	{
+        case Topology::TRIANGLES: psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; pipeline.primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST; break;
+        case Topology::LINES:     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;     pipeline.primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;     break;
+        case Topology::POINTS:    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;    pipeline.primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;    break;
+    }
+
+    // Formats
+    if (desc.dsvFormat == DXGI_FORMAT_UNKNOWN)
+    {
+        psoDesc.NumRenderTargets = 0;
+    }
+    else
+    {
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = desc.rtvFormat;
+    }
+    psoDesc.DSVFormat = desc.dsvFormat;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.SampleDesc.Count = 1;
+
+    DX_ASSERT(gfxDevice_.device_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pso)));
+
+    return pipeline;
+}
+
+Pipeline PipelineCache::CreateComputePSO(const ComputePipelineDesc& desc)
+{
+    Pipeline pipeline;
+
+    Shader* cs = this->GetShader(desc.computeShader);
+    pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, cs->pBlob.Get());
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
+	csoDesc.pRootSignature = pipeline.rootSign.Get();
+
+    D3D12_SHADER_BYTECODE cShaderBytecode{};
+    cShaderBytecode.BytecodeLength = cs->pBlob->GetBufferSize();
+    cShaderBytecode.pShaderBytecode = cs->pBlob->GetBufferPointer();
+    csoDesc.CS = cShaderBytecode;
+
+    csoDesc.NodeMask = 0;
+
+    DX_ASSERT(gfxDevice_.device_->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pso)));
+
+    return pipeline;
 }
 
 Pipeline* PipelineCache::GetPipeline(PipelineHandle handle)
@@ -179,7 +359,8 @@ void PipelineCache::ReloadShader(ShaderHandle handle)
     }
 }
 
-void PipelineCache::ReloadPipeline(PipelineHandle handle) {
+void PipelineCache::ReloadPipeline(PipelineHandle handle)
+{
     if (!IsPipelineHandleValid(handle)) {
         return;
     }
@@ -187,8 +368,18 @@ void PipelineCache::ReloadPipeline(PipelineHandle handle) {
     auto& managed = pipelines_[handle.index];
 
     managed.pipeline.Release();
-    CompilePipelineInternal(this, gfxDevice_, swapchain_, managed.pipeline, managed.desc);
+
+    // Switch on type to rebuild
+    if (managed.type == PipelineType::GRAPHICS)
+    {
+        managed.pipeline = CreateGraphicsPSO(managed.graphicsDesc);
+    }
+    else if (managed.type == PipelineType::COMPUTE)
+    {
+        managed.pipeline = CreateComputePSO(managed.computeDesc);
+    }
 }
+
 
 ShaderHandle PipelineCache::AllocateShaderHandle()
 {
