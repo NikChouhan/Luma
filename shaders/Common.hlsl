@@ -67,3 +67,4 @@ float3 RandomOnHemisphere(inout float seed, float3 normal)
 	}
 	return normalize(randomDir);
 }
+

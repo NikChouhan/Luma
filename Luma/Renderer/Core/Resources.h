@@ -54,7 +54,6 @@ struct ManagedResource
 struct ResourceManager
 {
 	ResourceManager(const GfxDevice& lgfxDevice, FrameSync& lframeSync);
-	// single copy of resource manager should be present
 	ResourceManager(const ResourceManager& resourceManager) = delete;
 	ResourceManager operator=(const ResourceManager& resourceManager) = delete;
 	~ResourceManager();

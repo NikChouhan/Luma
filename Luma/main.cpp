@@ -49,8 +49,8 @@ int WINAPI wWinMain(
 	Timer timer{};
 	Swapchain swapchain = CreateSwapChain(gfxDevice, frameSync,
 		{
-			.height_ = 720,
-			.width_ = 1280,
+			.height_ = 1920,
+			.width_ = 1080,
 			.vsyncEnable_ = true,
 			.hwnd_ = window.GetHandle()
 		});
@@ -65,6 +65,7 @@ int WINAPI wWinMain(
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
 	// Add passes
 	renderer.AddPass<GeometryPass>();
+
 	renderer.Init();
 
 	timer.Reset();
