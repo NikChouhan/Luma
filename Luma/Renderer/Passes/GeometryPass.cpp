@@ -20,21 +20,22 @@ void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelin
 	.type = Type::VERTEX };
 	ShaderHandle vsHandle = pipelineCache->LoadShader(vsDesc, "VertexShader");
 
-	// create resources (texture[views]/buffer[views]) and pipelines
 	ShaderDesc psDesc{
 	.shaderPath = L"../../../../shaders/model.hlsl",
 	.pEntryPoint = L"PSMain",
 	.pTarget = L"ps_6_7",
 	.type = Type::PIXEL };
-
 	ShaderHandle psHandle = pipelineCache->LoadShader(psDesc, "PixelShader");
+
 	GraphicsPipelineDesc desc {
 	.vertexShader = vsHandle,
 	.pixelShader = psHandle,
 	.blendMode = BlendMode::NON_TRANSPARENT,
 	.depthMode = DepthMode::READ_WRITE,
-	.rasterMode = RasterMode::SOLID_BACK_CULL,
-	.topology = Topology::TRIANGLES };
+	.rasterMode = RasterMode::SOLID_NONE_CULL,
+	.topology = Topology::TRIANGLES,
+	.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM,
+	.dsvFormat = DXGI_FORMAT_D32_FLOAT};
 	pipelineHandle_ = pipelineCache->CreatePipeline(desc, "Geometry Pipeline");
 }
 

@@ -231,6 +231,7 @@ ResourceHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRG
         .desc = {
             .width = (u32)w,
             .height = (u32)h,
+            .texPixelSize = 4,
             .format = sRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
             .viewFlags = TextureViewFlags::SRV,
             .initialData = data

@@ -248,7 +248,7 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
     }
 
     // Formats
-    if (desc.dsvFormat == DXGI_FORMAT_UNKNOWN)
+    if (desc.rtvFormat == DXGI_FORMAT_UNKNOWN)
     {
         psoDesc.NumRenderTargets = 0;
     }

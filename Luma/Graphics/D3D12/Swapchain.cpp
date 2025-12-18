@@ -90,7 +90,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapchain.rtvHeap_->GetCPUDescriptorHandleForHeapStart());
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
         // create rtv for each frame
