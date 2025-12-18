@@ -73,7 +73,7 @@ PSInput VSMain(VSInput input)
 "           addressU = TEXTURE_ADDRESS_WRAP,"\
 "           addressV = TEXTURE_ADDRESS_WRAP,"\
 "           addressW = TEXTURE_ADDRESS_WRAP,"\
-"           visibility = SHADER_VISIBILITY_PIXEL )"
+"           visibility = SHADER_VISIBILITY_ALL )"
 
 [RootSignature(Raster)]
 float4 PSMain(PSInput input) : SV_TARGET
