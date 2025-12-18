@@ -14,28 +14,21 @@ void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelin
 
 	// create resources (texture[views]/buffer[views]) and pipelines
 	ShaderDesc vsDesc{
-	.shaderPath = L"../../../../shaders/model.hlsl",
-	.pEntryPoint = L"VSMain",
+	.shaderPath = L"../../../../shaders/depth_pass.hlsl",
+	.pEntryPoint = L"DepthVS",
 	.pTarget = L"vs_6_7",
 	.type = Type::VERTEX };
 	ShaderHandle vsHandle = pipelineCache->LoadShader(vsDesc, "VertexShader");
 
-	ShaderDesc psDesc{
-	.shaderPath = L"../../../../shaders/model.hlsl",
-	.pEntryPoint = L"PSMain",
-	.pTarget = L"ps_6_7",
-	.type = Type::PIXEL };
-	ShaderHandle psHandle = pipelineCache->LoadShader(psDesc, "PixelShader");
-
-	GraphicsPipelineDesc desc {
+	GraphicsPipelineDesc desc{
 	.vertexShader = vsHandle,
-	.pixelShader = psHandle,
+	.pixelShader = g_invalidShaderHandle,
 	.blendMode = BlendMode::NON_TRANSPARENT,
 	.depthMode = DepthMode::READ_WRITE,
 	.rasterMode = RasterMode::SOLID_NONE_CULL,
 	.topology = Topology::TRIANGLES,
-	.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM,
-	.dsvFormat = DXGI_FORMAT_D32_FLOAT};
+	.rtvFormat = DXGI_FORMAT_UNKNOWN,
+	.dsvFormat = DXGI_FORMAT_D32_FLOAT };
 	pipelineHandle_ = pipelineCache->CreatePipeline(desc, "Geometry Pipeline");
 }
 
@@ -56,9 +49,10 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 	cmdList->RSSetViewports(1, &ctx.viewport);
 	cmdList->RSSetScissorRects(1, &ctx.scissorRect);
 
-	cmdList->OMSetRenderTargets(1, &ctx.currentRtv, FALSE, &ctx.currentDsv);
-	cmdList->ClearDepthStencilView(ctx.currentDsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
+	cmdList->ClearDepthStencilView(ctx.currentDsv, D3D12_CLEAR_FLAG_DEPTH,
+		1.0f, 0, 0, nullptr);
+	cmdList->OMSetRenderTargets(0, nullptr,
+		FALSE, &ctx.currentDsv);
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	const Camera& cam = scene.GetCamera();
@@ -83,41 +77,15 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 
 		for (const auto& mesh : model->GetSubMeshes())
 		{
-			int materialIndex = mesh.materialIndex;
-			const std::vector materials = model->GetMaterials();
-
-			ResourceHandle albedoHandle = materials.at(materialIndex).albedoTexture;
-			Resource* albedo = resourceManager_->GetResource(albedoHandle);
-			u32 albedoIndex = std::get_if<Texture>(albedo)->srvIndex.value();
-
-			ResourceHandle normalHandle = materials.at(materialIndex).normalTexture;
-			Resource* normal= resourceManager_->GetResource(albedoHandle);
-			u32 normalIndex = std::get_if<Texture>(normal)->srvIndex.value();
-
-			ResourceHandle metallicRoughnessHandle = materials.at(materialIndex).metallicRoughnessTexture;
-			Resource* metallicRoughness = resourceManager_->GetResource(albedoHandle);
-			u32 metallicRoughnessIndex = std::get_if<Texture>(metallicRoughness)->srvIndex.value();
-
-			ResourceHandle emissiveHandle = materials.at(materialIndex).emissiveTexture;
-			Resource* emissive = resourceManager_->GetResource(albedoHandle);
-			u32 emissiveIndex = std::get_if<Texture>(emissive)->srvIndex.value();
-
 			DirectX::XMMATRIX world = mesh.transform * renderObj.transform;
 			DirectX::XMMATRIX wvp = world * view * proj;
 
 			DrawModel constants;
 			constants.worldViewProj = (wvp);
 			constants.worldMatrix = (world);
-			constants.albedoIndex = albedoIndex;
-			constants.normalIndex = normalIndex;
-			constants.metallicRoughnessIndex = metallicRoughnessIndex;
-			constants.emissiveIndex= emissiveIndex;
 
-			/* TODO: haven't filled most of the structs, too late in the night :/
-			* need to fill asap
-			*/
-
-			cmdList->SetGraphicsRoot32BitConstants(0, sizeof(DrawModel) / 4, &constants, 0);
+			cmdList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPPBuffer) / 4,
+				&constants, 0);
 
 			cmdList->DrawIndexedInstanced(
 				mesh.indexCount,

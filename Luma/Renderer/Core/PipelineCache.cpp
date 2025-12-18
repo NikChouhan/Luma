@@ -198,7 +198,10 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
     Shader* ps = this->GetShader(desc.pixelShader);
     assert(vs && "Vertex Shader is mandatory");
 
-    pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, ps->pBlob.Get());
+    /* TODO: Currently I am only passing VS blob cuz my shaders will have a common root signature
+     * declared at the top. Both will share it
+	*/
+    pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, vs->pBlob.Get());
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.pRootSignature = pipeline.rootSign.Get();

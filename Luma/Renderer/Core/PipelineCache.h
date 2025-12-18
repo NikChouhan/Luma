@@ -21,7 +21,7 @@ struct PipelineCache
 
 	// Pipeline management
 
-	ComPtr<ID3D12RootSignature> CreateRootSignatureFromBlob(const GfxDevice& gfxDevice, IDxcBlob* get);
+	static ComPtr<ID3D12RootSignature> CreateRootSignatureFromBlob(const GfxDevice& gfxDevice, IDxcBlob* get);
 
 	[[nodiscard]] PipelineHandle CreatePipeline(const GraphicsPipelineDesc& desc, const std::string& name);
 	[[nodiscard]] PipelineHandle CreatePipeline(const ComputePipelineDesc& desc, const std::string& name);

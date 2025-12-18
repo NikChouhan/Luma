@@ -83,7 +83,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     Texture2D metallicRoughnessTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._metallicRoughNessIndex)];
     Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._emissiveIndex)];
 
-    RWTexture2D<float4> normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(72)];
+    RWTexture2D<float4> normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._normalIndex)];
 
     float2 uv = input._uv;
     //uv.x = 1.0 - uv.x;
