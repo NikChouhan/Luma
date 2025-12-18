@@ -200,8 +200,14 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
 
     /* TODO: Currently I am only passing VS blob cuz my shaders will have a common root signature
      * declared at the top. Both will share it
+     * Guess I was wrong. If Pixel shader has the [RootSignature[<define>]] part at the top of its
+     * definition, vs blob cant have access to it. Rather define it at the top of both definitions
+     * OR
+     * Always define it above ps def, and once its reflected to c++ code, it will be used
+     * nonetheless, and if ps doesn't exist (depth pre pass for ex) define it above vs def
 	*/
-    pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, vs->pBlob.Get());
+    if (ps) pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, ps->pBlob.Get());
+    else pipeline.rootSign = CreateRootSignatureFromBlob(gfxDevice_, vs->pBlob.Get());
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.pRootSignature = pipeline.rootSign.Get();
