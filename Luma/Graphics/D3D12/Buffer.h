@@ -114,7 +114,7 @@ struct StructuredBufferDesc
     const void* data;
     u32 elementCount;
     u32 elementStride;
-    bool createSRV = false;
+    bool createSRV = true;
     bool createUAV = false;
 };
 
@@ -123,7 +123,7 @@ struct RawBufferDesc
     const void* data;
     u32 sizeInBytes;
 
-    bool createSRV = false;
+    bool createSRV = true;
     bool createUAV = false;
     DXGI_FORMAT format = DXGI_FORMAT_R32_TYPELESS;
 };
@@ -143,10 +143,19 @@ enum class BufferUsage : u8 {
     GPU_UPLOAD   // CPU available (and writeable, don't read ever, its slow af), GPU located memory
 };
 
+enum class BufferViewFlags : u8
+{
+    NONE = 0,
+    SRV = 1 << 0,
+    UAV = 1 << 1,
+    RTV = 1 << 2
+};
+
 struct BufferCreateInfo {
     BufferDesc desc;
     // never use GPU_UPLOAD, renderdoc crashes, its also broken in my impl
     BufferUsage usage = BufferUsage::UPLOAD;
+    BufferViewFlags bufferResourceViewFlags = BufferViewFlags::NONE;
     bool keepMapped = false;
     const wchar_t* debugName = nullptr;
 
