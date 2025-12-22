@@ -1,7 +1,5 @@
 #pragma once
-#include <variant>
 
-#include "Graphics/GfxDevice.h"
 #include "Graphics/D3D12/Shader.h"
 
 enum class BlendMode : u8 { NON_TRANSPARENT, ALPHA_BLEND, ADDITIVE, PREMULTIPLIED };

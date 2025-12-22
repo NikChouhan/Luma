@@ -8,5 +8,5 @@ struct GeometryPass : public RenderPass
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
-	PipelineHandle pipelineHandle_{};
+	PipelineHandle pipelineHandle_ = g_invalidPipelineHandle;
 };

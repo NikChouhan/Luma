@@ -61,7 +61,7 @@ void Model::Load(const std::string& path)
     {
         BufferCreateInfo vbInfo = {
             .desc = VertexBufferDesc{.vertices = allVertices.data(), .vertexCount = (u32)allVertices.size(), .vertexStride = sizeof(Vertex)},
-            .usage = BufferUsage::UPLOAD, 
+            .usage = BufferUsage::UPLOAD,
             .debugName = L"Model_GlobalVB"
         };
         globalVertexBuffer_ = resourceManager_->CreateResource(vbInfo, path + "_VB");

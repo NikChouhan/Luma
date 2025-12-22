@@ -1,6 +1,5 @@
 #pragma once
 
-
 struct Scene;
 struct RenderContext;
 struct PipelineCache;
