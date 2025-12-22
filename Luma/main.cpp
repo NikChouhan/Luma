@@ -26,6 +26,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Passes/GeometryPass.h"
+#include "Renderer/Passes/Clustered/LightCulling.h"
 
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -49,8 +50,8 @@ int WINAPI wWinMain(
 	Timer timer{};
 	Swapchain swapchain = CreateSwapChain(gfxDevice, frameSync,
 		{
-			.height_ = 1920,
-			.width_ = 1080,
+			.height_ = u16(GlobalStorage::g_LumaConstants.height),
+			.width_ = u16(GlobalStorage::g_LumaConstants.width),
 			.vsyncEnable_ = true,
 			.hwnd_ = window.GetHandle()
 		});
@@ -65,6 +66,7 @@ int WINAPI wWinMain(
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
 	// Add passes
 	renderer.AddPass<GeometryPass>();
+	renderer.AddPass<LightCullingPass>();
 
 	renderer.Init();
 
