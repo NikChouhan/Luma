@@ -22,9 +22,16 @@ struct LightSettings
     SM::Vector3 direction = { -1.0f, -2.0f, 0.0f };
 };
 
+struct LumaConstants
+{
+    u32 width = 1920;
+    u32 height = 1080;
+};
+
 namespace GlobalStorage
 {
     inline BindlessHeapIndex bindlessHeapIndex{};
+    inline LumaConstants g_LumaConstants{};
 
     inline DirectX::XMMATRIX projMatrixInv{};
     inline DirectX::XMMATRIX viewMatrixInv{};
