@@ -29,19 +29,22 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
             IID_PPV_ARGS(&textureUploadHeapResource)));
 
 
-        D3D12_SUBRESOURCE_DATA textureData = {};
-        textureData.pData = desc.initialData;
-        textureData.RowPitch = desc.width * desc.texPixelSize;
-        textureData.SlicePitch = textureData.RowPitch * desc.height;
+        if (desc.initialData)
+        {
+            D3D12_SUBRESOURCE_DATA textureData = {};
+            textureData.pData = desc.initialData;
+            textureData.RowPitch = desc.width * desc.texPixelSize;
+            textureData.SlicePitch = textureData.RowPitch * desc.height;
 
-        ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
-            {
-                UpdateSubresources(frameSync.immediateContext_.commandList.Get(), resource.Get(),
-                    textureUploadHeapResource.Get(), 0, 0, 1, &textureData);
-                auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
-                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);
-            });
+            ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
+                {
+                    UpdateSubresources(frameSync.immediateContext_.commandList.Get(), resource.Get(),
+                        textureUploadHeapResource.Get(), 0, 0, 1, &textureData);
+                    auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
+                        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                    frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);
+                });
+        }
     }
     else if (usage == TextureUsage::GPU_UPLOAD)
     {
