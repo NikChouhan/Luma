@@ -145,6 +145,7 @@ struct BufferViewCreator
                 srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 srvDesc.Buffer.FirstElement = 0;
                 srvDesc.Buffer.NumElements = numElements;
+                srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 
                 CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(baseHandle);
                 srvHandle.Offset(*srvIndex, descriptorSize);
@@ -174,6 +175,7 @@ struct BufferViewCreator
                 uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
                 uavDesc.Buffer.FirstElement = 0;
                 uavDesc.Buffer.NumElements = numElements;
+                uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
 
                 CD3DX12_CPU_DESCRIPTOR_HANDLE uavHandle(baseHandle);
                 uavHandle.Offset(*uavIndex, descriptorSize);
@@ -223,8 +225,23 @@ Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createIn
         initialState = D3D12_RESOURCE_STATE_COMMON;
         break;
     }
+    D3D12_RESOURCE_FLAGS resourceFlags{};
 
-    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
+    switch (createInfo.bufferResourceViewFlags)
+    {
+    case BufferViewFlags::NONE:
+	    break;
+    case BufferViewFlags::SRV:
+	    break;
+    case BufferViewFlags::UAV:
+        resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	    break;
+    case BufferViewFlags::RTV:
+        resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	    break;
+    }
+
+    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, resourceFlags);
     D3D12MA::ALLOCATION_DESC allocDesc{};
     allocDesc.HeapType = heapType;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
