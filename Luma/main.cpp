@@ -26,7 +26,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Passes/GeometryPass.h"
-#include "Renderer/Passes/Clustered/LightCulling.h"
+#include "Renderer/Passes/Clustered/ClusteredForward.h"
 
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -66,7 +66,7 @@ int WINAPI wWinMain(
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
 	// Add passes
 	renderer.AddPass<GeometryPass>();
-	renderer.AddPass<LightCullingPass>();
+	renderer.AddPass<ClusteredForward>();
 
 	renderer.Init();
 
