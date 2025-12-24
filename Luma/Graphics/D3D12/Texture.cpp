@@ -8,7 +8,7 @@
 
 static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync, 
                               const ComPtr<ID3D12Resource>& resource, 
-                              const Texture2DDesc& desc,
+                              const TextureDesc& desc,
                               const TextureUsage usage)
 {
     auto heapProps = CD3DX12_HEAP_PROPERTIES((usage == TextureUsage::UPLOAD) ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_GPU_UPLOAD);
@@ -59,23 +59,29 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
     const GfxDevice& gfxDevice,
     FrameSync& frameSync,
     D3D12MA::Allocation* allocation,
-    const Texture2DDesc& desc,
+    const TextureDesc& desc,
     const TextureUsage& usage,
     const D3D12_RESOURCE_FLAGS resourceFlags)
 {
     ComPtr<ID3D12Resource> resource;
-
-	D3D12_RESOURCE_DESC resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc.Width = desc.width;
-    resourceDesc.Height = desc.height;
-    resourceDesc.DepthOrArraySize = desc.arraySize;
-    resourceDesc.MipLevels = desc.mipLevels;
-    resourceDesc.Format = desc.format;
-    resourceDesc.SampleDesc.Count = 1;
-    resourceDesc.SampleDesc.Quality = 0;
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc.Flags = resourceFlags;
+    CD3DX12_RESOURCE_DESC resourceDesc{};
+    if (desc.depth == 0)
+    {
+        resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+            desc.format, 
+            desc.width, desc.height,
+            desc.arraySize, desc.mipLevels,
+            1, 0, 
+            resourceFlags);
+    }
+    else if (desc.depth)
+    {
+        resourceDesc = CD3DX12_RESOURCE_DESC::Tex3D(
+            desc.format,
+            desc.width, desc.height, desc.depth, 
+            desc.mipLevels, 
+            resourceFlags);
+    }
 
     D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_CLEAR_VALUE* pClearValue = nullptr;
@@ -119,7 +125,7 @@ static u32 CreateTextureSRV(
     ID3D12DescriptorHeap* heap,
     u32* nextIndex,
     const ComPtr<ID3D12Resource>& resource,
-    const Texture2DDesc& desc)
+    const TextureDesc& desc)
 {
     u32 index = (*nextIndex)++;
 
@@ -145,7 +151,7 @@ static u32 CreateTextureRTV(
     ID3D12DescriptorHeap* rtvHeap,  // Note: Separate RTV heap!
     u32* nextRTVIndex,
     const ComPtr<ID3D12Resource>& resource,
-    const Texture2DDesc& desc)
+    const TextureDesc& desc)
 {
     u32 index = (*nextRTVIndex)++;
 
@@ -170,7 +176,7 @@ static u32 CreateTextureUAV(
     ID3D12DescriptorHeap* heap,
     u32* nextIndex,
     const ComPtr<ID3D12Resource>& resource,
-    const Texture2DDesc& desc,
+    const TextureDesc& desc,
     u32 mipLevel)
 {
     u32 index = (*nextIndex)++;

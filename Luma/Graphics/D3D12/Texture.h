@@ -37,10 +37,11 @@ inline bool HasFlag(TextureViewFlags flags, TextureViewFlags check)
 
 // allow having |ing with TextureUsage as well, required when you need a upload buffer
 
-struct Texture2DDesc
+struct TextureDesc
 {
     u32 width = 1920;
     u32 height = 1080;
+    u32 depth = 0;
     u32 texPixelSize = 4;
     u32 mipLevels = 1;
     u32 arraySize = 1;
@@ -69,7 +70,7 @@ struct Texture
 
 struct TextureCreateInfo
 {
-    Texture2DDesc desc;
+    TextureDesc desc;
     const wchar_t* debugName = nullptr;
 
     TextureUsage usage;

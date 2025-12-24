@@ -8,6 +8,7 @@
 
 namespace SM = DirectX::SimpleMath;
 
+
 struct BindlessHeapIndex
 {
     u32 nextIndex;
