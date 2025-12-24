@@ -143,6 +143,7 @@ enum class BufferUsage : u8 {
     GPU_UPLOAD   // CPU available (and writeable, don't read ever, its slow af), GPU located memory
 };
 
+
 enum class BufferViewFlags : u8
 {
     NONE = 0,
@@ -150,6 +151,10 @@ enum class BufferViewFlags : u8
     UAV = 1 << 1,
     RTV = 1 << 2
 };
+inline BufferViewFlags operator|(BufferViewFlags a, BufferViewFlags b)
+{
+    return static_cast<BufferViewFlags>(static_cast<u32>(a) | static_cast<u32>(b));
+}
 
 struct BufferCreateInfo {
     BufferDesc desc;
