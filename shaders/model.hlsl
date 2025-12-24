@@ -1,8 +1,5 @@
 #include "Common.hlsl"
 #include "PBRCalc.hlsl"
-#include "TraceShadowRay.hlsl"
-
-
 struct VSInput
 {
     float3 _position : POSITION;

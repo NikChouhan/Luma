@@ -10,6 +10,7 @@ target("Luma")
      "Renderer/*.h",
      "Renderer/Core/*.h",
      "Renderer/Passes/*.h",
+     "Renderer/Passes/Clustered/*.h",
      "RenderGraph/*.h"
      )
 
@@ -21,6 +22,7 @@ target("Luma")
      "Renderer/*.cpp",
      "Renderer/Core/*cpp",
      "Renderer/Passes/*cpp",
+     "Renderer/Passes/Clustered/*.cpp",
      "RenderGraph/*.cpp"
     )
 
