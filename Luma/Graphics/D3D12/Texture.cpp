@@ -15,8 +15,9 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
 
     if (usage == TextureUsage::UPLOAD)
     {
+        const UINT subresourceCount = desc.arraySize * desc.mipLevels;
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(resource.Get(),
-            0, 1);
+            0, subresourceCount);
         ComPtr<ID3D12Resource> textureUploadHeapResource;
         auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
@@ -31,15 +32,23 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
 
         if (desc.initialData)
         {
-            D3D12_SUBRESOURCE_DATA textureData = {};
-            textureData.pData = desc.initialData;
-            textureData.RowPitch = desc.width * desc.texPixelSize;
-            textureData.SlicePitch = textureData.RowPitch * desc.height;
+            std::vector<D3D12_SUBRESOURCE_DATA> subresources(subresourceCount);
+            const uint8_t* pData = static_cast<const uint8_t*>(desc.initialData);
+
+            UINT64 sliceSize = desc.width * desc.height * desc.texPixelSize;
+
+            for (u32 i = 0; i < desc.arraySize; ++i)
+            {
+                // Point to the specific offset for this face in the combinedData buffer
+                subresources[i].pData = pData + (i * sliceSize);
+                subresources[i].RowPitch = desc.width * desc.texPixelSize;
+                subresources[i].SlicePitch = sliceSize;
+            }
 
             ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
                 {
                     UpdateSubresources(frameSync.immediateContext_.commandList.Get(), resource.Get(),
-                        textureUploadHeapResource.Get(), 0, 0, 1, &textureData);
+                        textureUploadHeapResource.Get(), 0, 0, subresourceCount, subresources.data());
                     auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
                         D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                     frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);
@@ -74,7 +83,7 @@ static ComPtr<ID3D12Resource> CreateTextureResource(
             1, 0, 
             resourceFlags);
     }
-    else if (desc.depth)
+    else if (desc.depth > 0)
     {
         resourceDesc = CD3DX12_RESOURCE_DESC::Tex3D(
             desc.format,
@@ -130,11 +139,40 @@ static u32 CreateTextureSRV(
     u32 index = (*nextIndex)++;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+
     srvDesc.Format = desc.format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = desc.mipLevels;
-    srvDesc.Texture2D.MostDetailedMip = 0;
+
+    if (desc.depth > 0)
+    {
+        // 3D Texture
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+        srvDesc.Texture3D.MipLevels = desc.mipLevels;
+        srvDesc.Texture3D.MostDetailedMip = 0;
+    }
+    else if (desc.arraySize == 6)
+    {
+        // TODO:temp fix; ArraySize 6 implies Cubemap for now
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        srvDesc.TextureCube.MipLevels = desc.mipLevels;
+        srvDesc.TextureCube.MostDetailedMip = 0;
+    }
+    else if (desc.arraySize > 1)
+    {
+        // standard texture array
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MipLevels = desc.mipLevels;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.ArraySize = desc.arraySize;
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+    }
+    else
+    {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = desc.mipLevels;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+    }
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
     u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
