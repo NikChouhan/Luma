@@ -234,8 +234,22 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
 
     // Rasterizer State
     auto& rast = psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    if (desc.rasterMode == RasterMode::SOLID_NONE_CULL) rast.CullMode = D3D12_CULL_MODE_NONE;
-    if (desc.rasterMode == RasterMode::WIREFRAME) rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
+    switch (desc.rasterMode)
+    {
+    case RasterMode::SOLID_BACK_CULL:
+        rast.CullMode = D3D12_CULL_MODE_BACK;
+	    break;
+    case RasterMode::SOLID_FRONT_CULL:
+        rast.CullMode = D3D12_CULL_MODE_FRONT;
+	    break;
+    case RasterMode::SOLID_NONE_CULL:
+        rast.CullMode = D3D12_CULL_MODE_NONE;
+	    break;
+    case RasterMode::WIREFRAME:
+        rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	    break;
+    }
+
     rast.FrontCounterClockwise = TRUE;
 
     // Depth Stencil
@@ -246,6 +260,36 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
     else if (desc.depthMode == DepthMode::READ_ONLY) 
     {
         depth.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    }
+
+    switch (desc.depthFunc)
+    {
+    case DepthFunc::NONE :
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_NONE;
+    case DepthFunc::NEVER:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_NEVER;
+	    break;
+    case DepthFunc::LESS:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	    break;
+    case DepthFunc::EQUAL:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_EQUAL;
+	    break;
+    case DepthFunc::LESS_EQUAL:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	    break;
+    case DepthFunc::GREATER:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+	    break;
+    case DepthFunc::NOT_EQUAL:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_NOT_EQUAL;
+	    break;
+    case DepthFunc::GREATER_EQUAL:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+	    break;
+    case DepthFunc::ALWAYS:
+        depth.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+	    break;
     }
 
     // Topology

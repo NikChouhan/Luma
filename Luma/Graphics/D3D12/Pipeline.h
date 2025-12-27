@@ -4,7 +4,8 @@
 
 enum class BlendMode : u8 { NON_TRANSPARENT, ALPHA_BLEND, ADDITIVE, PREMULTIPLIED };
 enum class DepthMode : u8 { READ_WRITE, READ_ONLY, NONE };
-enum class RasterMode : u8 { SOLID_BACK_CULL, SOLID_NONE_CULL, WIREFRAME };
+enum class DepthFunc : u8 { NONE, NEVER, LESS, EQUAL, LESS_EQUAL, GREATER, NOT_EQUAL, GREATER_EQUAL, ALWAYS };
+enum class RasterMode : u8 { SOLID_BACK_CULL, SOLID_FRONT_CULL, SOLID_NONE_CULL, WIREFRAME };
 enum class Topology : u8 { TRIANGLES, LINES, POINTS };
 
 enum class PipelineType : u8 { GRAPHICS, COMPUTE };
@@ -30,6 +31,7 @@ struct GraphicsPipelineDesc
 
 	BlendMode blendMode = BlendMode::NON_TRANSPARENT;
 	DepthMode depthMode = DepthMode::READ_WRITE;
+	DepthFunc depthFunc = DepthFunc::LESS;
 	RasterMode rasterMode = RasterMode::SOLID_BACK_CULL;
 	Topology topology = Topology::TRIANGLES;
 
