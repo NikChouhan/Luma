@@ -40,6 +40,6 @@ SamplerState skyboxSampler : register(s0);
 [RootSignature(SkyBox)]
 float4 PSMain(VSOutput input) : SV_TARGET
 {
-    Texture2D skyboxTexture = ResourceDescriptorHeap[NonUniformResourceIndex(cubemapSRVIndex)];
+    TextureCube skyboxTexture = ResourceDescriptorHeap[NonUniformResourceIndex(cubemapSRVIndex)];
     return skyboxTexture.Sample(skyboxSampler, input.texCoord);
 }
