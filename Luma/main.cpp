@@ -8,10 +8,8 @@
 
 #include "Graphics/GfxDevice.h"
 #include "Graphics/D3D12/Swapchain.h"
-#include "Graphics/D3D12/Pipeline.h"
 #include "Graphics/FrameSync.h"
 #include "Graphics/D3D12/Buffer.h"
-#include "Graphics/D3D12/Texture.h"
 #include "Core/Log.h"
 
 #include "Graphics/Globals.h"
@@ -26,6 +24,8 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Passes/GeometryPass.h"
+#include "Renderer/Passes/RasterPass.h"
+#include "Renderer/Passes/SkyBoxPass.h"
 #include "Renderer/Passes/Clustered/ClusteredForward.h"
 
 
@@ -65,8 +65,9 @@ int WINAPI wWinMain(
 
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
 	// Add passes
+	renderer.AddPass<SkyBoxPass>();
 	renderer.AddPass<GeometryPass>();
-	renderer.AddPass<ClusteredForward>();
+	renderer.AddPass<RasterPass>();
 
 	renderer.Init();
 

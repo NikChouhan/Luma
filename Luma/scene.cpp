@@ -18,7 +18,9 @@ void Scene::Load()
 	printl(Log::LogLevel::Info, "[Scene] Loading World ...");
 
 	auto sponza = std::make_unique<Model>(gfxDevice_, &resourceManager_);
-	sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
+	//sponza->Load("../../../../assets/models/bistroWithEmissive/Untitled.gltf");
+	//sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
+	sponza->Load("../../../../assets/models/Sponza/glTF/Sponza.gltf");
 
 	renderObjects_.push_back(RenderObject{
 	.model = sponza.get(),
