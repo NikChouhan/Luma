@@ -179,24 +179,42 @@ void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& trans
     SM::Vector3 extents = (max - min) * 0.5;
     subMesh.bounds = DirectX::BoundingBox(center, extents);
 
+    cgltf_material* material = primitive->material;
     // Material Loading
-    if (primitive->material)
+    if (material)
     {
         Material mat = {};
-        cgltf_pbr_metallic_roughness& pbr = primitive->material->pbr_metallic_roughness;
+        if (material->has_pbr_metallic_roughness)
+        {
+            cgltf_pbr_metallic_roughness* pbr = &material->pbr_metallic_roughness;
 
-        mat.baseColorFactor = SM::Vector4(pbr.base_color_factor);
-        mat.metallicFactor = pbr.metallic_factor;
-        mat.roughnessFactor = pbr.roughness_factor;
+            if (pbr->base_color_texture.texture)
+            {
+                mat.baseColorFactor = SM::Vector4(pbr->base_color_factor);
+                mat.albedoTexture = LoadTexture(&pbr->base_color_texture, true);
+            }
+            if (pbr->metallic_roughness_texture.texture)
+            {
+                mat.metallicFactor = pbr->metallic_factor;
+                mat.roughnessFactor = pbr->roughness_factor;
+                mat.metallicRoughnessTexture = LoadTexture(&pbr->metallic_roughness_texture, false);
+            }
+        }
 
-        mat.albedoTexture = LoadTexture(&pbr.base_color_texture, true);
-        mat.metallicRoughnessTexture = LoadTexture(&pbr.metallic_roughness_texture, false);
-        mat.normalTexture = LoadTexture(&primitive->material->normal_texture, false);
-        mat.emissiveTexture = LoadTexture(&primitive->material->emissive_texture, true);
+        if (material->normal_texture.texture)
+        {
+            mat.normalTexture = LoadTexture(&primitive->material->normal_texture, false);
 
+        }
+        if (material->emissive_texture.texture)
+        {
+            mat.emissiveTexture = LoadTexture(&primitive->material->emissive_texture, true);
+
+        }
         subMesh.materialIndex = (u32)materials_.size();
         materials_.push_back(mat);
     }
+
 
     allVertices.insert(allVertices.end(), optVertices.begin(), optVertices.end());
     allIndices.insert(allIndices.end(), optIndices.begin(), optIndices.end());
