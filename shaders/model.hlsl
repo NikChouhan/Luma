@@ -19,7 +19,7 @@ SamplerState samplerDiffuse : register(s0);
 // normals will be generated through the geometry
 // SamplerState samplerNormal : register(s1);
 
-struct PerDraw
+cbuffer PerDraw : register(b0)
 {
     row_major float4x4 _worldViewProjMatrix;
 
@@ -41,17 +41,15 @@ struct PerDraw
 
     float _pointLightRadius;
     float3 _pointLightColor;
-};
-
-ConstantBuffer<PerDraw> constBuffer : register(b0);
+}
 
 PSInput VSMain(VSInput input)
 {
     PSInput result;
-    result._position = mul(float4(input._position, 1.0f), constBuffer._worldViewProjMatrix);
-    result._normal =  mul(input._normal, (float3x3)constBuffer._worldMatrix);
+    result._position = mul(float4(input._position, 1.0f), _worldViewProjMatrix);
+    result._normal =  mul(input._normal, (float3x3)_worldMatrix);
     result._uv = input._uv;
-    result._worldPos = (mul(float4(input._position, 1.), constBuffer._worldMatrix));
+    result._worldPos = (mul(float4(input._position, 1.), _worldMatrix));
     return result;
 }
 /* add other root constants with macro defined Root Constants
@@ -75,43 +73,38 @@ PSInput VSMain(VSInput input)
 [RootSignature(Raster)]
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    RaytracingAccelerationStructure accelStruct = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._accelerationStructureIndex)];
-    Texture2D albedoTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._albedoIndex)];
-    Texture2D metallicRoughnessTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._metallicRoughNessIndex)];
-    Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._emissiveIndex)];
-
-    RWTexture2D<float4> normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(constBuffer._normalIndex)];
-
     float2 uv = input._uv;
-    //uv.x = 1.0 - uv.x;
-    //uv.y = 1.0 - uv.y;
-    //uv = uv.yx;
 
-
+    Texture2D albedoTex = ResourceDescriptorHeap[NonUniformResourceIndex(_albedoIndex)];
     float4 albedoColor = albedoTex.Sample(samplerDiffuse, uv);
-    float2 metallicRoughness = metallicRoughnessTex.Sample(samplerDiffuse, uv).rg;
-    float metallic = metallicRoughness.x;
-    float roughness = metallicRoughness.y;
-    float3 emissive = emissiveTex.Sample(samplerDiffuse, uv).rgb;
 
-    float3 N = normalTex.Load(uv);
-    float3 V = normalize(constBuffer._cameraPos - input._worldPos);
-    float3 surfaceOffset = input._worldPos + N * 0.1;
-
-    float3 Lo = float3(0.0, 0.0, 0.0);
-
-    /*float attenuation = 1.0 / (distance * distance);
-    attenuation *= pow(max(1.0 - (distance / constBuffer._pointLightRadius), 0.0), 2.0);*/
-
-    float shadow = 1.f;
-    float3 radiance = constBuffer._pointLightColor * constBuffer._pointLightIntensity;
-    Lo += CalculatePBR(N, V, float3(0.,0.,0.), radiance, albedoColor.rgb, metallic, roughness, 1.0) * shadow;
     float amb = .9f;
-    float3 ambient = float3(amb, amb, amb) * albedoColor.rgb * (1.0 - metallic * 0.5);
+    float3 finalColor = float3(amb, amb, amb) * albedoColor.rgb;
 
-    float3 finalColor = ambient + Lo + emissive;
+	if (_metallicRoughNessIndex)
+	{
+	    Texture2D metallicRoughnessTex = ResourceDescriptorHeap[NonUniformResourceIndex(_metallicRoughNessIndex)];
+        float2 metallicRoughness = metallicRoughnessTex.Sample(samplerDiffuse, uv).rg;
+        float metallic = metallicRoughness.x;
+        float roughness = metallicRoughness.y;
 
-    // Tone mapping (simple Reinhard)
-    finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));
+        finalColor *= (1.0 - metallic * 0.5);
+	}
+    if (_emissiveIndex)
+    {
+        Texture2D emissiveTex = ResourceDescriptorHeap[NonUniformResourceIndex(_emissiveIndex)];
+        float3 emissive = emissiveTex.Sample(samplerDiffuse, uv).rgb;
+
+        finalColor += emissive;
+    }
+    if (_normalIndex)
+    {
+        Texture2D normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(_normalIndex)];
+        //float3 N = normalTex.Load(uv);
+    }
+
+    // TODO: generated normals later soon
+    // RWTexture2D<float4> normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(_normalIndex)];
+
     return float4(finalColor, albedoColor.a);
 }
