@@ -47,8 +47,10 @@ static void UploadTextureData(const GfxDevice& gfxDevice, FrameSync& frameSync,
 
             ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
                 {
-                    UpdateSubresources(frameSync.immediateContext_.commandList.Get(), resource.Get(),
-                        textureUploadHeapResource.Get(), 0, 0, subresourceCount, subresources.data());
+                    UpdateSubresources(frameSync.immediateContext_.commandList.Get(),
+                        resource.Get(),
+                        textureUploadHeapResource.Get(), 
+                        0, 0, subresourceCount, subresources.data());
                     auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
                         D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                     frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);

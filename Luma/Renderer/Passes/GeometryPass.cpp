@@ -25,6 +25,7 @@ void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelin
 		.pixelShader = g_invalidShaderHandle,
 		.blendMode = BlendMode::NON_TRANSPARENT,
 		.depthMode = DepthMode::READ_WRITE,
+		.depthFunc = DepthFunc::LESS,
 		.rasterMode = RasterMode::SOLID_NONE_CULL,
 		.topology = Topology::TRIANGLES,
 		.rtvFormat = DXGI_FORMAT_UNKNOWN,
