@@ -15,3 +15,5 @@ compile_commands.json
 .zed
 assets/models/bistro3
 Logs/
+assets/models/bistroWithEmissive
+assets/models/bistro
