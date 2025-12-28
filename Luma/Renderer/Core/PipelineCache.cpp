@@ -253,7 +253,7 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
     rast.FrontCounterClockwise = TRUE;
 
     // Depth Stencil
-    auto& depth = psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    auto& depth = psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
     if (desc.depthMode == DepthMode::NONE) {
         depth.DepthEnable = FALSE;
     }
@@ -266,6 +266,7 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
     {
     case DepthFunc::NONE :
         depth.DepthFunc = D3D12_COMPARISON_FUNC_NONE;
+        break;
     case DepthFunc::NEVER:
         depth.DepthFunc = D3D12_COMPARISON_FUNC_NEVER;
 	    break;
