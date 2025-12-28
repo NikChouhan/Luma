@@ -14,12 +14,12 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
 	// create texture and pipeline for skybox
     {
         const char* cubemapFaces[6] = {
-            "../../../../assets/skybox/right.png",   // +X
-            "../../../../assets/skybox/left.png",    // -X
-            "../../../../assets/skybox/top.png",     // +Y
-            "../../../../assets/skybox/bottom.png",  // -Y
-            "../../../../assets/skybox/back.png",    // +Z
-        	"../../../../assets/skybox/front.png"    // -Z
+            "../../../../assets/skybox/starrynight/right.png",   // +X
+            "../../../../assets/skybox/starrynight/left.png",    // -X
+            "../../../../assets/skybox/starrynight/top.png",     // +Y
+            "../../../../assets/skybox/starrynight/bottom.png",  // -Y
+            "../../../../assets/skybox/starrynight/back.png",    // +Z
+        	"../../../../assets/skybox/starrynight/front.png"    // -Z
         };
 
         int width, height, channels;
@@ -27,7 +27,7 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
 
         for (auto& cubemapFace : cubemapFaces)
         {
-            unsigned char* data = stbi_load(cubemapFace, &width, &height, &channels, 4); // Force RGBA
+            unsigned char* data = stbi_load(cubemapFace, &width, &height, &channels, STBI_rgb_alpha);
             if (!data) {
                 assert(false && "Failed to load cubemap face");
             }
@@ -46,7 +46,7 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
             .desc = {
                 .width = static_cast<u32>(width),
                 .height = static_cast<u32>(height),
-                .depth = 1,
+                .depth = 0,
                 .texPixelSize = 4,
                 .mipLevels = 1,
                 .arraySize = 6,  // 6 faces for cubemap
@@ -56,7 +56,7 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
                 .initialData = combinedData.data()
             },
             .debugName = L"SkyboxCubMap",
-            .usage = TextureUsage::DEFAULT,
+            .usage = TextureUsage::UPLOAD,
             .heap = resourceManager->GetBindlessHeap().Get()
         };
 
@@ -154,7 +154,7 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
             .vertexShader = vertexShader,
             .pixelShader = pixelShader,
             .blendMode = BlendMode::NON_TRANSPARENT,
-            .depthMode = DepthMode::READ_ONLY,
+            .depthMode = DepthMode::NONE,
             .depthFunc = DepthFunc::LESS_EQUAL,
             .rasterMode = RasterMode::SOLID_NONE_CULL,
             .topology = Topology::TRIANGLES,
