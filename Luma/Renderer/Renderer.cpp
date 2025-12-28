@@ -63,6 +63,10 @@ RenderContext Renderer::BeginFrame() const
 		frameSync_.frameIndex_, swapchain_.rtvDescriptorSize_);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(swapchain_.dsvDepthHeap_->GetCPUDescriptorHandleForHeapStart());
 
+	const float clearColor[] = { 0.4f, 0.2f, 0.7f, 1.0f };
+	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
 	return RenderContext{
 		.cmdList_ = commandList.Get(),
 		.frameIndex_ = frameIdx,
