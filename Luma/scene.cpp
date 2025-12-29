@@ -19,8 +19,8 @@ void Scene::Load()
 
 	auto sponza = std::make_unique<Model>(gfxDevice_, &resourceManager_);
 	//sponza->Load("../../../../assets/models/bistroWithEmissive/Untitled.gltf");
-	//sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
-	sponza->Load("../../../../assets/models/Sponza/glTF/Sponza.gltf");
+	sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
+	//sponza->Load("../../../../assets/models/Sponza/glTF/Sponza.gltf");
 
 	renderObjects_.push_back(RenderObject{
 	.model = sponza.get(),
@@ -34,6 +34,8 @@ void Scene::Load()
 void Scene::Update(float deltaTime)
 {
 	HandleCamera(camera_, deltaTime);
+
+	printl(Log::LogLevel::Info, "Camera pos-> x:{}, y: {}, z: {}", camera_._pos.x, camera_._pos.y, camera_._pos.z);
 }
 
 void HandleCamera(Camera& camera, f32 deltaTime)

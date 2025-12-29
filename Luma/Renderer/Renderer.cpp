@@ -33,7 +33,6 @@ void Renderer::RenderFrame(const Scene& scene) const
 	{
 		pass->Execute(ctx, scene);
 	}
-
 	EndFrame(ctx);
 }
 
