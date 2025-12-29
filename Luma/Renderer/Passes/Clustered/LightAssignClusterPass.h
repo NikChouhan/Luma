@@ -2,22 +2,11 @@
 #include "Graphics/D3D12/Pipeline.h"
 #include "Renderer/Core/RenderPass.h"
 #include "Renderer/Core/Resources.h"
-u32 constexpr max_lights = 4096;
+u32 constexpr max_lights = 256;
 u32 constexpr no_of_clusters = 16 * 9 * 24;
 
 u32 constexpr maxLightIndices = no_of_clusters * max_lights;
 
-struct ComputeAABBData
-{
-	DirectX::XMMATRIX inverseProj;
-
-	u32 clusterInputData[3];
-	float zNear;
-
-	u32 screenDimensions[2];
-	float zFar;
-	u32 clusterUAVIndex;
-};
 
 struct LightAssignCluster
 {
@@ -28,6 +17,9 @@ struct LightAssignCluster
 	u32 LightCounterUAVIndex;
 	u32 LightIndexBufferUAVIndex;
 	u32 lightCount;
+
+	u32 globalLightStructuredBufferUAVIndex;
+	u32 padding[3];
 };
 
 struct LightListCounterBuffer
@@ -46,19 +38,20 @@ struct LightIndexList
 	
 };
 
-struct ClusteredForward : public RenderPass
+struct LightAssignClusterPass : public RenderPass
 {
-	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
+	auto Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) -> void override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
-	PipelineHandle ComputeAABBPipeline = g_invalidPipelineHandle;
-	ResourceHandle ClusterResourceHandle = g_invalidResourceHandle;
-
 	PipelineHandle LightAssignClusterPipeline = g_invalidPipelineHandle;
+
+	ResourceHandle GlobalLightsStructuredBufferHandle = g_invalidResourceHandle;
 	ResourceHandle LightIndexListTextureHandle = g_invalidResourceHandle;
 	ResourceHandle LightListCounterBufferHandle = g_invalidResourceHandle;
 	ResourceHandle LightIndicesBufferHandle = g_invalidResourceHandle;
+
+	ResourceHandle ClusterResourceHandle = g_invalidResourceHandle;
 
 	u32 clusterSizeXYZ[3] { 16, 9, 24};
 };
