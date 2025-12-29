@@ -24,10 +24,10 @@ cbuffer LightAssignCluster : register(b0)
 	uint globalLightIndexBufferUAVIndex; 	// using the offset and light counter values per cluster extract the light indices for it
 											// Buffer to store actual light indices in a long buffer chain
 	uint lightCount; // Total number of lights in scene
+
+	uint globalLightsStructuredBufferSRVIndex;
+	uint padding[3];
 }
-
-ConstantBuffer<Light> gLights[] : register(b1);
-
 #define THREADS_PER_GROUP 256
 
 groupshared uint LocalLightIndexList[1024];
@@ -73,6 +73,8 @@ void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 	// cluster AABB, all threads in one WG read same cluster
 	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(clusterUAVIndex)];
 	Cluster currentCluster = clusters[clusterIndex];
+
+	StructuredBuffer<Light> gLights = ResourceDescriptorHeap[NonUniformResourceIndex(globalLightsStructuredBufferSRVIndex)];
 
 	// 1 light per thread in a strided pattern
 	// doing 256 lights per call, can be easily increased
