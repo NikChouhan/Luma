@@ -26,7 +26,10 @@
 #include "Renderer/Passes/GeometryPass.h"
 #include "Renderer/Passes/RasterPass.h"
 #include "Renderer/Passes/SkyBoxPass.h"
-#include "Renderer/Passes/Clustered/ClusteredForward.h"
+#include "Renderer/Passes/Clustered/ComputeAABBPass.h"
+#include "Renderer/Passes/Clustered/LightAssignClusterPass.h"
+#include "Renderer/Passes/Clustered/MarkActiveClusters.h"
+#include "Renderer/Passes/Clustered/LightShadingPass.h"
 
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -68,6 +71,11 @@ int WINAPI wWinMain(
 	renderer.AddPass<SkyBoxPass>();
 	renderer.AddPass<GeometryPass>();
 	renderer.AddPass<RasterPass>();
+	// always in this order
+	renderer.AddPass<ComputeAABBPass>();
+	renderer.AddPass<MarkActiveClusters>();
+	renderer.AddPass<LightAssignClusterPass>();
+	renderer.AddPass<LightShadingPass>();
 
 	renderer.Init();
 
@@ -85,3 +93,6 @@ int WINAPI wWinMain(
 	}
 	return 0;
 }
+
+// [INFO] [INFO] Camera pos-> x:17.133108, y: -1.0338303, z: -8.97141 -> min
+// [INFO] Camera pos->x:-14.823427, y : 12.848415, z : 8.941228 ->  max
