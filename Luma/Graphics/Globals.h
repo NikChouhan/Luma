@@ -8,6 +8,13 @@
 
 namespace SM = DirectX::SimpleMath;
 
+constexpr auto cluster_number = (16 * 9 * 24);
+
+namespace SponzaAABB
+{
+    inline constexpr SM::Vector3 min = { 17, -1, -9 };
+    inline constexpr SM::Vector3 max = { -15, 13, 9 };
+};
 
 struct BindlessHeapIndex
 {
