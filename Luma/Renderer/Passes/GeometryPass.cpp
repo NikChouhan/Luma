@@ -82,11 +82,11 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 			DirectX::XMMATRIX world = mesh.transform * renderObj.transform;
 			DirectX::XMMATRIX wvp = world * view * proj;
 
-			DrawModel constants;
+			DepthPassRootConstants constants;
 			constants.worldViewProj = (wvp);
 			constants.worldMatrix = (world);
 
-			cmdList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPPBuffer) / 4,
+			cmdList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPassRootConstants) / 4,
 				&constants, 0);
 
 			cmdList->DrawIndexedInstanced(

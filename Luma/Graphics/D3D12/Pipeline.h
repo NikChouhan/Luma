@@ -41,6 +41,11 @@ struct GraphicsPipelineDesc
 	DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
 
 	// optional (I will keep an input layout set always, if none provided)
+	/* TODO: I am setting the input element desc even if none provided
+	 * this is bad idea if i dont want to use vertex buffer
+	 * sill it does work if I dont use it in shader. Leaving it here
+	 * rn, will handle it better later
+	 */ 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout;
 };
 

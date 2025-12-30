@@ -214,7 +214,7 @@ Pipeline PipelineCache::CreateGraphicsPSO(const GraphicsPipelineDesc& desc)
 
     psoDesc.VS = CD3DX12_SHADER_BYTECODE({ vs->pBlob->GetBufferPointer(), vs->pBlob->GetBufferSize()});
     if (ps) psoDesc.PS = CD3DX12_SHADER_BYTECODE(ps->pBlob->GetBufferPointer(), ps->pBlob->GetBufferSize());
-
+	
     if (desc.inputLayout.empty()) {
         psoDesc.InputLayout = {.pInputElementDescs = kStandardInputLayout, .NumElements = _countof(kStandardInputLayout) };
     }

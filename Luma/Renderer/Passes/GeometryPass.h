@@ -2,6 +2,13 @@
 #include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Core/RenderPass.h"
 
+struct DepthPassRootConstants
+{
+	DirectX::XMMATRIX worldViewProj;
+	DirectX::XMMATRIX worldMatrix;
+};
+
+
 struct GeometryPass : public RenderPass
 {
 	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
