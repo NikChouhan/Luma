@@ -1,12 +1,4 @@
-struct Light
-{
-	float3 Position;
-	float  Radius;
-	float3 Color;
-	float  Intensity;
-	uint   Type; // 0 = Point, 1 = Spot, 2 = Directional (I will only do point rn)
-	float3 Direction; // For spot/dir. light
-};
+#include "../LightsCommon.hlsl"
 
 struct Cluster
 {
@@ -14,20 +6,23 @@ struct Cluster
 	float4 maxPoint;
 };
 
-cbuffer LightAssignCluster : register(b0)
+struct LightAssignCluster
 {
 	uint3 clusterInputData;	// contains WG size in x,y,z dimensions
-	uint clusterUAVIndex;
+	uint  clusterUAVIndex;
 
 	uint globalLightListTextureUAVIndex;	// 3d texture storing offset and count of lights per cluster
-	uint globalLightCounterUAVIndex;	// global light counter buffer
+	uint globalLightCounterUAVIndex;	    // global light counter buffer
 	uint globalLightIndexBufferUAVIndex; 	// using the offset and light counter values per cluster extract the light indices for it
 											// Buffer to store actual light indices in a long buffer chain
 	uint lightCount; // Total number of lights in scene
 
 	uint globalLightsStructuredBufferSRVIndex;
 	uint padding[3];
-}
+};
+
+ConstantBuffer<LightAssignCluster> LightAssignCluster : register(b0);
+
 #define THREADS_PER_GROUP 256
 
 groupshared uint LocalLightIndexList[1024];
@@ -67,18 +62,18 @@ void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 
 	// cluster index
 	uint clusterIndex = groupID.x +
-		groupID.y * clusterInputData.x +
-		groupID.z * clusterInputData.x * clusterInputData.y;
+		groupID.y * LightAssignCluster.clusterInputData.x +
+		groupID.z * LightAssignCluster.clusterInputData.x * LightAssignCluster.clusterInputData.y;
 
 	// cluster AABB, all threads in one WG read same cluster
-	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(clusterUAVIndex)];
+	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(LightAssignCluster.clusterUAVIndex)];
 	Cluster currentCluster = clusters[clusterIndex];
 
-	StructuredBuffer<Light> gLights = ResourceDescriptorHeap[NonUniformResourceIndex(globalLightsStructuredBufferSRVIndex)];
+	StructuredBuffer<Light> gLights = ResourceDescriptorHeap[NonUniformResourceIndex(LightAssignCluster.globalLightsStructuredBufferSRVIndex)];
 
 	// 1 light per thread in a strided pattern
 	// doing 256 lights per call, can be easily increased
-	for (uint lightIdx = threadIdx; lightIdx < lightCount; lightIdx += THREADS_PER_GROUP)
+	for (uint lightIdx = threadIdx; lightIdx < LightAssignCluster.lightCount; lightIdx += THREADS_PER_GROUP)
 	{
 		Light light = gLights[lightIdx];
 
@@ -91,7 +86,7 @@ void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 			InterlockedAdd(LocalLightCount, 1, localIndex);
 
 			// Store in groupshared if there's space
-			if (localIndex < 1024)
+			if (localIndex < LightAssignCluster.lightCount)
 			{
 				LocalLightIndexList[localIndex] = lightIdx;
 			}
@@ -106,20 +101,20 @@ void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 	// With no useful performance gain, it will likely just overload VGPRs
 	if (threadIdx == 0)
 	{
-		uint lightsToWrite = min(LocalLightCount, 1024);
+		uint lightsToWrite = min(LocalLightCount, LightAssignCluster.lightCount);
 
 		// Get global offset atomically
-		RWStructuredBuffer<uint> GlobalLightCounter = ResourceDescriptorHeap[NonUniformResourceIndex(globalLightCounterUAVIndex)];
+		RWStructuredBuffer<uint> GlobalLightCounter = ResourceDescriptorHeap[NonUniformResourceIndex(LightAssignCluster.globalLightCounterUAVIndex)];
 		uint globalOffset;
 		InterlockedAdd(GlobalLightCounter[0], lightsToWrite, globalOffset);
 
 		// store offset and count in global texture (per cluster)
 		// size of GlobalLightIndexList texture should be 16x9x24
-		RWTexture3D<uint2> GlobalLightIndexList = ResourceDescriptorHeap[NonUniformResourceIndex(globalLightListTextureUAVIndex)];
+		RWTexture3D<uint2> GlobalLightIndexList = ResourceDescriptorHeap[NonUniformResourceIndex(LightAssignCluster.globalLightListTextureUAVIndex)];
 		GlobalLightIndexList[groupID] = uint2(globalOffset, lightsToWrite);
 
 		// copy local light indices to global buffer
-		RWStructuredBuffer<uint> GlobalLightIndexBuffer = ResourceDescriptorHeap[NonUniformResourceIndex(globalLightIndexBufferUAVIndex)];
+		RWStructuredBuffer<uint> GlobalLightIndexBuffer = ResourceDescriptorHeap[NonUniformResourceIndex(LightAssignCluster.globalLightIndexBufferUAVIndex)];
 		for (uint i = 0; i < lightsToWrite; i++)
 		{
 			GlobalLightIndexBuffer[globalOffset + i] = LocalLightIndexList[i];

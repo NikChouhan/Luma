@@ -7,7 +7,7 @@ struct Cluster
 // just put it into bindless
 // RWStructuredBuffer<Cluster> cluster : register(u0);
 
-cbuffer ComputeAABBData : register(b0)
+struct ComputeAABBData
 {
 	float4x4 inverseProj;
 	uint3 clusterInputData; // contains workgroup size number in x, y, z
@@ -16,7 +16,9 @@ cbuffer ComputeAABBData : register(b0)
 	uint2 screenDimensions;
 	float zFar;
 	uint clusterUAVIndex;
-}
+};
+
+ConstantBuffer<ComputeAABBData> computeAABBData : register(b0);
 
 
 float4 ScreenToView(float4 pointInSS);
@@ -40,10 +42,10 @@ void ClusterMain(uint3 DtId : SV_DispatchThreadID,
 	 * groupThreadID : ID of the thread inside the current workgroup (or local workgroup)
 	 */
 	const float3 eyePos = float3(0., 0., 0.);
-	uint clusterSizePx = screenDimensions.x/clusterInputData.x;	// for 1920x180p its 1920/16 = 120
+	uint clusterSizePx = computeAABBData.screenDimensions.x/ computeAABBData.clusterInputData.x;	// for 1920x180p its 1920/16 = 120
 	uint clusterIndex = groupID.x +
-						groupID.y * clusterInputData.x +
-						groupID.z * clusterInputData.x * clusterInputData.y;
+						groupID.y * computeAABBData.clusterInputData.x +
+						groupID.z * computeAABBData.clusterInputData.x * computeAABBData.clusterInputData.y;
 	// max & min point in screen space
 	float4 maxPointSS = float4((groupID.xy + uint2(1, 1)) * clusterSizePx, -1, 1.);
 	float4 minPointSS = float4((groupID.xy) * clusterSizePx, -1, 1.);
@@ -51,8 +53,8 @@ void ClusterMain(uint3 DtId : SV_DispatchThreadID,
 	float3 maxPointVS = ScreenToView(maxPointSS).xyz;
 	float3 minPointVS = ScreenToView(minPointSS).xyz;
 	// near/far values of the cluster in view space
-	float clusterNear = -zNear * pow(zFar / zNear, groupID.z / float(clusterInputData.z));
-	float clusterFar = -zNear * pow(zFar / zNear, (groupID.z +1) / float(clusterInputData.z));
+	float clusterNear = -computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, groupID.z / float(computeAABBData.clusterInputData.z));
+	float clusterFar = -computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, (groupID.z +1) / float(computeAABBData.clusterInputData.z));
 
 	// find the 4 intersection points, wrt camera to the far/near plane
 	float3 minPointNear = LineIntersectionToZPlane(eyePos, minPointVS, clusterNear);
@@ -63,7 +65,7 @@ void ClusterMain(uint3 DtId : SV_DispatchThreadID,
 	float3 minPointAABB = min(min(minPointNear, minPointFar), min(maxPointNear, maxPointFar));
 	float3 maxPointAABB = max(max(minPointNear, minPointFar), max(maxPointNear, maxPointFar));
 
-	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(clusterUAVIndex)];
+	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(computeAABBData.clusterUAVIndex)];
 	clusters[clusterIndex].minPoint = float4(minPointAABB, 0.);
 	clusters[clusterIndex].maxPoint = float4(maxPointAABB, 0.);
 }
@@ -83,7 +85,7 @@ float3 LineIntersectionToZPlane(float3 eyePos, float3 viewSpacePos, float zDista
 float4 ClipToView(float4 clip)
 {
 	// View space transform
-	float4 view = mul(inverseProj, clip);
+	float4 view = mul(computeAABBData.inverseProj, clip);
 
 	view = view / view.w;
 	return view;
@@ -92,7 +94,7 @@ float4 ClipToView(float4 clip)
 float4 ScreenToView(float4 pointInSS)
 {
 	// to NDC
-	float2 texCoord = pointInSS.xy / screenDimensions.xy;
+	float2 texCoord = pointInSS.xy / computeAABBData.screenDimensions.xy;
 
 	// to clip space
 	float4 clip = float4(texCoord.xy * 2.0 - 1.0, pointInSS.z, pointInSS.w);
