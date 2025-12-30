@@ -46,12 +46,8 @@ struct LightAssignClusterPass : public RenderPass
 private:
 	PipelineHandle LightAssignClusterPipeline = g_invalidPipelineHandle;
 
-	ResourceHandle GlobalLightsStructuredBufferHandle = g_invalidResourceHandle;
-	ResourceHandle LightIndexListTextureHandle = g_invalidResourceHandle;
-	ResourceHandle LightListCounterBufferHandle = g_invalidResourceHandle;
-	ResourceHandle LightIndicesBufferHandle = g_invalidResourceHandle;
-
-	ResourceHandle ClusterResourceHandle = g_invalidResourceHandle;
-
 	u32 clusterSizeXYZ[3] { 16, 9, 24};
+
+	LightAssignCluster pushConstants{};
+
 };
