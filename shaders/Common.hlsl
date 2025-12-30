@@ -11,7 +11,7 @@ float length2(float4 v)
 	return dot(v, v);
 }
 
-float3 CalculateWorldPosFromDepth(float depth, float2 uv, float4x4 projMatrixInv, float4x4 viewMatrixInv)
+float3 CalculateWorldPosFromDepth(float depth, float2 uv, float4x4 invViewProj)
 {
 	float2 ndc;
 	ndc.x = uv.x * 2.0 - 1.0;
@@ -21,9 +21,9 @@ float3 CalculateWorldPosFromDepth(float depth, float2 uv, float4x4 projMatrixInv
 	float z = depth * 2.0 - 1.;
 
 	float4 clipSpacePosition = float4(ndc, z, 1.0);
-	float4 viewSpacePosition = mul(projMatrixInv, clipSpacePosition);
-	viewSpacePosition /= viewSpacePosition.w;
-	float4 worldSpacePosition = mul(viewMatrixInv, viewSpacePosition);
+
+	float4 worldSpacePosition = mul(invViewProj, clipSpacePosition);
+	worldSpacePosition.xyz /= worldSpacePosition.w;
 	return worldSpacePosition.xyz;
 }
 // taken from UE 5.6
