@@ -50,7 +50,7 @@ void RasterPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
 	{
 		ResourceHandle GlobalLightsStructuredBufferHandle = resourceManager->GetResourceHandleByName("GlobalLightsStructuredBuffer");
 		ResourceHandle LightListCounterBufferHandle = resourceManager->GetResourceHandleByName("LightListCounterBuffer");
-		ResourceHandle LightIndexListTextureHandle = resourceManager->GetResourceHandleByName("LightIndicesBuffer");
+		ResourceHandle LightIndexListTextureHandle = resourceManager->GetResourceHandleByName("LightIndexListTexture");
 		ResourceHandle LightIndicesBufferHandle = resourceManager->GetResourceHandleByName("LightIndicesBuffer");
 		ResourceHandle ClusterResourceHandle = resourceManager->GetResourceHandleByName("Clusters");
 
@@ -60,16 +60,16 @@ void RasterPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
 		Resource* globalLightsStructuredBuffer = resourceManager_->GetResource(GlobalLightsStructuredBufferHandle);
 		Resource* cluster = resourceManager_->GetResource(ClusterResourceHandle);
 
-		const u32 lightListCounterBufferUAVIndex = std::get_if<Buffer>(lightListCounterBuffer)->AsUnorderedAccessView()->heapIndex.value();
-		const u32 lightListTextureUAVIndex = std::get_if<Texture>(lightIndexListTexture)->uavIndex.value();
-		const u32 lightIndicesBufferUAVIndex = std::get_if<Buffer>(lightIndicesBuffer)->AsUnorderedAccessView()->heapIndex.value();
-		const u32 globalLightStructuredBufferUAVIndex = std::get_if<Buffer>(globalLightsStructuredBuffer)->AsUnorderedAccessView()->heapIndex.value();
-		const u32 clusterIndex = std::get_if<Texture>(cluster)->uavIndex.value();
+		const u32 lightListCounterBufferSRVIndex = std::get_if<Buffer>(lightListCounterBuffer)->AsShaderResourceView()->heapIndex.value();
+		const u32 lightListTextureSRVIndex = std::get_if<Texture>(lightIndexListTexture)->srvIndex.value();
+		const u32 lightIndicesBufferSRVIndex = std::get_if<Buffer>(lightIndicesBuffer)->AsShaderResourceView()->heapIndex.value();
+		const u32 globalLightStructuredBufferSRVIndex = std::get_if<Buffer>(globalLightsStructuredBuffer)->AsShaderResourceView()->heapIndex.value();
+		const u32 clusterIndex = std::get_if<Buffer>(cluster)->AsShaderResourceView()->heapIndex.value();
 
-		pushConstants.lightListCounterBufferUAVIndex = lightListCounterBufferUAVIndex;
-		pushConstants.lightListTextureUAVIndex = lightListTextureUAVIndex;
-		pushConstants.lightIndicesBufferUAVIndex = lightIndicesBufferUAVIndex;
-		pushConstants.globalLightStructuredBufferUAVIndex = globalLightStructuredBufferUAVIndex;
+		pushConstants.lightListCounterBufferSRVIndex = lightListCounterBufferSRVIndex;
+		pushConstants.lightListTextureSRVIndex = lightListTextureSRVIndex;
+		pushConstants.lightIndicesBufferSRVIndex = lightIndicesBufferSRVIndex;
+		pushConstants.globalLightStructuredBufferSRVIndex = globalLightStructuredBufferSRVIndex;
 
 
 		pushConstants.ScreenResolution = SM::Vector2{ f32(GlobalStorage::g_LumaConstants.width), f32(GlobalStorage::g_LumaConstants.height)};

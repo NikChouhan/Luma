@@ -17,10 +17,10 @@ struct RasterPassRootConstants
     u32 clusterIndex;
     u32 depthSRVIndex;
 
-    u32 lightListCounterBufferUAVIndex;
-    u32 lightListTextureUAVIndex;
-    u32 lightIndicesBufferUAVIndex;
-    u32 globalLightStructuredBufferUAVIndex;
+    u32 lightListCounterBufferSRVIndex;
+    u32 lightListTextureSRVIndex;
+    u32 lightIndicesBufferSRVIndex;
+    u32 globalLightStructuredBufferSRVIndex;
 };
 
 

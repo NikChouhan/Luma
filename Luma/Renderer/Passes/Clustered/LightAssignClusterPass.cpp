@@ -9,6 +9,9 @@
 
 void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineCache)
 {
+	resourceManager_ = resourceManager;
+	pipelineCache_ = pipelineCache;
+
 	// for each (active) cluster, loop over all the lights and test Cluster AABB with
 	// Light sphere for intersection and assign light indices
 
@@ -17,9 +20,9 @@ void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCach
 
 	BufferCreateInfo globalLightsBufferDesc
 	{
-		.desc = StructuredBufferDesc{.data = allLights.data(), .elementCount = u32(allLights.size()), .elementStride = sizeof(Light), .createSRV = true, .createUAV = true},
+		.desc = StructuredBufferDesc{.data = allLights.data(), .elementCount = u32(allLights.size()), .elementStride = sizeof(Light), .createSRV = true, .createUAV = false},
 		.usage = BufferUsage::UPLOAD,
-		.bufferResourceViewFlags = BufferViewFlags::SRV | BufferViewFlags::UAV,
+		.bufferResourceViewFlags = BufferViewFlags::SRV,
 		.keepMapped = true,
 		.debugName = L"GlobalLightsStructuredBuffer",
 		.bindlessHeap = resourceManager->GetBindlessHeap().Get()
@@ -39,7 +42,7 @@ void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCach
 		.createUAV = true },
 	.usage = BufferUsage::DEFAULT,
 	.bufferResourceViewFlags = BufferViewFlags::UAV | BufferViewFlags::SRV,
-	.keepMapped = true,
+	.keepMapped = false,
 	.debugName = L"LightListCounterBuffer",
 	.bindlessHeap = resourceManager->GetBindlessHeap().Get() };
 
@@ -73,7 +76,7 @@ void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCach
 		.createUAV = true },
 	.usage = BufferUsage::DEFAULT,
 	.bufferResourceViewFlags = BufferViewFlags::UAV | BufferViewFlags::SRV,
-	.keepMapped = true,
+	.keepMapped = false,
 	.debugName = L"LightIndicesBuffer",
 	.bindlessHeap = resourceManager->GetBindlessHeap().Get() };
 
@@ -82,7 +85,7 @@ void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCach
 
 	ShaderHandle lightAssignCluster = pipelineCache->LoadShader({
 	.shaderPath = L"../../../../shaders/Clustered/LightAssignCluster.hlsl",
-	.pEntryPoint = L"CSLightAssign",
+	.pEntryPoint = L"CSLightAssignCluster",
 	.pTarget = L"cs_6_7",
 	.type = Type::COMPUTE });
 	LightAssignClusterPipeline = pipelineCache->CreatePipeline({ .computeShader = lightAssignCluster },
@@ -94,17 +97,17 @@ void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCach
 
 	ResourceHandle ClusterResourceHandle = resourceManager->GetResourceHandleByName("Clusters");
 
-	Resource* lightListCounterBuffer = resourceManager_->GetResource(LightListCounterBufferHandle);
 	Resource* lightIndexListTexture = resourceManager_->GetResource(LightIndexListTextureHandle);
 	Resource* lightIndicesBuffer = resourceManager_->GetResource(LightIndicesBufferHandle);
 	Resource* globalLightsStructuredBuffer = resourceManager_->GetResource(GlobalLightsStructuredBufferHandle);
 	Resource* cluster = resourceManager_->GetResource(ClusterResourceHandle);
+	Resource* lightListCounterBuffer = resourceManager_->GetResource(LightListCounterBufferHandle);
 
 	const u32 lightListCounterBufferUAVIndex = std::get_if<Buffer>(lightListCounterBuffer)->AsUnorderedAccessView()->heapIndex.value();
 	const u32 lightListTextureUAVIndex = std::get_if<Texture>(lightIndexListTexture)->uavIndex.value();
 	const u32 lightIndicesBufferUAVIndex = std::get_if<Buffer>(lightIndicesBuffer)->AsUnorderedAccessView()->heapIndex.value();
-	const u32 globalLightStructuredBufferUAVIndex = std::get_if<Buffer>(globalLightsStructuredBuffer)->AsUnorderedAccessView()->heapIndex.value();
-	const u32 clusterIndex = std::get_if<Texture>(cluster)->uavIndex.value();
+	const u32 globalLightStructuredBufferUAVIndex = std::get_if<Buffer>(globalLightsStructuredBuffer)->AsShaderResourceView()->heapIndex.value();
+	const u32 clusterIndex = std::get_if<Buffer>(cluster)->AsUnorderedAccessView()->heapIndex.value();
 
 	pushConstants.clusterInputData[0] = clusterSizeXYZ[0];
 	pushConstants.clusterInputData[1] = clusterSizeXYZ[1];
