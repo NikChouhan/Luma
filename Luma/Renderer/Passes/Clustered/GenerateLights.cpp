@@ -37,11 +37,22 @@ std::vector<Light> GenerateLights(u32 lightCount)
 		float layerMinY = SponzaAABB::min.y + (size.y / numLayers) * layer;
 		float layerMaxY = SponzaAABB::min.y + (size.y / numLayers) * (layer + 1);
 
-		std::uniform_real_distribution<float> xDist(SponzaAABB::min.x, SponzaAABB::max.x);
+		std::uniform_real_distribution<float> xDist(SponzaAABB::max.x, SponzaAABB::min.x);
 		std::uniform_real_distribution<float> yDist(layerMinY, layerMaxY);
 		std::uniform_real_distribution<float> zDist(SponzaAABB::min.z, SponzaAABB::max.z);
 		std::uniform_real_distribution<float> radiusDist(1.0f, 4.0f);
 		std::uniform_real_distribution<float> intensityDist(0.8f, 2.0f);
+
+		// TODO: can't do the following cuz no overload for SM::Vector3 :/, will prolly add it later
+		// for now doing it as x,y,z is enough
+		//std::uniform_real_distribution<SM::Vector3> directionDist({ 0., 0., 0. }, { 1.,1.,1. });
+		std::uniform_real_distribution<float> distanceDistX(0., 1.);
+		std::uniform_real_distribution<float> distanceDistY(0., 1.);
+		std::uniform_real_distribution<float> distanceDistZ(0., 1.);
+
+		float distanceX = distanceDistX(gen);
+		float distanceY = distanceDistY(gen);
+		float distanceZ = distanceDistZ(gen);
 
 		u32 lightsThisLayer = (layer == numLayers - 1)
 			? (lightCount - lights.size())
@@ -63,7 +74,8 @@ std::vector<Light> GenerateLights(u32 lightCount)
 
 			light.Intensity = intensityDist(gen);
 			light.Type = LightType::POINT;
-			light.Direction = SM::Vector3{ 0, -1, 0 };
+			light.Direction = SM::Vector3{distanceX, distanceY, distanceZ};
+			light.Direction.Normalize();
 
 			lights.push_back(light);
 		}
