@@ -41,6 +41,8 @@ namespace GlobalStorage
     inline BindlessHeapIndex bindlessHeapIndex{};
     inline LumaConstants g_LumaConstants{};
 
+    inline u32 depthSRVIndex;
+
     inline DirectX::XMMATRIX projMatrixInv{};
     inline DirectX::XMMATRIX viewMatrixInv{};
     inline LightSettings g_lightSettings;

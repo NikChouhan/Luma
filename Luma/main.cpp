@@ -24,15 +24,36 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Passes/GeometryPass.h"
-#include "Renderer/Passes/RasterPass.h"
+#include "Renderer/Passes/Clustered/RasterPass.h"
 #include "Renderer/Passes/SkyBoxPass.h"
 #include "Renderer/Passes/Clustered/ComputeAABBPass.h"
 #include "Renderer/Passes/Clustered/LightAssignClusterPass.h"
 #include "Renderer/Passes/Clustered/MarkActiveClusters.h"
-#include "Renderer/Passes/Clustered/LightShadingPass.h"
+
 
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+static u32 CreateDepthSRV(const GfxDevice& gfxDevice, ID3D12Resource* depthResource, ID3D12DescriptorHeap* bindlessHeap)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+
+	u32 index = GlobalStorage::bindlessHeapIndex.nextIndex++;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(bindlessHeap->GetCPUDescriptorHandleForHeapStart());
+	u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	cpuHandle.Offset(index, descriptorSize);
+
+	gfxDevice.device_->CreateShaderResourceView(depthResource, &srvDesc, cpuHandle);
+
+	return index;
+}
 
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -67,15 +88,17 @@ int WINAPI wWinMain(
 	scene.Load();
 
 	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
+	// the worst way to do ts i know but i dont have time. fuck it we ball
+	GlobalStorage::depthSRVIndex = CreateDepthSRV(gfxDevice, swapchain.depthStencil_.Get(), resourceManager.GetBindlessHeap().Get());
 	// Add passes
 	renderer.AddPass<SkyBoxPass>();
 	renderer.AddPass<GeometryPass>();
-	renderer.AddPass<RasterPass>();
-	// always in this order
+
 	renderer.AddPass<ComputeAABBPass>();
 	renderer.AddPass<MarkActiveClusters>();
 	renderer.AddPass<LightAssignClusterPass>();
-	renderer.AddPass<LightShadingPass>();
+
+	renderer.AddPass<RasterPass>();
 
 	renderer.Init();
 
