@@ -140,7 +140,7 @@ static u32 CreateTextureSRV(
 {
     u32 index = (*nextIndex)++;
 
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    CD3DX12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
 
     srvDesc.Format = desc.format;
@@ -149,31 +149,21 @@ static u32 CreateTextureSRV(
     if (desc.depth > 0)
     {
         // 3D Texture
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-        srvDesc.Texture3D.MipLevels = desc.mipLevels;
-        srvDesc.Texture3D.MostDetailedMip = 0;
+        srvDesc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex3D(desc.format);
     }
     else if (desc.arraySize == 6)
     {
         // TODO:temp fix; ArraySize 6 implies Cubemap for now
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        srvDesc.TextureCube.MipLevels = desc.mipLevels;
-        srvDesc.TextureCube.MostDetailedMip = 0;
+        srvDesc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::TexCube(desc.format);
     }
     else if (desc.arraySize > 1)
     {
         // standard texture array
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-        srvDesc.Texture2DArray.MipLevels = desc.mipLevels;
-        srvDesc.Texture2DArray.MostDetailedMip = 0;
-        srvDesc.Texture2DArray.ArraySize = desc.arraySize;
-        srvDesc.Texture2DArray.FirstArraySlice = 0;
+        srvDesc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2DArray(desc.format);
     }
     else
     {
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = desc.mipLevels;
-        srvDesc.Texture2D.MostDetailedMip = 0;
+        srvDesc = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D(desc.format);
     }
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
@@ -221,10 +211,23 @@ static u32 CreateTextureUAV(
 {
     u32 index = (*nextIndex)++;
 
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    CD3DX12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+
     uavDesc.Format = desc.format;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    uavDesc.Texture2D.MipSlice = mipLevel;
+
+    if (desc.depth > 0)
+    {
+        // 3D Texture
+        uavDesc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex3D(desc.format);
+    }
+    else if (desc.arraySize > 1)
+    {
+        uavDesc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2DArray(desc.format);
+    }
+    else
+    {
+        uavDesc = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D(desc.format);
+    }
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(heap->GetCPUDescriptorHandleForHeapStart());
     u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
