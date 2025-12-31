@@ -20,7 +20,7 @@ void ComputeAABBPass::Init(ResourceManager* resourceManager, PipelineCache* pipe
 			.createUAV = true},
 		.usage = BufferUsage::DEFAULT,
 		.bufferResourceViewFlags = BufferViewFlags::UAV | BufferViewFlags::SRV,
-		.keepMapped = true,
+		.keepMapped = false,
 		.debugName = L"Clusters",
 		.bindlessHeap = resourceManager->GetBindlessHeap().Get() };
 
@@ -46,7 +46,7 @@ void ComputeAABBPass::Execute(RenderContext& ctx, const Scene& scene)
 	auto cmdList = ctx.cmdList_;
 
 	Resource* cluster = resourceManager_->GetResource(ClusterResourceHandle);
-	const u32 clusterIndex = std::get_if<Texture>(cluster)->uavIndex.value();
+	const u32 clusterIndex = std::get_if<Buffer>(cluster)->AsUnorderedAccessView()->heapIndex.value();
 
 	Pipeline* pipeline = pipelineCache_->GetPipeline(ComputeAABBPipeline);
 
