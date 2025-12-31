@@ -66,7 +66,7 @@ PSInput VSMain(VSInput input)
 #define Raster \
 "RootFlags ( ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
 "            CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED )," \
-"RootConstants(num32BitConstants=44, b0)," \
+"RootConstants(num32BitConstants=62, b0)," \
 "StaticSampler(s0,"\
 "           filter = FILTER_ANISOTROPIC,"\
 "           addressU = TEXTURE_ADDRESS_WRAP,"\
@@ -74,7 +74,7 @@ PSInput VSMain(VSInput input)
 "           addressW = TEXTURE_ADDRESS_WRAP,"\
 "           visibility = SHADER_VISIBILITY_ALL )"
 
-uint3 GetClusterID(float2 pixelCoord, float2 depth)
+uint3 GetClusterID(int2 pixelCoord, float depth)
 {
     uint clusterX = pixelCoord.x / 16;
     uint clusterY = pixelCoord.y / 9;
@@ -87,18 +87,16 @@ uint3 GetClusterID(float2 pixelCoord, float2 depth)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float2 uv = input.uv;
+	int2 pixelCoord = int2(uv * perDraw.ScreenResolution.xy);
 
     Texture2D albedoTex = ResourceDescriptorHeap[NonUniformResourceIndex(perDraw.albedoIndex)];
-    float3 albedoColor = albedoTex.Sample(samplerDiffuse, uv).xyz;
+    float4 albedoColor = albedoTex.Sample(samplerDiffuse, uv);
 
 	Texture2D normalTex = ResourceDescriptorHeap[NonUniformResourceIndex(perDraw.normalIndex)];
-    float3 normal = normalTex.Load(uv);
+    float3 normal = normalTex.Load(int3(pixelCoord, 0)).xyz;
 
     Texture2D depthTex = ResourceDescriptorHeap[NonUniformResourceIndex(perDraw.depthSRVIndex)];
-    float2 depth = depthTex.Load(uv);
-
-
-    float2 pixelCoord = uv * perDraw.ScreenResolution.xy;
+    float depth = depthTex.Load(int3(pixelCoord, 0)).r;
 	uint3 clusterID = GetClusterID(pixelCoord, depth);
 
     uint clusterIndex = clusterID.x +
@@ -132,7 +130,7 @@ float4 PSMain(PSInput input) : SV_TARGET
             attenuation *= attenuation;
 
             float NdotL = saturate(dot(normal, lightDir));
-            lighting += albedoColor * light.Color * light.Intensity * NdotL * attenuation;
+            lighting += albedoColor.xyz * light.Color * light.Intensity * NdotL * attenuation;
         }
     }
 
