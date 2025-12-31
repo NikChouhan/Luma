@@ -63,28 +63,33 @@ struct Buffer
 {
     ComPtr<ID3D12Resource> resource;
     D3D12MA::Allocation* allocation = nullptr;
-    BufferView view;
-    u32 heapIndex = 0;
+	u32 heapIndex = 0;
+
+    std::optional<VertexBufferView> vertexView;
+    std::optional<IndexBufferView> indexView;
+    std::optional<ConstantBufferView> constantView;
+    std::optional<ShaderResourceView> srvView;
+    std::optional<UnorderedAccessView> uavView;
 
     [[nodiscard]] const VertexBufferView* AsVertexBuffer() const
     {
-        return std::get_if<VertexBufferView>(&view);
+        return vertexView ? &(*vertexView) : nullptr;
     }
     [[nodiscard]] const IndexBufferView* AsIndexBuffer() const
     {
-        return std::get_if<IndexBufferView>(&view);
+        return indexView ? &(*indexView) : nullptr;
     }
     [[nodiscard]] const ConstantBufferView* AsConstantBuffer() const
     {
-        return std::get_if<ConstantBufferView>(&view);
-    }
-	[[nodiscard]] const UnorderedAccessView* AsUnorderedAccessView() const
-    {
-        return std::get_if<UnorderedAccessView>(&view);
+        return constantView ? &(*constantView) : nullptr;
     }
     [[nodiscard]] const ShaderResourceView* AsShaderResourceView() const
     {
-        return std::get_if<ShaderResourceView>(&view);
+        return srvView ? &(*srvView) : nullptr;
+    }
+    [[nodiscard]] const UnorderedAccessView* AsUnorderedAccessView() const
+    {
+        return uavView ? &(*uavView) : nullptr;
     }
 };
 
@@ -154,6 +159,10 @@ enum class BufferViewFlags : u8
 inline BufferViewFlags operator|(BufferViewFlags a, BufferViewFlags b)
 {
     return static_cast<BufferViewFlags>(static_cast<u32>(a) | static_cast<u32>(b));
+}
+inline bool HasFlag(BufferViewFlags flags, BufferViewFlags check)
+{
+    return (static_cast<u32>(flags) & static_cast<u32>(check)) != 0;
 }
 
 struct BufferCreateInfo {

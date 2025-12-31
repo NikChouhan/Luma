@@ -6,31 +6,31 @@
 
 struct BufferViewCreator
 {
-    const Buffer& buffer;
+    Buffer& buffer;
     const GfxDevice& gfxDevice;
     const BufferCreateInfo& createInfo;
 
-    BufferView operator()(const VertexBufferDesc& desc) const
+    void operator()(const VertexBufferDesc& desc) const
     {
         D3D12_VERTEX_BUFFER_VIEW vbv{};
         vbv.BufferLocation = buffer.resource->GetGPUVirtualAddress();
         vbv.StrideInBytes = desc.vertexStride;
         vbv.SizeInBytes = GetBufferSize(desc);
 
-        return VertexBufferView{ .view = vbv, .stride = desc.vertexStride };
+        buffer.vertexView = VertexBufferView{ .view = vbv, .stride = desc.vertexStride };
     }
 
-    BufferView operator()(const IndexBufferDesc& desc) const
+    void operator()(const IndexBufferDesc& desc) const
     {
         D3D12_INDEX_BUFFER_VIEW ibv{};
         ibv.BufferLocation = buffer.resource->GetGPUVirtualAddress();
         ibv.Format = desc.indexFormat;
         ibv.SizeInBytes = GetBufferSize(desc);
 
-        return IndexBufferView{ .view = ibv, .indexFormat = desc.indexFormat };
+        buffer.indexView = IndexBufferView{ .view = ibv, .indexFormat = desc.indexFormat };
     }
 
-    BufferView operator()(const ConstantBufferDesc& desc) const
+    void operator()(const ConstantBufferDesc& desc) const
     {
     	std::optional<u32> heapIdx = std::nullopt;
 		if (desc.createView && createInfo.bindlessHeap)
@@ -47,13 +47,14 @@ struct BufferViewCreator
             gfxDevice.device_->CreateConstantBufferView(&cbvDesc, cpuHandle);
 		}
 
-        return ConstantBufferView{ .gpuAddress = buffer.resource->GetGPUVirtualAddress(),
+        buffer.constantView = ConstantBufferView{ .gpuAddress = buffer.resource->GetGPUVirtualAddress(),
             .sizeInBytes = GetBufferSize(desc),
             .heapIndex = *heapIdx };
     }
-    BufferView operator()(const StructuredBufferDesc& desc) const
+    void operator()(const StructuredBufferDesc& desc) const
     {
-        if (createInfo.bindlessHeap) {
+        if (createInfo.bindlessHeap) 
+        {
             u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -65,7 +66,6 @@ struct BufferViewCreator
             {
                 std::optional<u32> srvIndex = std::nullopt;
                 srvIndex = (GlobalStorage::bindlessHeapIndex.nextIndex)++;
-
 
                 D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
                 srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -81,7 +81,7 @@ struct BufferViewCreator
                 gfxDevice.device_->CreateShaderResourceView(
                     buffer.resource.Get(), &srvDesc, srvHandle);
 
-                return ShaderResourceView{
+                buffer.srvView = ShaderResourceView{
                 buffer.resource->GetGPUVirtualAddress(),
                 GetBufferSize(desc),
                 DXGI_FORMAT_UNKNOWN,
@@ -94,7 +94,6 @@ struct BufferViewCreator
             {
                 std::optional<u32> uavIndex = std::nullopt;
                 uavIndex = (GlobalStorage::bindlessHeapIndex.nextIndex)++;
-
 
                 D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
                 uavDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -109,7 +108,7 @@ struct BufferViewCreator
                 gfxDevice.device_->CreateUnorderedAccessView(
                     buffer.resource.Get(), nullptr, &uavDesc, uavHandle);
 
-                return UnorderedAccessView{
+                buffer.uavView = UnorderedAccessView{
                 buffer.resource->GetGPUVirtualAddress(),
                 GetBufferSize(desc),
                 DXGI_FORMAT_UNKNOWN,
@@ -117,10 +116,9 @@ struct BufferViewCreator
                 };
             }
         }
-        return std::monostate{};
     }
 
-    BufferView operator()(const RawBufferDesc& desc) const
+    void operator()(const RawBufferDesc& desc) const
     {
         if (createInfo.bindlessHeap) 
         {
@@ -134,7 +132,6 @@ struct BufferViewCreator
             {
                 std::optional<u32> srvIndex = std::nullopt;
                 srvIndex = (GlobalStorage::bindlessHeapIndex.nextIndex)++;
-
 
                 u32 elementSize = 4;  // For R32 formats
                 u32 numElements = desc.sizeInBytes / elementSize;
@@ -153,7 +150,7 @@ struct BufferViewCreator
                 gfxDevice.device_->CreateShaderResourceView(
                     buffer.resource.Get(), &srvDesc, srvHandle);
 
-                return ShaderResourceView{
+                buffer.srvView = ShaderResourceView{
 			    buffer.resource->GetGPUVirtualAddress(),
 			    desc.sizeInBytes,
 			    desc.format,
@@ -165,7 +162,6 @@ struct BufferViewCreator
             {
                 std::optional<u32> uavIndex = std::nullopt;
                 uavIndex = (GlobalStorage::bindlessHeapIndex.nextIndex)++;
-
 
                 u32 elementSize = 4;
                 u32 numElements = desc.sizeInBytes / elementSize;
@@ -183,7 +179,7 @@ struct BufferViewCreator
                 gfxDevice.device_->CreateUnorderedAccessView(
                     buffer.resource.Get(), nullptr, &uavDesc, uavHandle);
 
-                return UnorderedAccessView{
+                buffer.uavView = UnorderedAccessView{
                buffer.resource->GetGPUVirtualAddress(),
                desc.sizeInBytes,
                desc.format,
@@ -191,7 +187,6 @@ struct BufferViewCreator
                 };
             }
         }
-        return std::monostate{};
     }
 };
 
@@ -227,18 +222,18 @@ Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createIn
     }
     D3D12_RESOURCE_FLAGS resourceFlags{};
 
-    switch (createInfo.bufferResourceViewFlags)
+    if (HasFlag(createInfo.bufferResourceViewFlags, BufferViewFlags::SRV))
     {
-    case BufferViewFlags::NONE:
-	    break;
-    case BufferViewFlags::SRV:
-	    break;
-    case BufferViewFlags::UAV:
+	    // do nothing
+    }
+    if (HasFlag(createInfo.bufferResourceViewFlags, BufferViewFlags::UAV))
+    {
         resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	    break;
-    case BufferViewFlags::RTV:
+    }
+
+    if (HasFlag(createInfo.bufferResourceViewFlags, BufferViewFlags::RTV))
+    {
         resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-	    break;
     }
 
     auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, resourceFlags);
@@ -270,7 +265,7 @@ Buffer CreateBuffer(const GfxDevice& gfxDevice, const BufferCreateInfo& createIn
         }
     }
 
-    buffer.view = std::visit(BufferViewCreator{
+    std::visit(BufferViewCreator{
         .buffer = buffer,
     	.gfxDevice = gfxDevice,
     	.createInfo = createInfo}, createInfo.desc);
