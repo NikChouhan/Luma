@@ -45,6 +45,11 @@ bool LightSphereAABBIntersect(float3 lightPos, float lightRadius, Cluster cluste
 	return distanceSquared <= (lightRadius * lightRadius);
 }
 
+#define LightAssignCluster_RS \
+"RootFlags ( CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED) ," \
+"RootConstants(num32BitConstants=12, b0)" \
+
+[RootSignature(LightAssignCluster_RS)]
 [numthreads(THREADS_PER_GROUP, 1, 1)]
 void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 	uint3 groupID : SV_GroupID,
