@@ -8,7 +8,6 @@ struct DepthPassRootConstants
 	DirectX::XMMATRIX worldMatrix;
 };
 
-
 struct GeometryPass : public RenderPass
 {
 	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
