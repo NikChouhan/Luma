@@ -27,6 +27,7 @@ Model::Model(const GfxDevice& gfxDevice, ResourceManager* resourceManager)
 
 void Model::Load(const std::string& path)
 {
+    static DWORD timeStart = GetTickCount();
     cgltf_options options = {};
     cgltf_data* data = nullptr;
 
@@ -72,8 +73,9 @@ void Model::Load(const std::string& path)
             .debugName = L"Model_GlobalIB"
         };
         globalIndexBuffer_ = resourceManager_->CreateResource(ibInfo, path + "_IB");
-
-        printl(Log::LogLevel::Info, "[Model] Loaded {} with {} submeshes. Total Verts: {}", path, subMeshes_.size(), allVertices.size());
+        static DWORD timeEnd = GetTickCount();
+        printl(Log::LogLevel::Info, "[Model] Loaded {} with {} submeshes. Total Verts: {}, Time taken: {} seconds", 
+            path, subMeshes_.size(), allVertices.size(), f32(timeEnd - timeStart)/1000);
     }
 
     cgltf_free(data);
