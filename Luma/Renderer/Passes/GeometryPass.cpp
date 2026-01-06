@@ -25,7 +25,7 @@ void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelin
 		.pixelShader = g_invalidShaderHandle,
 		.blendMode = BlendMode::NON_TRANSPARENT,
 		.depthMode = DepthMode::READ_WRITE,
-		.depthFunc = DepthFunc::LESS,
+		.depthFunc = DepthFunc::GREATER,
 		.rasterMode = RasterMode::SOLID_NONE_CULL,
 		.topology = Topology::TRIANGLES,
 		.rtvFormat = DXGI_FORMAT_UNKNOWN,
@@ -52,15 +52,14 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 	cmdList->RSSetScissorRects(1, &ctx.scissorRect);
 
 	cmdList->ClearDepthStencilView(ctx.currentDsv, D3D12_CLEAR_FLAG_DEPTH,
-		1.0f, 0, 0, nullptr);
+		0.0f, 0, 0, nullptr);
 	cmdList->OMSetRenderTargets(0, nullptr,
 		FALSE, &ctx.currentDsv);
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	const Camera& cam = scene.GetCamera();
-	DirectX::XMMATRIX view = cam._view;
-	DirectX::XMMATRIX proj = cam._projection;
 
+	DirectX::XMMATRIX viewProj = cam._view * cam._projection;
 	for (const auto& renderObj : scene.GetRenderObjects())
 	{
 		Model* model = renderObj.model;
@@ -80,7 +79,7 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 		for (const auto& mesh : model->GetSubMeshes())
 		{
 			DirectX::XMMATRIX world = mesh.transform * renderObj.transform;
-			DirectX::XMMATRIX wvp = world * view * proj;
+			DirectX::XMMATRIX wvp = world * viewProj;
 
 			DepthPassRootConstants constants;
 			constants.worldViewProj = (wvp);
@@ -98,4 +97,10 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 			);
 		}
 	}
+	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		ctx.depthResource,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		D3D12_RESOURCE_STATE_DEPTH_READ
+	);
+	cmdList->ResourceBarrier(1, &barrier);
 }
