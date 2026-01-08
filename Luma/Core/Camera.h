@@ -3,23 +3,23 @@
 
 struct Camera
 {
-	SM::Vector3 _pos{};
-	SM::Vector3 _target{};
-	SM::Vector3 _up{};
+	SM::Vector3 pos{};
+	SM::Vector3 target{};
+	SM::Vector3 up{};
 
-	f32 _angle{};
-	f32 _aspectRatio{};
-	f32 _near{};
-	f32 _far{};
+	f32 angle{};
+	f32 aspectRatio{};
+	f32 nearPlane{};
+	f32 farPlane{};
 
-	SM::Matrix _ortho{};
-	SM::Matrix _projection{};
-	SM::Matrix _view{};
+	SM::Matrix ortho{};
+	SM::Matrix projection{};
+	SM::Matrix view{};
 
-	float _yaw;
-	float _pitch;
+	float yawAngle;
+	float pitchAngle;
 
-	float _time;
+	float time;
 };
 
 struct OrtCameraDesc
@@ -29,10 +29,10 @@ struct OrtCameraDesc
 
 struct PersCameraDesc
 {
-	f32 _angle{};
-	f32 _aspectRatio{};
-	f32 _near{};
-	f32 _far{};
+	f32 angle{};
+	f32 aspectRatio{};
+	f32 nearPlane{};
+	f32 farPlane{};
 };
 
 Camera CreatePerspectiveCamera(PersCameraDesc cameraDesc);
