@@ -6,6 +6,7 @@ build/
 .DS_Store
 
 vsxmake2022/
+vsxmake2026/
 .vscode/
 assets/models/bistro2
 assets/models/sponza
@@ -17,3 +18,5 @@ assets/models/bistro3
 Logs/
 assets/models/bistroWithEmissive
 assets/models/bistro
+assets/models/sponzaJeremiah
+assets/models/sponzaBanner
