@@ -47,14 +47,14 @@ void ClusterMain(uint3 DtId : SV_DispatchThreadID,
 						groupID.y * computeAABBData.clusterInputData.x +
 						groupID.z * computeAABBData.clusterInputData.x * computeAABBData.clusterInputData.y;
 	// max & min point in screen space
-	float4 maxPointSS = float4((groupID.xy + uint2(1, 1)) * clusterSizePx, -1, 1.);
-	float4 minPointSS = float4((groupID.xy) * clusterSizePx, -1, 1.);
+	float4 maxPointSS = float4((groupID.xy + uint2(1, 1)) * clusterSizePx, 0., 1.);
+	float4 minPointSS = float4((groupID.xy) * clusterSizePx, 0., 1.);
 	// convert to view space
 	float3 maxPointVS = ScreenToView(maxPointSS).xyz;
 	float3 minPointVS = ScreenToView(minPointSS).xyz;
 	// near/far values of the cluster in view space
-	float clusterNear = -computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, groupID.z / float(computeAABBData.clusterInputData.z));
-	float clusterFar = -computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, (groupID.z +1) / float(computeAABBData.clusterInputData.z));
+	float clusterNear = computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, groupID.z / float(computeAABBData.clusterInputData.z));
+	float clusterFar = computeAABBData.zNear * pow(computeAABBData.zFar / computeAABBData.zNear, (groupID.z +1) / float(computeAABBData.clusterInputData.z));
 
 	// find the 4 intersection points, wrt camera to the far/near plane
 	float3 minPointNear = LineIntersectionToZPlane(eyePos, minPointVS, clusterNear);
@@ -95,9 +95,13 @@ float4 ScreenToView(float4 pointInSS)
 {
 	// to NDC
 	float2 texCoord = pointInSS.xy / computeAABBData.screenDimensions.xy;
+	float2 ndc;
+	ndc.x = texCoord.x * 2.0 - 1.0;
+	ndc.y = (1.0 - texCoord.y) * 2.0 - 1.0;
+	//ndc.y = (texCoord.y) * 2.0 - 1.0;
 
 	// to clip space
-	float4 clip = float4(texCoord.xy * 2.0 - 1.0, pointInSS.z, pointInSS.w);
+	float4 clip = float4(ndc, pointInSS.z, 1.);
 
 	return ClipToView(clip);
 }
