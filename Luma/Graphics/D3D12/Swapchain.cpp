@@ -28,8 +28,8 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
     swapchain.viewport_.TopLeftY = 0;
     swapchain.viewport_.Height = desc.height_;
     swapchain.viewport_.Width = desc.width_;
-    swapchain.viewport_.MinDepth = 1.0f;
-    swapchain.viewport_.MaxDepth = 0.0f;
+    swapchain.viewport_.MinDepth = 0.0f;
+    swapchain.viewport_.MaxDepth = 1.0f;
 
     swapchain.height_ = desc.height_;
     swapchain.width_ = desc.width_;
@@ -111,7 +111,7 @@ Swapchain CreateSwapChain(GfxDevice& gfxDevice, FrameSync& frameSync, SwapchainD
 
         D3D12_CLEAR_VALUE depthOptimisedClearValue{};
         depthOptimisedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        depthOptimisedClearValue.DepthStencil.Depth = 1.f;
+        depthOptimisedClearValue.DepthStencil.Depth = 0.f;
         depthOptimisedClearValue.DepthStencil.Stencil = 0;
 
         const CD3DX12_HEAP_PROPERTIES depthStencilHeapProps(D3D12_HEAP_TYPE_DEFAULT);
