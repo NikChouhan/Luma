@@ -20,7 +20,7 @@ VSOutput VSMain(VSInput input)
 {
     VSOutput output;
     float4 pos = mul(viewProj, float4(input.position, 1.0));
-    output.position = pos.xyww; // Force max depth
+    output.position = float4(pos.x, pos.y, 0.0f, pos.w);    // for reverse z depth is 0.f
     output.texCoord = input.position;
     return output;
 }
