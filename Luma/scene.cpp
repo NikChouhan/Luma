@@ -9,10 +9,10 @@ void Scene::Load()
 {
 	camera_ = CreatePerspectiveCamera(
 		{
-			._angle = 1.3,
-			._aspectRatio = 16.f / 9.f,
-			._near = 0.1f,
-			._far = 10000.f
+			.angle = 1.3,
+			.aspectRatio = 16.f / 9.f,
+			.nearPlane = 0.1f,
+			.farPlane = 10000.f
 		});
 
 	printl(Log::LogLevel::Info, "[Scene] Loading World ...");
@@ -21,11 +21,13 @@ void Scene::Load()
 	//sponza->Load("../../../../assets/models/bistroWithEmissive/Untitled.gltf");
 	sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
 	//sponza->Load("../../../../assets/models/Sponza/glTF/Sponza.gltf");
+	//sponza->Load("../../../../assets/models/sponzaJeremiah/sponza.gltf");
+	//sponza->Load("../../../../assets/models/sponzaBanner/sponza.gltf");
 
 	renderObjects_.push_back(RenderObject{
-	.model = sponza.get(),
-	.transform = SM::Matrix::CreateScale(1.f),
-		});
+		.model = sponza.get(),
+		.transform = SM::Matrix::CreateScale(1.f),
+	});
 
 	loadedModels_.push_back(std::move(sponza));
 	printl(Log::LogLevel::Info, "[Scene] Loading complete. Objects: {}", renderObjects_.size());
@@ -35,7 +37,7 @@ void Scene::Update(float deltaTime)
 {
 	HandleCamera(camera_, deltaTime);
 
-	printl(Log::LogLevel::Info, "Camera pos-> x:{}, y: {}, z: {}", camera_._pos.x, camera_._pos.y, camera_._pos.z);
+	printl(Log::LogLevel::Info, "Camera pos-> x:{}, y: {}, z: {}", camera_.pos.x, camera_.pos.y, camera_.pos.z);
 }
 
 void HandleCamera(Camera& camera, f32 deltaTime)
@@ -51,8 +53,8 @@ void HandleCamera(Camera& camera, f32 deltaTime)
 			float yaw = static_cast<float>(deltaX) * lookSensitivity * (DirectX::XM_PI / 180.0f);
 			float pitch = static_cast<float>(deltaY) * -lookSensitivity * (DirectX::XM_PI / 180.0f);
 
-			SM::Vector3 forward = camera._target - camera._pos;
-			SM::Vector3 right = forward.Cross(camera._up);
+			SM::Vector3 forward = camera.target - camera.pos;
+			SM::Vector3 right = forward.Cross(camera.up);
 			right.Normalize();
 
 			SM::Matrix yawRotation = SM::Matrix::CreateFromAxisAngle(SM::Vector3::UnitY, yaw);
@@ -61,27 +63,27 @@ void HandleCamera(Camera& camera, f32 deltaTime)
 			forward = XMVector3TransformNormal(forward, yawRotation);
 			forward = XMVector3TransformNormal(forward, pitchRotation);
 
-			camera._target = camera._pos + forward;
+			camera.target = camera.pos + forward;
 
 			right = forward.Cross(SM::Vector3::UnitY);
-			camera._up = right.Cross(forward);
+			camera.up = right.Cross(forward);
 
 			IGS::lastMouseX = IGS::currentMouseX;
 			IGS::lastMouseY = IGS::currentMouseY;
 
 			InitViewMatrix(camera);
 
-			camera._yaw = yaw;
-			camera._pitch = pitch;
+			camera.yawAngle = yaw;
+			camera.pitchAngle = pitch;
 		}
 	}
 
 	constexpr float moveSpeed = 8.f;
 
-	SM::Vector3 forward = camera._target - camera._pos;
+	SM::Vector3 forward = camera.target - camera.pos;
 	forward.Normalize();
 
-	SM::Vector3 up = camera._up;
+	SM::Vector3 up = camera.up;
 	up.Normalize();
 
 	SM::Vector3 right = forward.Cross(up);
