@@ -153,8 +153,8 @@ void SkyBoxPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineC
             .vertexShader = vertexShader,
             .pixelShader = pixelShader,
             .blendMode = BlendMode::NON_TRANSPARENT,
-            .depthMode = DepthMode::NONE,
-            .depthFunc = DepthFunc::LESS_EQUAL,
+            .depthMode = DepthMode::READ_ONLY,
+            .depthFunc = DepthFunc::GREATER_EQUAL,
             .rasterMode = RasterMode::SOLID_NONE_CULL,
             .topology = Topology::TRIANGLES,
             .rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -187,10 +187,10 @@ void SkyBoxPass::Execute(RenderContext& ctx, const Scene& scene)
 
     // remove translation matrix
     const Camera& cam = scene.GetCamera();
-    DirectX::XMMATRIX view = cam._view;
+    DirectX::XMMATRIX view = cam.view;
     view.r[3] = DirectX::XMVectorSet(0, 0, 0, 1); // Zero out translation
 
-    DirectX::XMMATRIX viewProj = DirectX::XMMatrixMultiply(view,cam._projection);
+    DirectX::XMMATRIX viewProj = DirectX::XMMatrixMultiply(view,cam.projection);
 
     SkyBoxConstants constants{};
     constants.viewProj = viewProj;
