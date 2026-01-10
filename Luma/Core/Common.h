@@ -17,6 +17,10 @@ using namespace Luma;
 
 namespace SM = DirectX::SimpleMath;
 
+u32 constexpr NumClusters = 16 * 9 * 24;
+u32 constexpr max_lights = 1024;
+u32 constexpr maxLightIndices = NumClusters * max_lights;
+
 constexpr u32 frameCount = 2;
 #define MAX_TEXTURES 1024
 #define REBAR 0

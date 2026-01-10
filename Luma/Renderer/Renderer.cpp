@@ -64,7 +64,6 @@ RenderContext Renderer::BeginFrame() const
 
 	const float clearColor[] = { 0.4f, 0.2f, 0.7f, 1.0f };
 	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	return RenderContext{
 		.cmdList_ = commandList.Get(),
@@ -73,7 +72,8 @@ RenderContext Renderer::BeginFrame() const
 		.currentRtv = rtvHandle,
 		.currentDsv = dsvHandle,
 		.viewport = swapchain_.viewport_,
-		.scissorRect = swapchain_.scissorRect_
+		.scissorRect = swapchain_.scissorRect_,
+		.depthResource = swapchain_.depthStencil_.Get()
 	};
 }
 
@@ -84,6 +84,13 @@ void Renderer::EndFrame(const RenderContext& ctx) const
 		backBuffer.Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT
+	);
+	ctx.cmdList_->ResourceBarrier(1, &barrier);
+
+	barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		ctx.depthResource,
+		D3D12_RESOURCE_STATE_DEPTH_READ,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE
 	);
 	ctx.cmdList_->ResourceBarrier(1, &barrier);
 	DX_ASSERT(ctx.cmdList_->Close());

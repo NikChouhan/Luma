@@ -13,7 +13,28 @@ struct ComputeAABBData
 	u32 screenDimensions[2];
 	float zFar;
 	u32 clusterUAVIndex;
+
+	u32 clusterGeometryStructuredBufferUAVndex;
+	SM::Vector3 padding;
 };
+
+struct ClusterGeometryData
+{
+	SM::Vector4 vertices[8];
+	struct {
+		u32 indices[2];
+		u32 padding[2];
+	} triangles[18];
+};
+
+struct ClusterRender
+{
+	DirectX::XMMATRIX viewProj;
+
+	u32 clusterGeometryStructuredBufferSRVIndex;
+	SM::Vector3 padding;
+};
+
 
 struct ComputeAABBPass : RenderPass
 {
@@ -22,7 +43,9 @@ struct ComputeAABBPass : RenderPass
 
 private:
 	PipelineHandle ComputeAABBPipeline = g_invalidPipelineHandle;
-	ResourceHandle ClusterResourceHandle = g_invalidResourceHandle;
-
 	u32 clusterSizeXYZ[3]{ 16, 9, 24 };
+	ComputeAABBData pushConstants{};
+
+	PipelineHandle ClusterRenderPipeline = g_invalidPipelineHandle;
+	ClusterRender pushConstants1{};
 };

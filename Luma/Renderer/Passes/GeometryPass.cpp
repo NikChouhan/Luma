@@ -59,7 +59,7 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 
 	const Camera& cam = scene.GetCamera();
 
-	DirectX::XMMATRIX viewProj = cam._view * cam._projection;
+	DirectX::XMMATRIX viewProj = cam.view * cam.projection;
 	for (const auto& renderObj : scene.GetRenderObjects())
 	{
 		Model* model = renderObj.model;

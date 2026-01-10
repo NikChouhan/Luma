@@ -13,4 +13,7 @@ struct RenderContext
     D3D12_CPU_DESCRIPTOR_HANDLE currentDsv;     // Depth Stencil handle
     D3D12_VIEWPORT viewport;
     D3D12_RECT scissorRect;
+
+    ID3D12Resource* swapchainResource = nullptr;
+    ID3D12Resource* depthResource = nullptr;
 };

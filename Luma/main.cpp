@@ -30,8 +30,6 @@
 #include "Renderer/Passes/Clustered/LightAssignClusterPass.h"
 #include "Renderer/Passes/Clustered/MarkActiveClusters.h"
 
-
-
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static u32 CreateDepthSRV(const GfxDevice& gfxDevice, ID3D12Resource* depthResource, ID3D12DescriptorHeap* bindlessHeap)
@@ -91,14 +89,14 @@ int WINAPI wWinMain(
 	// the worst way to do ts i know but i dont have time. fuck it we ball
 	GlobalStorage::depthSRVIndex = CreateDepthSRV(gfxDevice, swapchain.depthStencil_.Get(), resourceManager.GetBindlessHeap().Get());
 	// Add passes
-	renderer.AddPass<SkyBoxPass>();
 	renderer.AddPass<GeometryPass>();
 
 	renderer.AddPass<ComputeAABBPass>();
-	renderer.AddPass<MarkActiveClusters>();
-	renderer.AddPass<LightAssignClusterPass>();
+	//renderer.AddPass<MarkActiveClusters>();
+	//renderer.AddPass<LightAssignClusterPass>();
 
 	renderer.AddPass<RasterPass>();
+	renderer.AddPass<SkyBoxPass>();
 
 	renderer.Init();
 

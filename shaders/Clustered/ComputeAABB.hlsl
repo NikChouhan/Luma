@@ -4,6 +4,11 @@ struct Cluster
 	float4 maxPoint;
 };
 
+struct ClusterGeometryData
+{
+    float3 vertices[8];
+    uint2x3 indices[6];
+};
 // just put it into bindless
 // RWStructuredBuffer<Cluster> cluster : register(u0);
 
@@ -16,10 +21,12 @@ struct ComputeAABBData
 	uint2 screenDimensions;
 	float zFar;
 	uint clusterUAVIndex;
+
+    uint clusterGeometryStructuredBufferUAVndex;
+    float3 padding;
 };
 
 ConstantBuffer<ComputeAABBData> computeAABBData : register(b0);
-
 
 float4 ScreenToView(float4 pointInSS);
 float3 LineIntersectionToZPlane(float3 eyePos, float3 viewSpacePos, float zDistance);
@@ -68,6 +75,34 @@ void ClusterMain(uint3 DtId : SV_DispatchThreadID,
 	RWStructuredBuffer<Cluster> clusters = ResourceDescriptorHeap[NonUniformResourceIndex(computeAABBData.clusterUAVIndex)];
 	clusters[clusterIndex].minPoint = float4(minPointAABB, 0.);
 	clusters[clusterIndex].maxPoint = float4(maxPointAABB, 0.);
+
+    float3 v0 = minPointNear;
+    float3 v1 = float3(minPointNear.x, maxPointNear.y, minPointNear.z);
+    float3 v2 = maxPointNear;
+    float3 v3 = float3(maxPointNear.x, minPointNear.y, minPointNear.z);
+
+    float3 v4 = minPointFar;
+    float3 v5 = float3(minPointFar.x, maxPointFar.y, minPointFar.z);
+    float3 v6 = maxPointFar;
+    float3 v7 = float3(maxPointFar.x, minPointFar.y, minPointFar.z);
+
+	uint3x2 ind0 = {{0,1,2}, {2,3,0}};
+	uint3x2 ind1 = {{1,5,6}, {6,2,1}};
+	uint3x2 ind2 = {{4,5,6}, {6,7,4}};
+	uint3x2 ind3 = {{0,4,7}, {7,3,0}};
+	uint3x2 ind4 = {{3,2,6}, {6,7,3}};
+	uint3x2 ind5 = {{5,4,0}, {0,1,5}};
+
+    RWStructuredBuffer<ClusterGeometryData> clusterGeoData = ResourceDescriptorHeap[NonUniformResourceIndex(computeAABBData.clusterGeometryStructuredBufferUAVndex)];
+
+	float3 vertices[8] = { v0, v1, v2, v3, v4, v5, v6, v7 };
+    uint2x3 indices[6] = { ind0, ind1, ind2, ind3, ind4, ind5 };
+	[unroll]
+    for (int i = 0; i < 8; i++)
+        clusterGeoData[clusterIndex].vertices[i] = vertices[i];
+	[unroll]
+    for (int i = 0; i < 6; i++)
+        clusterGeoData[clusterIndex].indices[i] = indices[i];
 }
 
 float3 LineIntersectionToZPlane(float3 eyePos, float3 viewSpacePos, float zDistance)
