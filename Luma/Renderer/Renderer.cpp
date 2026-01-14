@@ -87,12 +87,15 @@ void Renderer::EndFrame(const RenderContext& ctx) const
 	);
 	ctx.cmdList_->ResourceBarrier(1, &barrier);
 
-	barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		ctx.depthResource,
-		D3D12_RESOURCE_STATE_DEPTH_READ,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE
-	);
-	ctx.cmdList_->ResourceBarrier(1, &barrier);
+	// dont ever convert to write states before the end of frame
+	// Impilict resource decay mentions that read states decay to common state always
+	// but not write states, doing this will stop the decay and cause issues furhter
+	//barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+	//	ctx.depthResource,
+	//	D3D12_RESOURCE_STATE_DEPTH_READ,
+	//	D3D12_RESOURCE_STATE_DEPTH_WRITE
+	//);
+	//ctx.cmdList_->ResourceBarrier(1, &barrier);
 	DX_ASSERT(ctx.cmdList_->Close());
 
 	ID3D12CommandList* ppCommandLists[] = { ctx.cmdList_};

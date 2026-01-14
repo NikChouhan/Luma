@@ -37,7 +37,7 @@ struct GraphicsPipelineDesc
 
 	// render targets
 	
-	DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
 
 	// optional (I will keep an input layout set always, if none provided)
