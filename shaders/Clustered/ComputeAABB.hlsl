@@ -36,7 +36,7 @@ float3 LineIntersectionToZPlane(float3 eyePos, float3 viewSpacePos, float zDista
 
 #define ComputeAABB_RS \
 "RootFlags ( CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED) ," \
-"RootConstants(num32BitConstants=24, b0)" \
+"RootConstants(num32BitConstants=28, b0)" \
 
 [RootSignature(ComputeAABB_RS)]
 [numthreads(1,1,1)]
