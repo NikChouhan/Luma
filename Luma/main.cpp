@@ -29,6 +29,7 @@
 #include "Renderer/Passes/Clustered/ComputeAABBPass.h"
 #include "Renderer/Passes/Clustered/LightAssignClusterPass.h"
 #include "Renderer/Passes/Clustered/MarkActiveClusters.h"
+#include "Renderer/Passes/Clustered/RenderClustervis.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -92,9 +93,9 @@ int WINAPI wWinMain(
 	renderer.AddPass<GeometryPass>();
 
 	renderer.AddPass<ComputeAABBPass>();
+	renderer.AddPass<RenderClusterVis>();
 	//renderer.AddPass<MarkActiveClusters>();
 	//renderer.AddPass<LightAssignClusterPass>();
-
 	renderer.AddPass<RasterPass>();
 	renderer.AddPass<SkyBoxPass>();
 
