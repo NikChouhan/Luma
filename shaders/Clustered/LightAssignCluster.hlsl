@@ -1,5 +1,7 @@
 #include "../LightsCommon.hlsl"
 
+#define MAX_LIGHTS 1024
+
 struct Cluster
 {
 	float4 minPoint;
@@ -8,6 +10,8 @@ struct Cluster
 
 struct LightAssignCluster
 {
+	row_major float4x4 viewMatrix;
+
 	uint3 clusterInputData;	// contains WG size in x,y,z dimensions
 	uint  clusterUAVIndex;
 
@@ -18,14 +22,14 @@ struct LightAssignCluster
 	uint lightCount; // Total number of lights in scene
 
 	uint globalLightsStructuredBufferSRVIndex;
-	uint padding[3];
+	uint3 padding;
 };
 
 ConstantBuffer<LightAssignCluster> LightAssignCluster : register(b0);
 
 #define THREADS_PER_GROUP 256
 
-groupshared uint LocalLightIndexList[1024];
+groupshared uint LocalLightIndexList[MAX_LIGHTS];
 groupshared uint LocalLightCount;
 
 bool LightSphereAABBIntersect(float3 lightPos, float lightRadius, Cluster cluster)
@@ -47,7 +51,7 @@ bool LightSphereAABBIntersect(float3 lightPos, float lightRadius, Cluster cluste
 
 #define LightAssignCluster_RS \
 "RootFlags ( CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED) ," \
-"RootConstants(num32BitConstants=12, b0)" \
+"RootConstants(num32BitConstants=28, b0)" \
 
 [RootSignature(LightAssignCluster_RS)]
 [numthreads(THREADS_PER_GROUP, 1, 1)]
@@ -82,7 +86,9 @@ void CSLightAssignCluster(uint3 DTid : SV_DispatchThreadID,
 	{
 		Light light = gLights[lightIdx];
 
-		bool checkIntersect = LightSphereAABBIntersect(light.Position, light.Radius, currentCluster);
+		// perform intersection test in view space obv
+		float3 lightPosVS = mul(float4(light.Position, 1.0), LightAssignCluster.viewMatrix).xyz;
+		bool checkIntersect = LightSphereAABBIntersect(lightPosVS, light.Radius, currentCluster);
 
 		if (checkIntersect)
 		{
