@@ -27,15 +27,6 @@ struct ClusterGeometryData
 	} triangles[18];
 };
 
-struct ClusterRender
-{
-	DirectX::XMMATRIX viewProj;
-
-	u32 clusterGeometryStructuredBufferSRVIndex;
-	SM::Vector3 padding;
-};
-
-
 struct ComputeAABBPass : RenderPass
 {
 	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
@@ -45,7 +36,4 @@ private:
 	PipelineHandle ComputeAABBPipeline = g_invalidPipelineHandle;
 	u32 clusterSizeXYZ[3]{ 16, 9, 24 };
 	ComputeAABBData pushConstants{};
-
-	PipelineHandle ClusterRenderPipeline = g_invalidPipelineHandle;
-	ClusterRender pushConstants1{};
 };
