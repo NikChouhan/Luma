@@ -1,19 +1,18 @@
 #pragma once
-#include "Resources.h"
-#include "Graphics/GfxDevice.h"
+#include "Graphics/RHI/RHI.h"
 
 struct RenderContext
 {
-    ID3D12GraphicsCommandList* cmdList_;
-    u32 frameIndex_;
+    RHI::CommandList* cl;
+    std::vector<TextureHandle> colorTargets;
+    TextureHandle depthTarget;
 
-    const GfxDevice& gfxDevice_;
+    RHIViewPort viewport;
+    RHIScissor scissor;
 
-    D3D12_CPU_DESCRIPTOR_HANDLE currentRtv;     // Backbuffer RTV handle
-    D3D12_CPU_DESCRIPTOR_HANDLE currentDsv;     // Depth Stencil handle
-    D3D12_VIEWPORT viewport;
-    D3D12_RECT scissorRect;
-
-    ID3D12Resource* swapchainResource = nullptr;
-    ID3D12Resource* depthResource = nullptr;
+    // TODO: perform binding here
+    //void BindRenderTargets() const
+    //{
+    //    cl->BeginRendering(colorTargets, depthTarget);
+    //}
 };

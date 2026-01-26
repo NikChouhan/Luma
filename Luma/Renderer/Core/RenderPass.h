@@ -9,7 +9,7 @@ struct RenderPass
 {
 	virtual ~RenderPass() = default;
 
-	virtual void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) = 0;
+	virtual void Init() = 0;
 	virtual void Execute(RenderContext& ctx, const Scene& scene) = 0;
 
 	ResourceManager* resourceManager_;

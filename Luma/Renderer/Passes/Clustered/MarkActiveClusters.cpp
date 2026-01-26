@@ -1,6 +1,6 @@
 #include "MarkActiveClusters.h"
 
-void MarkActiveClusters::Init(ResourceManager* resourceManager, PipelineCache* pipelineCache)
+void MarkActiveClusters::Init()
 {
 	// TODO: mark active clusters, i,e cull clusters if the contribution don't count
 }

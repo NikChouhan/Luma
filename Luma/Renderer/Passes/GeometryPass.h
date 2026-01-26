@@ -1,5 +1,6 @@
 #pragma once
-#include "Renderer/Core/PipelineCache.h"
+#include <Graphics/RHI/RHITypes.h>
+
 #include "Renderer/Core/RenderPass.h"
 
 struct DepthPassRootConstants
@@ -10,9 +11,9 @@ struct DepthPassRootConstants
 
 struct GeometryPass : public RenderPass
 {
-	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
+	void Init() override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
-	PipelineHandle pipelineHandle_ = g_invalidPipelineHandle;
+	PipelineHandle pipelineHandle = g_invalidPipelineHandle;
 };

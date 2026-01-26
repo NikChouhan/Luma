@@ -1,7 +1,5 @@
 #pragma once
-#include "Graphics/D3D12/Pipeline.h"
 #include "Renderer/Core/RenderPass.h"
-#include "Renderer/Core/Resources.h"
 
 struct ClusterRender
 {
@@ -13,7 +11,7 @@ struct ClusterRender
 
 struct RenderClusterVis : RenderPass
 {
-	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
+	void Init() override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:

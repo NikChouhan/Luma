@@ -1,7 +1,7 @@
 #pragma once
 #include "Renderer/Core/RenderPass.h"
 
-struct MarkActiveClusters : RenderPass
+struct TrianglePass : public RenderPass
 {
 	void Init() override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;

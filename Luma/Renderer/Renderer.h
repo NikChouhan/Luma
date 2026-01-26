@@ -1,6 +1,5 @@
 #pragma once
 #include "Core/RenderContext.h"
-#include "Graphics/GfxDevice.h"
 #include "Renderer/Core/RenderPass.h"
 
 struct Swapchain;
@@ -10,11 +9,7 @@ struct ResourceManager;
 
 struct Renderer
 {
-	Renderer(const GfxDevice& gfxDevice,
-		FrameSync& frameSync,
-		Swapchain& swapchain,
-		ResourceManager* resourceManager,
-		PipelineCache* pipelineCache);
+	Renderer();
 	~Renderer() = default;
 	template<typename T>
 	void AddPass();
@@ -22,15 +17,8 @@ struct Renderer
 	void RenderFrame(const Scene& scene) const;
 
 private:
-	const GfxDevice& gfxDevice_;
-	FrameSync& frameSync_;
-	Swapchain& swapchain_;
-	ResourceManager* resourceManager_ = nullptr;
-	PipelineCache* pipelineCache_ = nullptr;
-
 	std::vector<std::unique_ptr<RenderPass>> passes_;
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-
+	RHI::CommandList* cl;
 	RenderContext BeginFrame() const;
 	void EndFrame(const RenderContext& ctx) const;
 };

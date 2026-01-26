@@ -1,11 +1,9 @@
 #pragma once
-#include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Core/RenderPass.h"
 
 struct RasterPassRootConstants
 {
     DirectX::XMMATRIX worldViewProj;
-    DirectX::XMMATRIX worldMatrix;
     DirectX::XMMATRIX inverseViewProj;
 
     u32 albedoIndex;
@@ -21,12 +19,19 @@ struct RasterPassRootConstants
     u32 lightListTextureSRVIndex;
     u32 lightIndicesBufferSRVIndex;
     u32 globalLightStructuredBufferSRVIndex;
+
+    float farZ;
+    float nearZ;
+    SM::Vector2 padding;
+
+    SM::Vector3 cameraPosition;
+    float padding2;
 };
 
 
 struct RasterPass : RenderPass
 {
-	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
+	void Init() override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:

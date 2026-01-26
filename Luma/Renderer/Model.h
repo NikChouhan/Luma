@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include <External/SimpleMath/SimpleMath.h>
-#include "Core/Resources.h"
+#include "Graphics/RHI/RHITypes.h"
 
 struct cgltf_node;
 struct cgltf_primitive;
@@ -27,38 +27,38 @@ struct Material
     float roughnessFactor = 1.0f;
     float emissiveFactor = 1.0f;
 
-    ResourceHandle albedoTexture = g_invalidResourceHandle;
-    ResourceHandle normalTexture = g_invalidResourceHandle;
-    ResourceHandle metallicRoughnessTexture = g_invalidResourceHandle;
-    ResourceHandle emissiveTexture = g_invalidResourceHandle;
+    TextureHandle albedoTexture = g_invalidTextureHandle;
+    TextureHandle normalTexture = g_invalidTextureHandle;
+    TextureHandle metallicRoughnessTexture = g_invalidTextureHandle;
+    TextureHandle emissiveTexture = g_invalidTextureHandle;
 };
 
 class Model
 {
 public:
-    Model(const GfxDevice& gfxDevice, ResourceManager* resourceManager);
+    Model() = default;
     ~Model() = default;
 
     void Load(const std::string& path);
 
-    [[nodiscard]] const std::vector<SubMesh>& GetSubMeshes() const { return subMeshes_; }
-    [[nodiscard]] const std::vector<Material>& GetMaterials() const { return materials_; }
+    [[nodiscard]] const std::vector<SubMesh>& GetSubMeshes() const { return subMeshes; }
+    [[nodiscard]] const std::vector<Material>& GetMaterials() const { return materials; }
 
-    ResourceHandle GetVertexBuffer() const { return globalVertexBuffer_; }
-    ResourceHandle GetIndexBuffer() const { return globalIndexBuffer_; }
+    BufferHandle GetVertexBuffer() const { return globalVertexBuffer; }
+    BufferHandle GetIndexBuffer() const { return globalIndexBuffer; }
 
 private:
-    const GfxDevice& gfxDevice_;
-    ResourceManager* resourceManager_;
     std::string directory_;
 
-	ResourceHandle globalVertexBuffer_ = g_invalidResourceHandle;
-    ResourceHandle globalIndexBuffer_ = g_invalidResourceHandle;
+	BufferHandle globalVertexBuffer = g_invalidBufferHandle;
+    BufferHandle globalIndexBuffer = g_invalidBufferHandle;
 
-    std::vector<SubMesh> subMeshes_;
-    std::vector<Material> materials_;
+    std::vector<SubMesh> subMeshes;
+    std::vector<Material> materials;
+
+    std::unordered_map<uintptr_t, TextureHandle> textureCache;
 
     void ProcessNode(cgltf_node* node, const SM::Matrix& parentTransform, std::vector<Vertex>& allVertices, std::vector<u32>& allIndices);
     void ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& transform, std::vector<Vertex>& allVertices, std::vector<u32>& allIndices);
-    ResourceHandle LoadTexture(const cgltf_texture_view* view, bool sRGB) const;
+    TextureHandle LoadTexture(const cgltf_texture_view* view, bool sRGB);
 };

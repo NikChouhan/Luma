@@ -40,15 +40,15 @@ std::vector<Light> GenerateLights(u32 lightCount)
 		std::uniform_real_distribution<float> xDist(SponzaAABB::max.x, SponzaAABB::min.x);
 		std::uniform_real_distribution<float> yDist(layerMinY, layerMaxY);
 		std::uniform_real_distribution<float> zDist(SponzaAABB::min.z, SponzaAABB::max.z);
-		std::uniform_real_distribution<float> radiusDist(1.0f, 4.0f);
-		std::uniform_real_distribution<float> intensityDist(0.8f, 2.0f);
+		std::uniform_real_distribution<float> radiusDist(100.0f, 1000);
+		std::uniform_real_distribution<float> intensityDist(80000.f, 1000000.0f);
 
 		// TODO: can't do the following cuz no overload for SM::Vector3 :/, will prolly add it later
 		// for now doing it as x,y,z is enough
 		//std::uniform_real_distribution<SM::Vector3> directionDist({ 0., 0., 0. }, { 1.,1.,1. });
-		std::uniform_real_distribution<float> distanceDistX(0., 1.);
-		std::uniform_real_distribution<float> distanceDistY(0., 1.);
-		std::uniform_real_distribution<float> distanceDistZ(0., 1.);
+		std::uniform_real_distribution<float> distanceDistX(0., 24);
+		std::uniform_real_distribution<float> distanceDistY(0., 8);
+		std::uniform_real_distribution<float> distanceDistZ(0., 9.);
 
 		float distanceX = distanceDistX(gen);
 		float distanceY = distanceDistY(gen);
@@ -67,8 +67,8 @@ std::vector<Light> GenerateLights(u32 lightCount)
 			// TODO: dt based manipulation to change light color with time
 			float heightFactor = static_cast<float>(layer) / numLayers;
 			light.Color = LerpColor(
-				SM::Vector3{ 1.0f, 0.8f, 0.6f },
-				SM::Vector3{ 0.8f, 0.9f, 1.0f },
+				SM::Vector3{ 0.,0.,1.},
+				SM::Vector3{ 1.,0.,0. },
 				heightFactor
 			);
 

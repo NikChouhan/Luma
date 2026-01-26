@@ -3,59 +3,47 @@
 #include "scene.h"
 #include "Core/Camera.h"
 #include "Graphics/PushConstants.h"
-#include "Graphics/D3D12/Shader.h"
-#include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Core/RenderContext.h"
+#include "Graphics/RHI/RHI.h"
 
-void GeometryPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineCache)
+void GeometryPass::Init()
 {
-	resourceManager_ = resourceManager;
-	pipelineCache_ = pipelineCache;
-
 	// create resources (texture[views]/buffer[views]) and pipelines
-	ShaderDesc vsDesc{
-	.shaderPath = L"../../../../shaders/depth_pass.hlsl",
-	.pEntryPoint = L"DepthVS",
-	.pTarget = L"vs_6_7",
-	.type = Type::VERTEX };
-	ShaderHandle vsHandle = pipelineCache->LoadShader(vsDesc, "VertexShader");
 
-	GraphicsPipelineDesc desc{
-		.vertexShader = vsHandle,
-		.pixelShader = g_invalidShaderHandle,
-		.blendMode = BlendMode::NON_TRANSPARENT,
-		.depthMode = DepthMode::READ_WRITE,
-		.depthFunc = DepthFunc::GREATER,
-		.rasterMode = RasterMode::SOLID_NONE_CULL,
-		.topology = Topology::TRIANGLES,
-		.rtvFormat = DXGI_FORMAT_UNKNOWN,
-		.dsvFormat = DXGI_FORMAT_D32_FLOAT
-	};
-	pipelineHandle_ = pipelineCache->CreatePipeline(desc, "Geometry Pipeline");
+	// rhi impl
+	RHIShaderDesc vsDesc;
+	ShaderHandle vsHandle = RHI::CreateShader(
+		{
+		.path = L"../../../../shaders/depth_pass.hlsl",
+		.entryPoint = L"DepthVS",
+		.target = L"vs_6_7",
+		.stage = RHIShaderStage::VERTEX }
+		);
+	pipelineHandle = RHI::CreateGraphicsPipeline(
+		{
+		.vs = vsHandle,
+		.ps = g_invalidShaderHandle,
+		.blend = RHIBlendMode::NON_TRANSPARENT,
+		.depthFunc = RHIDepthFunc::GREATER,
+		.depthMode = RHIDepthMode::WRITE,
+		.rasterMode = RHIRasterMode::NONE,
+		.topology = RHITopology::TRIANGLE_LIST,
+		.colorFormats = {RHIFormat::R8G8B8A8_UNORM},
+		.depthFormat = RHIFormat::D32_FLOAT,
+		.inputBindings = kBindingdescs,
+		.inputAttributes = kInputAttributes }
+		);
 }
 
 void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 {
-	auto cmdList = ctx.cmdList_;
-	Pipeline* pipeline = pipelineCache_->GetPipeline(pipelineHandle_);
-
+	auto cmdList = ctx.cl;
 	// setup frame state
-	cmdList->SetPipelineState(pipeline->pso.Get());
-
-	// already set in renderer.BeginFrame();
-	/*ID3D12DescriptorHeap* ppHeaps[] = { resourceManager_->GetBindlessHeap().Get() };
-	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);*/
-
-	cmdList->SetGraphicsRootSignature(pipeline->rootSign.Get());
-
-	cmdList->RSSetViewports(1, &ctx.viewport);
-	cmdList->RSSetScissorRects(1, &ctx.scissorRect);
-
-	cmdList->ClearDepthStencilView(ctx.currentDsv, D3D12_CLEAR_FLAG_DEPTH,
-		0.0f, 0, 0, nullptr);
-	cmdList->OMSetRenderTargets(0, nullptr,
-		FALSE, &ctx.currentDsv);
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->SetPipeline(pipelineHandle);
+	cmdList->SetViewport({});
+	cmdList->SetScissor({});
+	// supply the render targets here. I will be using directly from the backend so pass empty for now
+	cmdList->BeginRendering({}, g_invalidTextureHandle);
 
 	const Camera& cam = scene.GetCamera();
 
@@ -65,16 +53,8 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 		Model* model = renderObj.model;
 		if (!model) continue;
 
-		Resource* vbRes = resourceManager_->GetResource(model->GetVertexBuffer());
-		Resource* ibRes = resourceManager_->GetResource(model->GetIndexBuffer());
-
-		if (!vbRes || !ibRes) continue;
-
-		const VertexBufferView* vbView = std::get_if<Buffer>(vbRes)->AsVertexBuffer();
-		const IndexBufferView* ibView = std::get_if<Buffer>(ibRes)->AsIndexBuffer();
-
-		cmdList->IASetVertexBuffers(0, 1, &vbView->view);
-		cmdList->IASetIndexBuffer(&ibView->view);
+		cmdList->BindVertexBuffer(model->GetVertexBuffer());
+		cmdList->BindIndexBuffer(model->GetIndexBuffer());
 
 		for (const auto& mesh : model->GetSubMeshes())
 		{
@@ -85,22 +65,9 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 			constants.worldViewProj = (wvp);
 			constants.worldMatrix = (world);
 
-			cmdList->SetGraphicsRoot32BitConstants(0, sizeof(DepthPassRootConstants) / 4,
-				&constants, 0);
-
-			cmdList->DrawIndexedInstanced(
-				mesh.indexCount,
-				1,
-				mesh.startIndex,
-				mesh.baseVertex,
-				0
-			);
+			cmdList->SetGraphicsPushConstants(&constants, sizeof(DepthPassRootConstants)/4, 0);
+			cmdList->DrawIndexed(mesh.indexCount, 1, mesh.startIndex, mesh.baseVertex, 0);
 		}
 	}
-	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		ctx.depthResource,
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		D3D12_RESOURCE_STATE_DEPTH_READ
-	);
-	cmdList->ResourceBarrier(1, &barrier);
+	cmdList->TextureBarrier(g_invalidTextureHandle, ResourceState::DEPTH_WRITE, ResourceState::DEPTH_READ);
 }

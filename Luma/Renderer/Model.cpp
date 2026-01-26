@@ -4,6 +4,7 @@
 #include <cgltf.h>
 #include <stb_image.h>
 #include "Core/Log.h"
+#include "Graphics/RHI/RHI.h"
 
 static SM::Matrix NodeToMatrix(cgltf_node* node)
 {
@@ -21,9 +22,6 @@ static SM::Matrix NodeToMatrix(cgltf_node* node)
     }
     return m;
 }
-
-Model::Model(const GfxDevice& gfxDevice, ResourceManager* resourceManager)
-	: gfxDevice_(gfxDevice), resourceManager_(resourceManager) {}
 
 void Model::Load(const std::string& path)
 {
@@ -60,22 +58,27 @@ void Model::Load(const std::string& path)
 
     if (!allVertices.empty())
     {
-        BufferCreateInfo vbInfo = {
-            .desc = VertexBufferDesc{.vertices = allVertices.data(), .vertexCount = (u32)allVertices.size(), .vertexStride = sizeof(Vertex)},
-            .usage = BufferUsage::UPLOAD,
-            .debugName = L"Model_GlobalVB"
-        };
-        globalVertexBuffer_ = resourceManager_->CreateResource(vbInfo, path + "_VB");
+        globalVertexBuffer = RHI::CreateBuffer(
+        {
+            .createInfo = RHIVertexBufferCreateInfo {.vertices = allVertices.data(), .vertexCount = u32(allVertices.size()), .vertexStride = sizeof(allVertices[0]) * 3},
+            .usage = RHIMemoryeUsage::DEFAULT,
+            .view = RHIResourceView::LOAD,
+            .debugName = L"VertexBuffer"
+        },
+        nullptr);
 
-        BufferCreateInfo ibInfo = {
-            .desc = IndexBufferDesc{.indices = allIndices.data(), .indexCount = (u32)allIndices.size(), .indexFormat = DXGI_FORMAT_R32_UINT},
-            .usage = BufferUsage::UPLOAD,
-            .debugName = L"Model_GlobalIB"
-        };
-        globalIndexBuffer_ = resourceManager_->CreateResource(ibInfo, path + "_IB");
+        globalIndexBuffer = RHI::CreateBuffer(
+        {
+            .createInfo = RHIIndexBufferCreateInfo{.indices = allIndices.data(), .indexCount = u32(allIndices.size()), .format = RHIFormat::R32_UINT},
+            .usage = RHIMemoryeUsage::DEFAULT,
+            .view = RHIResourceView::LOAD,
+            .debugName = L"IndexBuffer"
+        },
+        nullptr);
+
         static DWORD timeEnd = GetTickCount();
         printl(Log::LogLevel::Info, "[Model] Loaded {} with {} submeshes. Total Verts: {}, Time taken: {} seconds", 
-            path, subMeshes_.size(), allVertices.size(), f32(timeEnd - timeStart)/1000);
+            path, subMeshes.size(), allVertices.size(), f32(timeEnd - timeStart)/1000);
     }
 
     cgltf_free(data);
@@ -129,13 +132,13 @@ void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& trans
     std::vector<Vertex> tempVertices(vertexCount);
     for (size_t i = 0; i < vertexCount; ++i)
     {
-        cgltf_accessor_read_float(posAttr->data, i, &tempVertices[i].position_.x, 3);
+        cgltf_accessor_read_float(posAttr->data, i, &tempVertices[i].position.x, 3);
 
-        if (texAttr) cgltf_accessor_read_float(texAttr->data, i, &tempVertices[i].texCoord_.x, 2);
-        else tempVertices[i].texCoord_ = { 0, 0 };
+        if (texAttr) cgltf_accessor_read_float(texAttr->data, i, &tempVertices[i].texCoord.x, 2);
+        else tempVertices[i].texCoord = { 0, 0 };
 
-        if (normAttr) cgltf_accessor_read_float(normAttr->data, i, &tempVertices[i].normal_.x, 3);
-        else tempVertices[i].normal_ = { 0, 1, 0 };
+        if (normAttr) cgltf_accessor_read_float(normAttr->data, i, &tempVertices[i].normal.x, 3);
+        else tempVertices[i].normal = { 0, 1, 0 };
     }
 
     std::vector<u32> tempIndices(indexCount);
@@ -162,7 +165,7 @@ void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& trans
     // Optimisation 2 - Optimize cache for locality
     meshopt_optimizeVertexCache(optIndices.data(), optIndices.data(), indexCount, uniqueVertexCount);
     // Optimisation 3 - Optimize overdraw
-    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &optVertices[0].position_.x, 
+    meshopt_optimizeOverdraw(optIndices.data(), optIndices.data(), indexCount, &optVertices[0].position.x, 
         uniqueVertexCount, sizeof(Vertex), 1.05f);
     // Optimization 4 - optimize access to the vertex buffer
     meshopt_optimizeVertexFetch(optVertices.data(), optIndices.data(), indexCount, 
@@ -173,7 +176,7 @@ void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& trans
     SM::Vector3 max(-FLT_MAX);
     for (const auto& v : optVertices)
     {
-        SM::Vector3 pos = XMLoadFloat3(&v.position_);
+        SM::Vector3 pos = XMLoadFloat3(&v.position);
         min = SM::Vector3::Min(min, pos);
         max = SM::Vector3::Max(max, pos);
     }
@@ -213,55 +216,63 @@ void Model::ProcessPrimitive(cgltf_primitive* primitive, const SM::Matrix& trans
             mat.emissiveTexture = LoadTexture(&primitive->material->emissive_texture, true);
 
         }
-        subMesh.materialIndex = (u32)materials_.size();
-        materials_.push_back(mat);
+        subMesh.materialIndex = (u32)materials.size();
+        materials.push_back(mat);
     }
 
 
     allVertices.insert(allVertices.end(), optVertices.begin(), optVertices.end());
     allIndices.insert(allIndices.end(), optIndices.begin(), optIndices.end());
 
-    subMeshes_.push_back(subMesh);
+    subMeshes.push_back(subMesh);
 }
 
-ResourceHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRGB) const
+TextureHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRGB)
 {
     if (!view || !view->texture || !view->texture->image || !view->texture->image->uri)
-        return g_invalidResourceHandle;
+        return g_invalidTextureHandle;
 
     const char* uri = view->texture->image->uri;
     std::string fullPath = directory_ + "/" + uri;
 
-    ResourceHandle handle = resourceManager_->GetResourceHandleByName(uri);
-    if (resourceManager_->IsResourceHandleValid(handle))
-        return handle;
+    // this is strange, i don't actually have a map for now,
+    // i need to do that or find an alternative to return cached handles
 
+    cgltf_image* image = view->texture->image;
+    uintptr_t key = reinterpret_cast<uintptr_t>(image);
+    auto it = textureCache.find(key);
+    if (it != textureCache.end() && it->second.IsValid()) { return it->second; }
+    
     int w, h, c;
     unsigned char* data = stbi_load(fullPath.c_str(), &w, &h, &c, STBI_rgb_alpha);
     if (!data)
     {
         printl(Log::LogLevel::Warn, "[Model] Texture missing: {}", fullPath);
-        return g_invalidResourceHandle;
+        return g_invalidTextureHandle;
     }
 
     // msft wide character bs for debug name
     std::wstring debugName(uri, uri + strlen(uri));
 
-    TextureCreateInfo createInfo = {
-        .desc = {
-            .width = (u32)w,
-            .height = (u32)h,
-            .texPixelSize = 4,
-            .format = sRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
-            .viewFlags = TextureViewFlags::SRV,
-            .initialData = data
-        },
-        .debugName = debugName.c_str(),
-        .usage = TextureUsage::UPLOAD,
-        .heap = resourceManager_->GetBindlessHeap().Get()
-    };
+    // rhi impl
+    
 
-    handle = resourceManager_->CreateResource(createInfo, uri);
+    TextureHandle handle = RHI::CreateTexture(
+        {
+        .width = 1920,
+        .height = 1080,
+        .depth = 0,
+        .mips = 1,
+        .arraySize = 1,
+        .format = RHIFormat::R32G32B32A32_FLOAT,
+        .usage = RHIMemoryeUsage::UPLOAD,
+        .view = RHIResourceView::LOAD,
+        .createPerMipViews = false,
+        .initialData = nullptr,
+        .debugName = debugName.c_str() }
+    , nullptr);
+
+    textureCache[key] = handle;
 
     stbi_image_free(data);
     return handle;

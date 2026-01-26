@@ -21,7 +21,7 @@ struct DirectionalLight
 
 struct Scene
 {
-	Scene(const GfxDevice& gfxDevice, ResourceManager& resourceManager);
+	Scene();
 	~Scene() = default;
 
 	void Load();
@@ -34,8 +34,6 @@ struct Scene
 	[[nodiscard]] const DirectionalLight& GetSun() const { return sun_; }
 
 private:
-	const GfxDevice& gfxDevice_;
-	ResourceManager& resourceManager_;
 
 	Camera camera_;
 	DirectionalLight sun_;

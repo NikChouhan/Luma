@@ -4,12 +4,12 @@
 #include <wrl.h>
 using namespace Microsoft::WRL;
 
-#include <d3d12.h>
-#include <dxgi1_6.h>
+//#include <d3d12.h>
+//#include <dxgi1_6.h>
 
 #include <DirectXMath.h>
 #include "External/SimpleMath/SimpleMath.h"
-#include <d3dx12/d3dx12.h>
+//#include <d3dx12/d3dx12.h>
 
 #include "Core/Log.h"
 using namespace Luma;
@@ -25,7 +25,7 @@ constexpr u32 frameCount = 2;
 #define MAX_TEXTURES 1024
 #define REBAR 0
 
-#define DX_ASSERT(call)                                                                                     \
+#define RHI_ASSERT(call)                                                                                     \
     do                                                                                                      \
     {                                                                                                       \
         HRESULT result = call;                                                                              \

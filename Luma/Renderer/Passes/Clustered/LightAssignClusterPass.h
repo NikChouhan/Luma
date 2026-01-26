@@ -1,15 +1,10 @@
 #pragma once
-#include "Graphics/D3D12/Pipeline.h"
 #include "Renderer/Core/RenderPass.h"
-#include "Renderer/Core/Resources.h"
-u32 constexpr max_lights = 256;
-u32 constexpr no_of_clusters = 16 * 9 * 24;
-
-u32 constexpr maxLightIndices = no_of_clusters * max_lights;
-
 
 struct LightAssignCluster
 {
+	DirectX::XMMATRIX viewMatrix;
+
 	u32 clusterInputData[3];
 	u32 clusterUAVIndex;
 
@@ -40,7 +35,7 @@ struct LightIndexList
 
 struct LightAssignClusterPass : public RenderPass
 {
-	auto Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) -> void override;
+	auto Init() -> void override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:

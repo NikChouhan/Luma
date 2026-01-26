@@ -1,7 +1,5 @@
 #pragma once
 #include "Renderer/Core/RenderPass.h"
-#include "Graphics/D3D12/Pipeline.h"
-#include "Renderer/Core/Resources.h"
 
 struct SkyBoxConstants
 {
@@ -13,14 +11,14 @@ struct SkyBoxConstants
 
 struct SkyBoxPass : public RenderPass
 {
-	void Init(ResourceManager* resourceManager, PipelineCache* pipelineCache) override;
+	void Init() override;
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
 	PipelineHandle SkyBoxPipelineHandle = g_invalidPipelineHandle;
 
-	ResourceHandle skyboxVertexBufferHandle = g_invalidResourceHandle;
-	ResourceHandle skyboxIndexBufferHandle = g_invalidResourceHandle;
-	ResourceHandle skyboxCubemapHandle = g_invalidResourceHandle;
+	BufferHandle skyboxVertexBufferHandle = g_invalidBufferHandle;
+	BufferHandle skyboxIndexBufferHandle = g_invalidBufferHandle;
+	BufferHandle skyboxCubemapHandle = g_invalidBufferHandle;
 	// texture for skybox
 };

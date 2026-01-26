@@ -1,6 +1,5 @@
 #pragma once
 #include <type_traits>
-#include "RHICommandList.h"
 
 #include "Graphics/Globals.h"
 
@@ -16,14 +15,10 @@ using RHIBackend = D3D12Backend;
 #elif RHI_BACKEND_VULKAN
 #include "Vulkan/VulkanBackend.h"
 using RHIBackend = VulkanBackend;
+using RhiViewPort = 
 #else
 #error "No RHI backend defined"
 #endif
-
-struct CommandList 
-{
-    void* backendData = nullptr;
-};
 
 struct RHI
 {
@@ -38,10 +33,6 @@ struct RHI
     static void BeginFrame()
     {
         RHIBackend::BeginFrame();
-    }
-    static void EndFrame()
-    {
-        RHIBackend::EndFrame();
     }
     static void WaitIdle()
     {
@@ -129,9 +120,9 @@ struct RHI
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetPipeline(handle);
         }
-        void SetPushConstants(const void* data, u32 size, u32 offset)
+        void SetGraphicsPushConstants(const void* data, u32 size, u32 offset)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetPushConstants(data, size, offset);
+            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetGraphicsPushConstants(data, size, offset);
         }
         void BeginRendering(const std::span<TextureHandle> colorTargets, TextureHandle depthTarget)
         {
@@ -141,13 +132,13 @@ struct RHI
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->EndRendering();
         }
-        void SetViewport(float x, float y, float w, float h, float minD, float maxD)
+        void SetViewport(const RHIViewPort& viewPort)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetViewport(x, y, w, h, minD, maxD);
+            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetViewport(viewPort);
         }
-        void SetScissor(int x, int y, int w, int h)
+        void SetScissor(const RHIScissor& scissor)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetScissor(x, y, w, h);
+            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetScissor(scissor);
         }
         void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance)
         {
@@ -180,6 +171,10 @@ struct RHI
     private:
         void* backendData = nullptr;
     };
+    static void EndFrame()
+    {
+        RHIBackend::EndFrame();
+    }
 
     static CommandList* CreateCommandList() { return new CommandList(); }
     static void DestroyCommandList(CommandList* cl) { delete cl; }
@@ -188,15 +183,14 @@ struct RHI
     static void ImmediateSubmit(Func&& callback) {
         auto cl = CreateCommandList();
         cl->Begin();
-        callback(*cl);
+        callback();
         cl->End();
         cl->Submit();
         DestroyCommandList(cl);
     }
+    
 
-    struct ImmediateContext;
-
-    static void ImmediateSubmit(ImmediateContext* immediateCtx, LAMBDA() callback);
+    //static void ImmediateSubmit(ImmediateContext* immediateCtx, LAMBDA() callback);
     // unused patth, might need in the future
     // Command List Access 
     //template<typename Func>

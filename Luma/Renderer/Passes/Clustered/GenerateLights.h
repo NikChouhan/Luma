@@ -1,15 +1,17 @@
 #pragma once
-#include "Graphics/GfxDevice.h"
+#include <vector>
+
+#include "Core/Common.h"
+#include "StandardTypes.h"
 
 enum class LightType: u32 {POINT, DIRECTION};
-
 
 struct Light
 {
     SM::Vector3 Position;
     float Radius;
 
-    SM::Vector3 Color;
+    DirectX::SimpleMath::Vector3 Color;
     float Intensity;
 
 	SM::Vector3 Direction;

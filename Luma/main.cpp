@@ -6,10 +6,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "Graphics/GfxDevice.h"
-#include "Graphics/D3D12/Swapchain.h"
-#include "Graphics/FrameSync.h"
-#include "Graphics/D3D12/Buffer.h"
 #include "Core/Log.h"
 
 #include "Graphics/Globals.h"
@@ -22,19 +18,18 @@
 #include "Core/Timer.h"
 #include "Core/Window.h"
 #include "Renderer/Renderer.h"
-#include "Renderer/Core/PipelineCache.h"
 #include "Renderer/Passes/GeometryPass.h"
 #include "Renderer/Passes/Clustered/RasterPass.h"
-#include "Renderer/Passes/SkyBoxPass.h"
-#include "Renderer/Passes/Clustered/ComputeAABBPass.h"
-#include "Renderer/Passes/Clustered/LightAssignClusterPass.h"
-#include "Renderer/Passes/Clustered/MarkActiveClusters.h"
-#include "Renderer/Passes/Clustered/RenderClustervis.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static u32 CreateDepthSRV(const GfxDevice& gfxDevice, ID3D12Resource* depthResource, ID3D12DescriptorHeap* bindlessHeap)
+static u32 CreateDepthSRV()
 {
+	using namespace D3D12Internal;
+
+	auto depthResource = g_depthStencil.Get();
+	auto bindlessHeap = g_bindlessHeap.Get();
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -45,11 +40,11 @@ static u32 CreateDepthSRV(const GfxDevice& gfxDevice, ID3D12Resource* depthResou
 
 	u32 index = GlobalStorage::bindlessHeapIndex.nextIndex++;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(bindlessHeap->GetCPUDescriptorHandleForHeapStart());
-	u32 descriptorSize = gfxDevice.device_->GetDescriptorHandleIncrementSize(
+	u32 descriptorSize = g_device->GetDescriptorHandleIncrementSize(
 		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	cpuHandle.Offset(index, descriptorSize);
 
-	gfxDevice.device_->CreateShaderResourceView(depthResource, &srvDesc, cpuHandle);
+	g_device->CreateShaderResourceView(depthResource, &srvDesc, cpuHandle);
 
 	return index;
 }
@@ -63,41 +58,30 @@ int WINAPI wWinMain(
 {
 	Log::Init();
 
-	GfxDevice gfxDevice = CreateDevice({.something = true});
-	FrameSync frameSync = CreateFrameSyncResources(gfxDevice);
-	Window window(gfxDevice, frameSync,
-		{
+	Window window({
 		.width = 1920,
 		.height = 1080,
 		.title = L"Luma" });
 	Timer timer{};
-	Swapchain swapchain = CreateSwapChain(gfxDevice, frameSync,
-		{
-			.height_ = u16(GlobalStorage::g_LumaConstants.height),
-			.width_ = u16(GlobalStorage::g_LumaConstants.width),
-			.vsyncEnable_ = true,
-			.hwnd_ = window.GetHandle()
-		});
+	RHI::Init(window.GetHandle(), 1920, 1080);
 	//SetupLightSettingsHandler();
 
-	ResourceManager resourceManager(gfxDevice, frameSync);
-	PipelineCache pipelineCache(gfxDevice);
-
-	Scene scene(gfxDevice, resourceManager);
+	Scene scene;
 	scene.Load();
 
-	Renderer renderer(gfxDevice, frameSync, swapchain, &resourceManager, &pipelineCache);
+	Renderer renderer;
 	// the worst way to do ts i know but i dont have time. fuck it we ball
-	GlobalStorage::depthSRVIndex = CreateDepthSRV(gfxDevice, swapchain.depthStencil_.Get(), resourceManager.GetBindlessHeap().Get());
+	GlobalStorage::depthSRVIndex = CreateDepthSRV();
 	// Add passes
 	renderer.AddPass<GeometryPass>();
 
-	renderer.AddPass<ComputeAABBPass>();
-	renderer.AddPass<RenderClusterVis>();
-	//renderer.AddPass<MarkActiveClusters>();
-	//renderer.AddPass<LightAssignClusterPass>();
-	renderer.AddPass<RasterPass>();
-	renderer.AddPass<SkyBoxPass>();
+	////renderer.AddPass<ComputeAABBPass>();
+	////renderer.AddPass<RenderClusterVis>();
+	////renderer.AddPass<MarkActiveClusters>();
+	////renderer.AddPass<LightAssignClusterPass>();
+	//renderer.AddPass<RasterPass>();
+	//renderer.AddPass<SkyBoxPass>();
+	//renderer.AddPass<TrianglePass>();
 
 	renderer.Init();
 

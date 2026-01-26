@@ -1,9 +1,10 @@
 #include "scene.h"
 
+#include "Graphics/Globals.h"
+
 static void HandleCamera(Camera& camera, f32 deltaTime);
 
-Scene::Scene(const GfxDevice& gfxDevice, ResourceManager& resourceManager)
-	: gfxDevice_(gfxDevice), resourceManager_(resourceManager) {}
+Scene::Scene() {}
 
 void Scene::Load()
 {
@@ -17,7 +18,7 @@ void Scene::Load()
 
 	printl(Log::LogLevel::Info, "[Scene] Loading World ...");
 
-	auto sponza = std::make_unique<Model>(gfxDevice_, &resourceManager_);
+	auto sponza = std::make_unique<Model>();
 	//sponza->Load("../../../../assets/models/bistroWithEmissive/Untitled.gltf");
 	sponza->Load("../../../../assets/models/sponza2/sponza2.gltf");
 	//sponza->Load("../../../../assets/models/Sponza/glTF/Sponza.gltf");

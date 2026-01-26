@@ -3,8 +3,6 @@
 #include <windows.h>
 
 #include "Log.h"
-#include "Graphics/D3D12/Shader.h"
-#include "Renderer/Core/Resources.h"
 
 void Watcher::StartWatching()
 {
@@ -16,37 +14,37 @@ void Watcher::ProcessNotifications(BYTE* data, DWORD dword)
 
 }
 
-bool Watcher::WatchDirectory(LAMBDA(Resources*) resources)
-{
-    constexpr DWORD bufferSize = 64 * 1024;
-    std::vector<BYTE> buffer(bufferSize);
-    DWORD bytesReturned;
-
-    bool result = false;
-    while (!_stopRequested) 
-    {
-        if(!ReadDirectoryChangesW(
-            _hDir,
-            buffer.data(),
-            bufferSize,
-            TRUE, // Watch subdirectories
-            FILE_NOTIFY_CHANGE_LAST_WRITE |
-            FILE_NOTIFY_CHANGE_FILE_NAME |
-            FILE_NOTIFY_CHANGE_DIR_NAME,
-            &bytesReturned,
-            nullptr,
-            nullptr
-        )) 
-        {
-            return false;
-        }
-        if (bytesReturned == 0) break;
-
-        ProcessNotifications(buffer.data(), bytesReturned);
-    }
-    CloseHandle(_hDir);
-    return result;  
-}
+//bool Watcher::WatchDirectory(LAMBDA(Resources*) resources)
+//{
+//    constexpr DWORD bufferSize = 64 * 1024;
+//    std::vector<BYTE> buffer(bufferSize);
+//    DWORD bytesReturned;
+//
+//    bool result = false;
+//    while (!_stopRequested) 
+//    {
+//        if(!ReadDirectoryChangesW(
+//            _hDir,
+//            buffer.data(),
+//            bufferSize,
+//            TRUE, // Watch subdirectories
+//            FILE_NOTIFY_CHANGE_LAST_WRITE |
+//            FILE_NOTIFY_CHANGE_FILE_NAME |
+//            FILE_NOTIFY_CHANGE_DIR_NAME,
+//            &bytesReturned,
+//            nullptr,
+//            nullptr
+//        )) 
+//        {
+//            return false;
+//        }
+//        if (bytesReturned == 0) break;
+//
+//        ProcessNotifications(buffer.data(), bytesReturned);
+//    }
+//    CloseHandle(_hDir);
+//    return result;  
+//}
 
 Watcher CreateWatcher(const wchar_t* directory)
 {

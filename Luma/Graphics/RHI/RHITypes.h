@@ -1,4 +1,7 @@
 #pragma once
+
+#include "Core/Common.h"
+
 #include <variant>
 
 struct Vertex
@@ -220,4 +223,31 @@ enum class ResourceState : u8
 	COMMON, VERTEX_BUFFER, INDEX_BUFFER,
 	RENDER_TARGET, DEPTH_WRITE, DEPTH_READ,
 	UNORDERED_ACCESS, SHADER_RESOURCE, COPY_DEST, COPY_SOURCE, PRESENT
+};
+
+struct RHIViewPort
+{
+	float x;
+	float y;
+	float width;
+	float height;
+	float minDepth;
+	float maxDepth;
+
+	// Optional: convenience constructor
+	RHIViewPort() : x(0), y(0), width(0), height(0), minDepth(0.0f), maxDepth(1.0f) {}
+	RHIViewPort(float x, float y, float w, float h, float minD = 0.0f, float maxD = 1.0f)
+		: x(x), y(y), width(w), height(h), minDepth(minD), maxDepth(maxD) {
+	}
+};
+
+struct RHIScissor
+{
+	int x;
+	int y;
+	int width;
+	int height;
+
+	RHIScissor() : x(0), y(0), width(0), height(0) {}
+	RHIScissor(int x, int y, int w, int h) : x(x), y(y), width(w), height(h) {}
 };

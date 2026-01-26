@@ -1,10 +1,11 @@
 #include "RenderGraph/RenderGraph.h"
+#include <string>
 
-void RenderGraph::DeclareResource(const std::string name, ResourceHandle resourceHandle)
-{
-}
-
-void RenderGraph::AddPass(RenderPassDesc renderPassDesc)
-{
-
-}
+//void RenderGraph::DeclareResource(const std::string name)
+//{
+//}
+//
+//void RenderGraph::AddPass(RenderPassDesc renderPassDesc)
+//{
+//
+//}

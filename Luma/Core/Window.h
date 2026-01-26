@@ -1,5 +1,4 @@
 #pragma once
-#include "Graphics/GfxDevice.h"
 
 struct WindowDesc
 {
@@ -10,7 +9,7 @@ struct WindowDesc
 
 struct Window
 {
-	Window(GfxDevice& gfxDevice, FrameSync& frameSync, const WindowDesc& desc);
+	Window(const WindowDesc& desc);
 	~Window();
 
 	Window(const Window&) = delete;
@@ -25,9 +24,6 @@ struct Window
 	[[nodiscard]] bool IsClosed() const { return isClosed_; }
 
 private:
-	GfxDevice& gfxDevice_;
-	FrameSync& frameSync_;
-
 	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	LRESULT HandleMsg(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 

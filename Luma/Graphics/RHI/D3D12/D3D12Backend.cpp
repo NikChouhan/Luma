@@ -1,7 +1,11 @@
 #include "D3D12Backend.h"
 
-#include "Shader.h"
+#include <d3dx12/d3dx12.h>
+
 #include "Core/Common.h"
+#include "Graphics/RHI/RHI.h"
+
+using namespace D3D12Internal;
 
 // forward decs
 static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& desc);
@@ -344,8 +348,6 @@ struct BufferViewCreator
 
 void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
 {
-    using namespace D3D12Internal;
-
     g_hwnd = static_cast<HWND>(windowHandle);
     g_width = width;
     g_height = height;
@@ -426,8 +428,9 @@ void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
         RHI_ASSERT(swapChain.As(&g_swapchain));
     	
     	// swapchain heap
-        // know that you can place any resource here as well, and use with bindless
-        heapDesc.NumDescriptors = 256;
+        // know that you can place other RTV resource here as well, and use with bindless
+        // note: changing heap mid way is not good, prefer using OmSetRenderTargets not bindless
+        heapDesc.NumDescriptors = 8;
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         g_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&g_rtvHeap));
@@ -450,6 +453,13 @@ void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
 
     // depth stuff
     {
+        // depth buffer DSV heap
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
+        dsvHeapDesc.NumDescriptors = 1;
+        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        RHI_ASSERT(g_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&g_dsvHeap)));
+
         D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
         depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
         depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
@@ -475,10 +485,6 @@ void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
 
         g_device->CreateDepthStencilView(g_depthStencil.Get(), &depthStencilViewDesc,
             g_dsvHeap->GetCPUDescriptorHandleForHeapStart());
-        // Create DSV heap
-        heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-        g_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&g_dsvHeap));
-        g_dsvDescriptorSize = g_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
     }
 
     // bindless heap
@@ -508,6 +514,38 @@ void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
         RHI_ASSERT(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcRes.pCompiler.GetAddressOf())));
         RHI_ASSERT(g_dxcRes.pUtils->CreateDefaultIncludeHandler(g_dxcRes.pIncludeHandler.GetAddressOf()));
     }
+
+    // immediate context
+    {
+        RHI_ASSERT(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+            IID_PPV_ARGS(&g_immediateContext.cmdAllocator)));
+
+        RHI_ASSERT(g_device->CreateCommandList(
+            0,
+            D3D12_COMMAND_LIST_TYPE_DIRECT,
+            g_immediateContext.cmdAllocator.Get(),
+            nullptr,
+            IID_PPV_ARGS(&g_immediateContext.commandList)));
+
+        RHI_ASSERT(g_immediateContext.commandList->Close());
+
+        RHI_ASSERT(g_device->CreateFence(0,
+            D3D12_FENCE_FLAG_NONE,
+            IID_PPV_ARGS(&g_immediateContext.fence)));
+        g_immediateContext.fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+        if (!g_immediateContext.fenceEvent)
+        {
+            printl(Log::LogLevel::Error, "Failed to create fence event, for Immediate context!");
+            abort();
+        }
+    }
+
+    // reserve space for all the resources, shaders, pipelines
+    g_buffers.resize(1'000);
+    g_textures.resize(1'000);
+    g_shaders.resize(400);
+    g_pipelines.resize(200);
 }
 
 void D3D12Backend::Shutdown()
@@ -517,41 +555,18 @@ void D3D12Backend::Shutdown()
 
 void D3D12Backend::BeginFrame()
 {
-
+    WaitIdle();
 }
 
 void D3D12Backend::EndFrame()
 {
-    using namespace D3D12Internal;
-    /*
-     *
-     * perform the other tasks whatever
-     *
-    */
-
-    // do framesync stuff before the move to next frame
-    const u64 currentFenceValue = g_fenceValues[g_frameIndex];
-    RHI_ASSERT(g_commandQueue->Signal(g_fence.Get(), currentFenceValue));
-
-    // update the frame index
-    g_frameIndex = g_swapchain->GetCurrentBackBufferIndex();
-
-    // CPU side code
-    // if the next frame is not ready to be rendered yet, wait until its ready
-    if (g_fence->GetCompletedValue() < g_fenceValues[g_frameIndex])
-    {
-        RHI_ASSERT(g_fence->SetEventOnCompletion(g_fenceValues[g_frameIndex], g_fenceEvent));
-        WaitForSingleObjectEx(g_fenceEvent, INFINITE, FALSE);
-    }
-
-    // set the fence value for the next frame
-    g_fenceValues[g_frameIndex] = currentFenceValue + 1;
+    MoveToNextFrame();
 }
 
 
 void D3D12Backend::WaitIdle()
 {
-    using namespace D3D12Internal;
+
     /* commandQueue->Signal processes the GPU side command to set the fence to the fence value at the particular index
      * then fence->SetEventOnCompletion sets the event the same (set the fence value at frame index)
      * but on the CPU. The next command (WaitForSingleObjectEx) waits for the fence event CPU side to complete in the GPU side.
@@ -580,7 +595,7 @@ void D3D12Backend::WaitIdle()
 
 BufferHandle D3D12Backend::CreateBuffer(const RHIBufferDesc& desc, const void* initialData)
 {
-    using namespace D3D12Internal;
+
 
     // does buffer creation
     BufferResource resource = CreateBufferResource(desc);
@@ -591,13 +606,15 @@ BufferHandle D3D12Backend::CreateBuffer(const RHIBufferDesc& desc, const void* i
 	    .heap = g_bindlessHeap.Get(),
 	    .view = desc.view }, desc.createInfo);
 
-	return AssignBufferHandle();
+	BufferHandle handle = AssignBufferHandle();
+
+    g_buffers.at(handle.index) = resource;
+
+    return handle;
 }
 
 TextureHandle D3D12Backend::CreateTexture(const RHITextureDesc& desc, const void* initialData)
 {
-    using namespace D3D12Internal;
-
     // resource flags
     D3D12_RESOURCE_FLAGS resourceFlags = D3D12_RESOURCE_FLAG_NONE;
     if (HasFlag(desc.view, RHIResourceView::RENDER_TARGET))
@@ -646,14 +663,16 @@ TextureHandle D3D12Backend::CreateTexture(const RHITextureDesc& desc, const void
                 0);
         }
     }
-    g_textures.push_back(textureRes);
+    TextureHandle handle = AssignTextureHandle();
 
-    return AssignTextureHandle();
+    g_textures[handle.index] = textureRes;
+
+    return handle;
 }
 
 ShaderHandle D3D12Backend::CreateShader(const RHIShaderDesc& shaderDesc)
 {
-    using namespace D3D12Internal;
+
 
 	ShaderResource shader;
 	shader.type = shaderDesc.stage;
@@ -745,12 +764,16 @@ ShaderHandle D3D12Backend::CreateShader(const RHIShaderDesc& shaderDesc)
     // TODO: Shader res though pushed back isnt cached to get with a handle
     g_shaders.push_back(shader);
 
-    return AssignShaderHandle();
+    ShaderHandle handle = AssignShaderHandle();
+
+    g_shaders.at(handle.index) = shader;
+
+    return handle;
 }
 
 PipelineHandle D3D12Backend::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
 {
-    using namespace D3D12Internal;
+
     PipelineResource pipeline;
 
     ShaderResource* vs = GetShader(desc.vs);
@@ -884,19 +907,19 @@ PipelineHandle D3D12Backend::CreateGraphicsPipeline(const RHIGraphicsPipelineDes
 
     RHI_ASSERT(g_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipeline.pso)));
 
-    g_pipelines.push_back(pipeline);
+    PipelineHandle handle = AssignPipelineHandle();
+	g_pipelines[handle.index] = pipeline;
 
-	return AssignPipelineHandle();
+    return handle;
 }
 
 PipelineHandle D3D12Backend::CreateComputePipeline(const RHIComputePipelineDesc& desc)
 {
-    using namespace D3D12Internal;
-
     ShaderResource* cs = GetShader(desc.cs);
     ComPtr<ID3D12RootSignature> rootSignature = CreateRootSignatureFromBlob(cs->pBlob.Get());
 
     PipelineResource pipeline;
+    pipeline.isCompute = true;
 
     D3D12_COMPUTE_PIPELINE_STATE_DESC csoDesc{};
     csoDesc.pRootSignature = rootSignature.Get();
@@ -910,30 +933,32 @@ PipelineHandle D3D12Backend::CreateComputePipeline(const RHIComputePipelineDesc&
 
     RHI_ASSERT(g_device->CreateComputePipelineState(&csoDesc, IID_PPV_ARGS(&pipeline.pso)));
 
-    g_pipelines.push_back(pipeline);
+    PipelineHandle handle = AssignPipelineHandle();
 
-    return AssignPipelineHandle();
+    g_pipelines[handle.index] = pipeline;
+
+    return handle;
 }
 
 D3D12Internal::BufferResource* D3D12Backend::GetBuffer(BufferHandle handle) 
 {
     if (!IsBufferHandleValid(handle)) return nullptr;
-    return &D3D12Internal::g_buffers[handle.index];
+    return &g_buffers[handle.index];
 }
 D3D12Internal::TextureResource* D3D12Backend::GetTexture(TextureHandle handle) 
 {
     if (!IsTextureHandleValid(handle)) return nullptr;
-    return &D3D12Internal::g_textures[handle.index];
+    return &g_textures[handle.index];
 }
 D3D12Internal::ShaderResource* D3D12Backend::GetShader(ShaderHandle handle) 
 {
     if (!IsShaderHandleValid(handle)) return nullptr;
-    return &D3D12Internal::g_shaders[handle.index];
+    return &g_shaders[handle.index];
 }
 D3D12Internal::PipelineResource* D3D12Backend::GetPipeline(PipelineHandle handle) 
 {
     if (!IsPipelineHandleValid(handle)) return nullptr;
-    return &D3D12Internal::g_pipelines[handle.index];
+    return &g_pipelines[handle.index];
 }
 
 void D3D12Backend::DestroyBuffer(BufferHandle handle)
@@ -947,7 +972,7 @@ void D3D12Backend::DestroyTexture(TextureHandle handle)
 
 void D3D12Backend::DestroyShader(ShaderHandle handle)
 {
-    using namespace D3D12Internal;
+
 }
 
 void D3D12Backend::DestroyPipeline(PipelineHandle handle)
@@ -957,7 +982,7 @@ void D3D12Backend::DestroyPipeline(PipelineHandle handle)
 
 i32 D3D12Backend::GetBindlessReadIndex(TextureHandle handle)
 {
-    using namespace D3D12Internal;
+
     if (!handle.IsValid())
         return -1;
     TextureResource* texture = GetTexture(handle);
@@ -966,7 +991,7 @@ i32 D3D12Backend::GetBindlessReadIndex(TextureHandle handle)
 
 i32 D3D12Backend::GetBindlessWriteIndex(TextureHandle handle)
 {
-    using namespace D3D12Internal;
+
     if (!handle.IsValid())
         return -1;
     TextureResource* texture = GetTexture(handle);
@@ -975,7 +1000,7 @@ i32 D3D12Backend::GetBindlessWriteIndex(TextureHandle handle)
 
 i32 D3D12Backend::GetBindlessReadIndex(BufferHandle handle)
 {
-    using namespace D3D12Internal;
+
     if (!handle.IsValid())
         return -1;
     BufferResource* buffer = GetBuffer(handle);
@@ -984,7 +1009,7 @@ i32 D3D12Backend::GetBindlessReadIndex(BufferHandle handle)
 
 i32 D3D12Backend::GetBindlessWriteIndex(BufferHandle handle)
 {
-    using namespace D3D12Internal;
+
     if (!handle.IsValid())
         return -1;
     BufferResource* buffer = GetBuffer(handle);
@@ -995,25 +1020,302 @@ i32 D3D12Backend::GetBindlessWriteIndex(BufferHandle handle)
 void D3D12Backend::D3D12BackendCommandList::Begin()
 {
 
+    auto allocator = g_commandAllocators[g_frameIndex];
+    RHI_ASSERT(allocator->Reset());
+    RHI_ASSERT(cmdLists[g_frameIndex]->Reset(allocator.Get(), nullptr));
+}
+
+void D3D12Backend::D3D12BackendCommandList::End()
+{
+    RHI_ASSERT(cmdLists[g_frameIndex]->Close());
+}
+
+void D3D12Backend::D3D12BackendCommandList::Submit()
+{
+
+    ID3D12CommandList* ppCommandLists[] = { cmdLists[g_frameIndex].Get() };
+    g_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+
+    RHI_ASSERT(g_swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
+}
+
+void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle, ResourceState before,
+                                                           ResourceState after)
+{
+    auto stateBefore = ConvertResourceState(before);
+    auto stateAfter= ConvertResourceState(after);
+    if (handle == g_invalidTextureHandle)
+    {
+	    // the resource is either backbuffer render target or depth stencil
+        // they will be handled with the global vars
+
+        // handle backbuffer
+        if (before == ResourceState::RENDER_TARGET || before == ResourceState::PRESENT)
+        {
+            auto backBuffer = g_renderTargets[g_frameIndex];
+            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                backBuffer.Get(),
+                stateBefore,
+                stateAfter
+            );
+            cmdLists[g_frameIndex]->ResourceBarrier(1, &barrier);
+        }
+
+        if (before == ResourceState::DEPTH_WRITE || before == ResourceState::DEPTH_READ)
+        {
+            auto depthStencil = g_depthStencil;
+            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+                depthStencil.Get(),
+                stateBefore,
+                stateAfter);
+            cmdLists[g_frameIndex]->ResourceBarrier(1, &barrier);
+        }
+    }
+    else
+    {
+        TextureResource* resource = GetTexture(handle);
+        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            resource->resource.Get(),
+            stateBefore,
+            stateAfter);
+        cmdLists[g_frameIndex]->ResourceBarrier(1, &barrier);
+    }
+}
+
+void D3D12Backend::D3D12BackendCommandList::BufferBarrier(BufferHandle handle, ResourceState before,
+	ResourceState after)
+{
+
+	auto stateBefore = ConvertResourceState(before);
+    auto stateAfter = ConvertResourceState(after);
+
+    BufferResource* resource = GetBuffer(handle);
+    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        resource->resource.Get(),
+        stateBefore,
+        stateAfter);
+    cmdLists[g_frameIndex]->ResourceBarrier(1, &barrier);
+}
+
+
+void D3D12Backend::D3D12BackendCommandList::SetPipeline(PipelineHandle handle)
+{
+
+    if (!handle.IsValid())
+        return;
+    PipelineResource* pipeline = GetPipeline(handle);
+    cmdLists[g_frameIndex]->SetPipelineState(pipeline->pso.Get());
+    if(pipeline->isCompute == true) cmdLists[g_frameIndex]->SetComputeRootSignature(pipeline->rootSignature.Get());
+    cmdLists[g_frameIndex]->SetGraphicsRootSignature(pipeline->rootSignature.Get());
+
+    cmdLists[g_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+void D3D12Backend::D3D12BackendCommandList::SetGraphicsPushConstants(const void* data, u32 size, u32 offset)
+{
+    cmdLists[g_frameIndex]->SetGraphicsRoot32BitConstants(0, size, data, offset);
+}
+
+void D3D12Backend::D3D12BackendCommandList::SetComputePushConstants(const void* data, u32 size, u32 offset)
+{
+    cmdLists[g_frameIndex]->SetComputeRoot32BitConstants(0, size, data, offset);
+}
+
+static CD3DX12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(TextureHandle textureHandle)
+{
+    TextureResource* resource = D3D12Backend::GetTexture(textureHandle);
+    u32 rtvIndex = resource->rtvIndex;
+
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE (
+        g_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+        rtvIndex,
+        g_rtvDescriptorSize
+    );
+}
+
+static CD3DX12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(TextureHandle textureHandle)
+{
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE (g_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
+void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::span<TextureHandle> colorTargets,
+                                                           TextureHandle depthTarget)
+{
+    if (colorTargets.empty() && depthTarget == g_invalidTextureHandle)
+    {
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(g_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+            g_frameIndex, g_rtvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle{ g_dsvHeap->GetCPUDescriptorHandleForHeapStart() };
+        cmdLists[g_frameIndex]->OMSetRenderTargets(
+            0, nullptr,
+            FALSE,
+            &dsvHandle
+        );
+    }
+    else if (colorTargets[0] == g_invalidTextureHandle && depthTarget == g_invalidTextureHandle)
+    {
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(g_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+            g_frameIndex, g_rtvDescriptorSize);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle{ g_dsvHeap->GetCPUDescriptorHandleForHeapStart() };
+        cmdLists[g_frameIndex]->OMSetRenderTargets(
+            1,
+            &rtvHandle,
+            FALSE,
+            &dsvHandle
+        );
+    }
+    else
+    {
+        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles;
+
+        for (auto colorTarget : colorTargets)
+        {
+            auto* tex = GetTexture(colorTarget);
+            if (!tex) continue;
+
+            CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRTVHandle(colorTarget);
+            rtvHandles.push_back(rtvHandle);
+        }
+
+        D3D12_CPU_DESCRIPTOR_HANDLE* dsvHandle = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE dsv;
+
+        if (depthTarget.IsValid())
+        {
+            dsv = GetDSVHandle(depthTarget);
+            dsvHandle = &dsv;
+        }
+
+        cmdLists[g_frameIndex]->OMSetRenderTargets(
+            static_cast<UINT>(rtvHandles.size()),
+            rtvHandles.empty() ? nullptr : rtvHandles.data(),
+            FALSE,
+            dsvHandle
+        );
+    }
+
+    TextureBarrier(g_invalidTextureHandle, ResourceState::PRESENT, ResourceState::RENDER_TARGET);
+    TextureBarrier(g_invalidTextureHandle, ResourceState::DEPTH_READ, ResourceState::DEPTH_WRITE);
+}
+
+void D3D12Backend::D3D12BackendCommandList::EndRendering()
+{
+    // dont ever convert to write states before the end of frame
+	// Impilict resource decay mentions that read states decay to common state always
+	// but not write states, doing this will stop the decay and cause issues furhter
+    TextureBarrier(g_invalidTextureHandle, ResourceState::RENDER_TARGET, ResourceState::PRESENT);
+}
+
+void D3D12Backend::D3D12BackendCommandList::SetViewport(const RHIViewPort& viewPort)
+{
+
+
+    if (viewPort.width <= 0.0f || viewPort.height <= 0.0f)
+    {
+        cmdLists[g_frameIndex]->RSSetViewports(1, &g_viewport);
+    }
+    else
+    {
+        CD3DX12_VIEWPORT vp(viewPort.x, viewPort.y, viewPort.width, viewPort.height,
+            viewPort.minDepth, viewPort.maxDepth);
+        cmdLists[g_frameIndex]->RSSetViewports(1, &vp);
+    }
+}
+
+void D3D12Backend::D3D12BackendCommandList::SetScissor(const RHIScissor& scissor)
+{
+
+	if (scissor.width <= 0 || scissor.height <= 0)
+    {
+        cmdLists[g_frameIndex]->RSSetScissorRects(1, &g_scissorRect);
+    }
+    else
+    {
+        CD3DX12_RECT rect(scissor.x, scissor.y,
+            scissor.x + scissor.width, scissor.y + scissor.height);
+        cmdLists[g_frameIndex]->RSSetScissorRects(1, &rect);
+    }
+}
+
+void D3D12Backend::D3D12BackendCommandList::Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance)
+{
+    cmdLists[g_frameIndex]->DrawInstanced(vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void D3D12Backend::D3D12BackendCommandList::DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
+	i32 vertexOffset, u32 firstInstance)
+{
+    cmdLists[g_frameIndex]->DrawIndexedInstanced(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
+void D3D12Backend::D3D12BackendCommandList::Dispatch(u32 x, u32 y, u32 z)
+{
+    cmdLists[g_frameIndex]->Dispatch(x, y, z);
+}
+
+void D3D12Backend::D3D12BackendCommandList::BindVertexBuffer(BufferHandle handle)
+{
+
+    BufferResource* bufferResource = GetBuffer(handle);
+    cmdLists[g_frameIndex]->IASetVertexBuffers(0, 1, &bufferResource->AsVertexBuffer()->view);
+}
+
+void D3D12Backend::D3D12BackendCommandList::BindIndexBuffer(BufferHandle handle)
+{
+
+    BufferResource* bufferResource = GetBuffer(handle);
+    cmdLists[g_frameIndex]->IASetIndexBuffer(&bufferResource->AsIndexBuffer()->view);
 }
 
 D3D12Backend::D3D12BackendCommandList* D3D12Backend::CreateCommandList()
 {
-    using namespace D3D12Internal;
-
     D3D12BackendCommandList* commandList = new D3D12BackendCommandList();
-    RHI_ASSERT(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList->allocator.Get(),
-        nullptr,
-        IID_PPV_ARGS(&commandList->cmdList)));
 
-    RHI_ASSERT(commandList->cmdList->Close());
+    for (u32 i = 0; i < frameCount; i++)
+    {
+        RHI_ASSERT(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, 
+            IID_PPV_ARGS(&commandList->commandAllocators[i])));
 
+        RHI_ASSERT(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+            commandList->commandAllocators[i].Get(),
+            nullptr,
+            IID_PPV_ARGS(&commandList->cmdLists[i])));
+
+        RHI_ASSERT(commandList->cmdLists[i]->Close());
+    }
     return commandList;
 }
 
 void D3D12Backend::DestroyCommandList(D3D12BackendCommandList* cmdList)
 {
     delete cmdList;
+}
+
+void D3D12Backend::MoveToNextFrame()
+{
+
+    /*
+     *
+     * perform the other tasks whatever
+     *
+    */
+    // do framesync stuff before the move to next frame
+    const u64 currentFenceValue = g_fenceValues[g_frameIndex];
+    RHI_ASSERT(g_commandQueue->Signal(g_fence.Get(), currentFenceValue));
+
+    // update the frame index
+    g_frameIndex = g_swapchain->GetCurrentBackBufferIndex();
+
+    // CPU side code
+    // if the next frame is not ready to be rendered yet, wait until its ready
+    if (g_fence->GetCompletedValue() < g_fenceValues[g_frameIndex])
+    {
+        RHI_ASSERT(g_fence->SetEventOnCompletion(g_fenceValues[g_frameIndex], g_fenceEvent));
+        WaitForSingleObjectEx(g_fenceEvent, INFINITE, FALSE);
+    }
+
+    // set the fence value for the next frame
+    g_fenceValues[g_frameIndex] = currentFenceValue + 1;
 }
 
 DXGI_FORMAT D3D12Backend::ConvertFormat(RHIFormat format)
@@ -1037,9 +1339,114 @@ DXGI_FORMAT D3D12Backend::ConvertFormat(RHIFormat format)
     case RHIFormat::R32_TYPELESS:
         return DXGI_FORMAT_R32_TYPELESS;
     case RHIFormat::UNKNOWN:
+        return DXGI_FORMAT_UNKNOWN;
+        break;
+	case RHIFormat::R32G32B32_FLOAT:
+        return DXGI_FORMAT_R32G32B32_FLOAT;
+		break;
+	case RHIFormat::R32G32_FLOAT:
+        return DXGI_FORMAT_R32G32_FLOAT;
+		break;
     default:
         return DXGI_FORMAT_UNKNOWN;
     }
+}
+
+D3D12_RESOURCE_STATES D3D12Backend::ConvertResourceState(ResourceState state)
+{
+	switch (state)
+	{
+	case ResourceState::COMMON:
+        return D3D12_RESOURCE_STATE_COMMON;
+		break;
+	case ResourceState::VERTEX_BUFFER:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		break;
+	case ResourceState::INDEX_BUFFER:
+        return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+		break;
+	case ResourceState::RENDER_TARGET:
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		break;
+	case ResourceState::DEPTH_WRITE:
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		break;
+	case ResourceState::DEPTH_READ:
+        return D3D12_RESOURCE_STATE_DEPTH_READ;
+		break;
+	case ResourceState::UNORDERED_ACCESS:
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		break;
+	case ResourceState::SHADER_RESOURCE:
+        return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+		break;
+	case ResourceState::COPY_DEST:
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+		break;
+	case ResourceState::COPY_SOURCE:
+        return D3D12_RESOURCE_STATE_COPY_SOURCE;
+		break;
+	case ResourceState::PRESENT:
+        return D3D12_RESOURCE_STATE_PRESENT;
+		break;
+	default:
+		return D3D12_RESOURCE_STATE_COMMON;
+        break;
+	}
+}
+
+D3D12_COMPARISON_FUNC D3D12Backend::ConvertDepthFunc(RHIDepthFunc func)
+{
+	switch (func)
+	{
+	case RHIDepthFunc::NONE:
+        return D3D12_COMPARISON_FUNC_NONE;
+		break;
+	case RHIDepthFunc::NEVER:
+        return D3D12_COMPARISON_FUNC_NEVER;
+		break;
+	case RHIDepthFunc::LESS:
+        return D3D12_COMPARISON_FUNC_LESS;
+		break;
+	case RHIDepthFunc::EQUAL:
+        return D3D12_COMPARISON_FUNC_EQUAL;
+		break;
+	case RHIDepthFunc::LEQUAL:
+        return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		break;
+	case RHIDepthFunc::GREATER:
+        return D3D12_COMPARISON_FUNC_GREATER;
+		break;
+	case RHIDepthFunc::NEQUAL:
+        return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+		break;
+	case RHIDepthFunc::GEQUAL:
+        return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+		break;
+	case RHIDepthFunc::ALWAYS:
+        return D3D12_COMPARISON_FUNC_ALWAYS;
+		break;
+    default:
+        return D3D12_COMPARISON_FUNC_GREATER;
+	}
+}
+
+D3D12_PRIMITIVE_TOPOLOGY D3D12Backend::ConvertTopology(RHITopology topology)
+{
+	switch (topology)
+	{
+	case RHITopology::TRIANGLE_LIST:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		break;
+	case RHITopology::LINE_LIST:
+        return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+		break;
+	case RHITopology::POINT_LIST:
+        return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+		break;
+    default:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	}
 }
 
 static void GetHardwareAdapter(
@@ -1119,28 +1526,23 @@ static void IsDirectXRayTracingSuppported(ID3D12Device14* device)
 
 static BufferHandle AssignBufferHandle()
 {
-    using namespace D3D12Internal;
-
-    u32 index;
+    BufferHandle handle;
     if (!g_freeBuffers.empty())
     {
-        index = g_freeBuffers.back();
+        handle.index = g_freeBuffers.back();
         g_freeBuffers.pop_back();
+        handle.generation = g_generationsBuffers[handle.index];
     }
     else
     {
-        index = (u32)g_generationsBuffers.size();
+        handle.index = (u32)g_generationsBuffers.size();
         g_generationsBuffers.push_back(0);
     }
-    return BufferHandle{
-    .index = index,
-    .generation = g_generationsShaders[index] };
+    return handle;
 }
 
 static TextureHandle AssignTextureHandle()
 {
-    using namespace D3D12Internal;
-
     u32 index;
     if (!g_freeTextures.empty())
     {
@@ -1159,8 +1561,6 @@ static TextureHandle AssignTextureHandle()
 
 static ShaderHandle AssignShaderHandle()
 {
-    using namespace D3D12Internal;
-
     u32 index;
     if (!g_freeShaders.empty())
     {
@@ -1179,8 +1579,6 @@ static ShaderHandle AssignShaderHandle()
 
 static PipelineHandle AssignPipelineHandle()
 {
-    using namespace D3D12Internal;
-
     u32 index;
     if (!g_freePipelines.empty())
     {
@@ -1194,30 +1592,30 @@ static PipelineHandle AssignPipelineHandle()
     }
     return PipelineHandle{
     .index = index,
-    .generation = g_generationsShaders[index] };
+    .generation = g_generationsPipelines[index] };
 }
 
 static bool IsBufferHandleValid(BufferHandle handle) 
 {
-    using namespace D3D12Internal;
+
     return handle.index < g_generationsBuffers.size() &&
         g_generationsBuffers[handle.index] == handle.generation;
 }
 static bool IsTextureHandleValid(TextureHandle handle) 
 {
-    using namespace D3D12Internal;
+
     return handle.index < g_generationsTextures.size() &&
         g_generationsTextures[handle.index] == handle.generation;
 }
 static bool IsShaderHandleValid(ShaderHandle handle) 
 {
-    using namespace D3D12Internal;
+
     return handle.index < g_generationsShaders.size() &&
         g_generationsShaders[handle.index] == handle.generation;
 }
 static bool IsPipelineHandleValid(PipelineHandle handle) 
 {
-    using namespace D3D12Internal;
+
     return handle.index < g_generationsPipelines.size() &&
         g_generationsPipelines[handle.index] == handle.generation;
 }
@@ -1336,16 +1734,16 @@ static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
 
             /* TODO: Need to find a way to do this less messy way
             */
-            /*ImmediateSubmit(gfxDevice, &frameSync.immediateContext_, [&]()
+            RHI::ImmediateSubmit( [&]()
                 {
-                    UpdateSubresources(frameSync.immediateContext_.commandList.Get(),
+                    UpdateSubresources(g_immediateContext.commandList.Get(),
                         resource.Get(),
                         textureUploadHeapResource.Get(),
                         0, 0, subresourceCount, subresources.data());
                     auto pBarrier = CD3DX12_RESOURCE_BARRIER::Transition(resource.Get(),
                         D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                    frameSync.immediateContext_.commandList->ResourceBarrier(1, &pBarrier);
-                });*/
+                    g_immediateContext.commandList->ResourceBarrier(1, &pBarrier);
+                });
         }
     }
     else if (usage == RHIMemoryeUsage::GPU_UPLOAD)
@@ -1356,7 +1754,7 @@ static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
 
 static D3D12Internal::TextureResource CreateTextureResource(D3D12MA::Allocator* allocator, const D3D12_RESOURCE_FLAGS resourceFlags, const RHITextureDesc& desc)
 {
-    using namespace D3D12Internal;
+
     TextureResource textureRes{};
 
     CD3DX12_RESOURCE_DESC resourceDesc{};
@@ -1406,6 +1804,7 @@ static D3D12Internal::TextureResource CreateTextureResource(D3D12MA::Allocator* 
         &textureRes.allocation,
         IID_PPV_ARGS(&resource)));
 
+    textureRes.resource = textureRes.allocation->GetResource();
     if (desc.initialData && (desc.usage == RHIMemoryeUsage::UPLOAD || desc.usage == RHIMemoryeUsage::GPU_UPLOAD))
     {
         UploadTextureData(resource, desc, desc.usage);
@@ -1424,7 +1823,7 @@ static u32 CreateTextureSRV(
     const ComPtr<ID3D12Resource>& resource,
     const RHITextureDesc& desc)
 {
-    using namespace D3D12Internal;
+
     u32 index = (*nextIndex)++;
 
     CD3DX12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -1469,7 +1868,7 @@ static u32 CreateTextureRTV(
     const ComPtr<ID3D12Resource>& resource,
     const RHITextureDesc& desc)
 {
-    using namespace D3D12Internal;
+
     u32 index = (*nextRTVIndex)++;
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -1494,7 +1893,7 @@ static u32 CreateTextureUAV(
     const RHITextureDesc& desc,
     u32 mipLevel)
 {
-    using namespace D3D12Internal;
+
     u32 index = (*nextIndex)++;
 
     CD3DX12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -1527,12 +1926,13 @@ static u32 CreateTextureUAV(
 
 static ComPtr<ID3D12RootSignature> CreateRootSignatureFromBlob(IDxcBlob* shaderBlob)
 {
-    using namespace D3D12Internal;
+
     if (!shaderBlob) return nullptr;
 
     ComPtr<ID3D12RootSignature> rootSignature;
 
     // The D3D12 runtime can parse the Root Signature directly from the compiled shader blob
+    // i am using only dx12 shader macro based root signatures, pretty much for now
     HRESULT hr = g_device->CreateRootSignature(
         0,                                      // NodeMask (0 for single GPU)
         shaderBlob->GetBufferPointer(),         // Pointer to the shader bytecode

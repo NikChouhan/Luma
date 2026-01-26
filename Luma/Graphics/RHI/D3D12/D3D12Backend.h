@@ -96,6 +96,8 @@ namespace D3D12Internal
         D3D12MA::Allocation* allocation = nullptr;
         u32 bindlessSRVIndex = 0xFFFFFFFF;
         u32 bindlessUAVIndex = 0xFFFFFFFF;
+
+        u32 rtvIndex;
     };
 
     // shaders
@@ -126,7 +128,6 @@ namespace D3D12Internal
 
     // global d3d12 stuff
     inline ComPtr<ID3D12Device14> g_device;
-    inline ComPtr<ID3D12GraphicsCommandList4> g_List;
     inline ComPtr<D3D12MA::Allocator> g_allocator;
     inline ComPtr<ID3D12CommandQueue> g_commandQueue;
     inline ComPtr<ID3D12CommandAllocator> g_commandAllocators[frameCount];
@@ -158,6 +159,18 @@ namespace D3D12Internal
     inline HANDLE g_fenceEvent = INVALID_HANDLE_VALUE;
     inline ComPtr<ID3D12Fence> g_fence;
     inline std::array<u64, frameCount> g_fenceValues{ 0, 0 };
+
+    // immediate context stuff
+    struct ImmediateContext
+    {
+        ComPtr<ID3D12CommandAllocator> cmdAllocator;
+        ComPtr<ID3D12GraphicsCommandList1> commandList;
+        ComPtr<ID3D12Fence> fence;
+        u64 fenceValue = 0;
+        HANDLE fenceEvent = nullptr;
+    };
+
+    inline ImmediateContext g_immediateContext ;
 
     enum class BindlessCategory : u8 
 	{
@@ -240,8 +253,8 @@ struct D3D12Backend
 
     struct D3D12BackendCommandList
     {
-        ComPtr<ID3D12GraphicsCommandList4> cmdList;
-        ComPtr<ID3D12CommandAllocator> allocator;
+        ComPtr<ID3D12GraphicsCommandList4> cmdLists[frameCount];
+        ComPtr<ID3D12CommandAllocator> commandAllocators[frameCount];
 
         void Begin();
         void End();
@@ -251,13 +264,14 @@ struct D3D12Backend
         void BufferBarrier(BufferHandle handle, ResourceState before, ResourceState after);
 
         void SetPipeline(PipelineHandle handle);
-        void SetPushConstants(const void* data, u32 size, u32 offset);
+        void SetGraphicsPushConstants(const void* data, u32 size, u32 offset);
+        void SetComputePushConstants(const void* data, u32 size, u32 offset);
 
         void BeginRendering(const std::span<TextureHandle> colorTargets, TextureHandle depthTarget);
         void EndRendering();
 
-        void SetViewport(float x, float y, float w, float h, float minD, float maxD);
-        void SetScissor(int x, int y, int w, int h);
+        void SetViewport(const RHIViewPort& viewPort);
+        void SetScissor(const RHIScissor& scissor);
 
         void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance);
         void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance);
@@ -272,6 +286,7 @@ struct D3D12Backend
     static D3D12BackendCommandList* CreateCommandList();
     static void DestroyCommandList(D3D12BackendCommandList* cl);
 
+    static void MoveToNextFrame();
     static DXGI_FORMAT ConvertFormat(RHIFormat format);
     static D3D12_RESOURCE_STATES ConvertResourceState(ResourceState state);
     static D3D12_COMPARISON_FUNC ConvertDepthFunc(RHIDepthFunc func);

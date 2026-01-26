@@ -3,16 +3,15 @@
 #include <imgui.h>
 #include <windowsx.h>
 
-#include "Graphics/FrameSync.h"
 #include "Graphics/Globals.h"
+#include "Graphics/RHI/RHI.h"
 
 static const wchar_t* CLASS_NAME = L"LumaEngineWindowClass";
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
 
-Window::Window(GfxDevice& gfxDevice, FrameSync& frameSync, const WindowDesc& desc)
-	: gfxDevice_(gfxDevice), frameSync_(frameSync)
+Window::Window(const WindowDesc& desc)
 {
 	hInstance_ = GetModuleHandle(nullptr);
 
@@ -111,8 +110,8 @@ LRESULT Window::HandleMsg(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_DESTROY:
         isClosed_ = true;
-        WaitForGPU(gfxDevice_, frameSync_);
-        DestroyDevice(gfxDevice_);
+        RHI::WaitIdle();
+        // DestroyDevice();
         PostQuitMessage(0);
         return 0;
     case WM_KEYDOWN:
@@ -123,8 +122,8 @@ LRESULT Window::HandleMsg(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (wParam == VK_ESCAPE)
         {
-            WaitForGPU(gfxDevice_, frameSync_);
-            DestroyDevice(gfxDevice_);
+            RHI::WaitIdle();
+            // DestroyDevice();
             PostQuitMessage(0);
         }
         if (wParam == 'M')
