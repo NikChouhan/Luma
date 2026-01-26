@@ -6,7 +6,9 @@ target("Luma")
      "External/SimpleMath/SimpleMath.h",
      "External/sol/sol.hpp",
      "Graphics/*.h",
-     "Graphics/D3D12/*.h",
+     "Graphics/RHI/D3D12/*.h",
+     "Graphics/RHI/*.h",
+     "Graphics/RHI/Vulkan/*.h",
      "Renderer/*.h",
      "Renderer/Core/*.h",
      "Renderer/Passes/*.h",
@@ -18,13 +20,15 @@ target("Luma")
      "Core/*.cpp",
      "External/SimpleMath/SimpleMath.cpp",
      "Graphics/*.cpp",
-     "Graphics/D3D12/*.cpp",
+     "Graphics/RHI/D3D12/*.cpp",
+     "Graphics/RHI/Vulkan/*.cpp",
      "Renderer/*.cpp",
      "Renderer/Core/*cpp",
      "Renderer/Passes/*cpp",
      "Renderer/Passes/Clustered/*.cpp",
      "RenderGraph/*.cpp"
     )
+    add_rules("c++.unity_build")
 
     add_packages("d3d12-memory-allocator",
      "stb",
