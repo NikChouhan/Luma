@@ -133,6 +133,11 @@ namespace D3D12Internal
     inline ComPtr<ID3D12CommandAllocator> g_commandAllocators[frameCount];
     inline ComPtr<ID3D12DescriptorHeap> g_bindlessHeap;
 
+    // framesync stuff
+    inline u32 g_frameIndex = 0;
+    inline HANDLE g_fenceEvent = INVALID_HANDLE_VALUE;
+    inline ComPtr<ID3D12Fence> g_fence;
+    inline std::array<u64, frameCount> g_fenceValues{ 0, 0 };
 
     // swapchain
     inline u32 g_width;
@@ -148,17 +153,14 @@ namespace D3D12Internal
     inline u32 g_rtvDescriptorSize = 0;
     inline u32 g_dsvDescriptorSize = 0;
 
+    inline CD3DX12_CPU_DESCRIPTOR_HANDLE g_rtvHandle;
+    inline CD3DX12_CPU_DESCRIPTOR_HANDLE g_dsvHandle;
+
     inline u32 g_bindlessDescriptorSize = 0;
 
     inline u32 g_nextBindlessIndex = 0;
     inline u32 g_nextRTVIndex = 0;
     inline u32 g_nextDSVIndex = 0;
-
-    // framesync stuff
-    inline u32 g_frameIndex = 0;
-    inline HANDLE g_fenceEvent = INVALID_HANDLE_VALUE;
-    inline ComPtr<ID3D12Fence> g_fence;
-    inline std::array<u64, frameCount> g_fenceValues{ 0, 0 };
 
     // immediate context stuff
     struct ImmediateContext
@@ -260,14 +262,14 @@ struct D3D12Backend
         void End();
         void Submit();
 
-        void TextureBarrier(TextureHandle handle, ResourceState before, ResourceState after);
-        void BufferBarrier(BufferHandle handle, ResourceState before, ResourceState after);
+        void TextureBarrier(TextureHandle handle, RHIResourceState before, RHIResourceState after);
+        void BufferBarrier(BufferHandle handle, RHIResourceState before, RHIResourceState after);
 
         void SetPipeline(PipelineHandle handle);
         void SetGraphicsPushConstants(const void* data, u32 size, u32 offset);
         void SetComputePushConstants(const void* data, u32 size, u32 offset);
 
-        void BeginRendering(const std::span<TextureHandle> colorTargets, TextureHandle depthTarget);
+        void BeginRendering(const std::vector<TextureHandle> colorTargets, TextureHandle depthTarget);
         void EndRendering();
 
         void SetViewport(const RHIViewPort& viewPort);
@@ -282,13 +284,15 @@ struct D3D12Backend
 
         void BindVertexBuffer(BufferHandle handle);
         void BindIndexBuffer(BufferHandle handle);
+
+        bool isImmediate = false;
     };
-    static D3D12BackendCommandList* CreateCommandList();
+    static D3D12BackendCommandList* CreateCommandList(bool isImmediate);
     static void DestroyCommandList(D3D12BackendCommandList* cl);
 
     static void MoveToNextFrame();
     static DXGI_FORMAT ConvertFormat(RHIFormat format);
-    static D3D12_RESOURCE_STATES ConvertResourceState(ResourceState state);
+    static D3D12_RESOURCE_STATES ConvertResourceState(RHIResourceState state);
     static D3D12_COMPARISON_FUNC ConvertDepthFunc(RHIDepthFunc func);
     static D3D12_PRIMITIVE_TOPOLOGY ConvertTopology(RHITopology topology);
 };
