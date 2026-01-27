@@ -12,7 +12,8 @@ static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& d
 static D3D12Internal::TextureResource CreateTextureResource(
     D3D12MA::Allocator* allocator,
     const D3D12_RESOURCE_FLAGS resourceFlags,
-    const RHITextureDesc& desc);
+    const RHITextureDesc& desc,
+    const void* initialData);
 static u32 CreateTextureUAV(
     u32* nextIndex,
     const ComPtr<ID3D12Resource>& resource,
@@ -351,7 +352,7 @@ void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
     g_hwnd = static_cast<HWND>(windowHandle);
     g_width = width;
     g_height = height;
-    g_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height));
+    g_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0., 1.);
     g_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(width), static_cast<LONG>(height));
 
     u32 dxgiFactoryFlags = 0;
@@ -627,7 +628,7 @@ TextureHandle D3D12Backend::CreateTexture(const RHITextureDesc& desc, const void
     }
 
     // texture creation
-    TextureResource textureRes = CreateTextureResource(g_allocator.Get(), resourceFlags, desc);
+    TextureResource textureRes = CreateTextureResource(g_allocator.Get(), resourceFlags, desc, initialData);
 
     // texture views
     if (HasFlag(desc.view, RHIResourceView::LOAD))
@@ -1019,28 +1020,68 @@ i32 D3D12Backend::GetBindlessWriteIndex(BufferHandle handle)
 
 void D3D12Backend::D3D12BackendCommandList::Begin()
 {
+    if (isImmediate)
+    {
+        auto allocator = g_immediateContext.cmdAllocator;
+        RHI_ASSERT(allocator->Reset());
+        RHI_ASSERT(g_immediateContext.commandList->Reset(allocator.Get(), nullptr));
+    }
+    else
+    {
+        auto allocator = g_commandAllocators[g_frameIndex];
+        RHI_ASSERT(allocator->Reset());
+        RHI_ASSERT(cmdLists[g_frameIndex]->Reset(allocator.Get(), nullptr));
 
-    auto allocator = g_commandAllocators[g_frameIndex];
-    RHI_ASSERT(allocator->Reset());
-    RHI_ASSERT(cmdLists[g_frameIndex]->Reset(allocator.Get(), nullptr));
+        ID3D12DescriptorHeap* heaps[] = { g_bindlessHeap.Get() };
+        cmdLists[g_frameIndex]->SetDescriptorHeaps(1, heaps);
+
+        TextureBarrier(g_invalidTextureHandle, RHIResourceState::PRESENT, RHIResourceState::RENDER_TARGET);
+
+        g_dsvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(g_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+        g_rtvHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(g_rtvHeap->GetCPUDescriptorHandleForHeapStart(), g_frameIndex, g_rtvDescriptorSize);
+
+        const float clearColor[] = { 0.4f, 0.2f, 0.7f, 1.0f };
+        cmdLists[g_frameIndex]->ClearRenderTargetView(g_rtvHandle, clearColor, 0, nullptr);
+        cmdLists[g_frameIndex]->ClearDepthStencilView(g_dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+    }
 }
 
 void D3D12Backend::D3D12BackendCommandList::End()
 {
-    RHI_ASSERT(cmdLists[g_frameIndex]->Close());
+    if (isImmediate)
+    {
+        RHI_ASSERT(g_immediateContext.commandList->Close());
+    }
+    else  RHI_ASSERT(cmdLists[g_frameIndex]->Close());
 }
 
 void D3D12Backend::D3D12BackendCommandList::Submit()
 {
+    if (isImmediate)
+    {
+        ID3D12CommandList* ppCommandLists[] = { g_immediateContext.commandList.Get() };
+        g_commandQueue->ExecuteCommandLists(1, ppCommandLists);
 
-    ID3D12CommandList* ppCommandLists[] = { cmdLists[g_frameIndex].Get() };
-    g_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+        const u64 currentFenceValue = ++g_immediateContext.fenceValue;
+        RHI_ASSERT(g_commandQueue->Signal(g_immediateContext.fence.Get(), currentFenceValue));
 
-    RHI_ASSERT(g_swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
+        if (g_immediateContext.fence->GetCompletedValue() < currentFenceValue)
+        {
+            RHI_ASSERT(g_immediateContext.fence->SetEventOnCompletion(currentFenceValue, g_immediateContext.fenceEvent));
+            WaitForSingleObject(g_immediateContext.fenceEvent, INFINITE);
+        }
+    }
+    else
+    {
+        ID3D12CommandList* ppCommandLists[] = { cmdLists[g_frameIndex].Get() };
+        g_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+
+        RHI_ASSERT(g_swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
+    }
 }
 
-void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle, ResourceState before,
-                                                           ResourceState after)
+void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle, RHIResourceState before,
+                                                           RHIResourceState after)
 {
     auto stateBefore = ConvertResourceState(before);
     auto stateAfter= ConvertResourceState(after);
@@ -1050,7 +1091,7 @@ void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle,
         // they will be handled with the global vars
 
         // handle backbuffer
-        if (before == ResourceState::RENDER_TARGET || before == ResourceState::PRESENT)
+        if (before == RHIResourceState::RENDER_TARGET || before == RHIResourceState::PRESENT)
         {
             auto backBuffer = g_renderTargets[g_frameIndex];
             auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -1061,7 +1102,7 @@ void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle,
             cmdLists[g_frameIndex]->ResourceBarrier(1, &barrier);
         }
 
-        if (before == ResourceState::DEPTH_WRITE || before == ResourceState::DEPTH_READ)
+        if (before == RHIResourceState::DEPTH_WRITE || before == RHIResourceState::DEPTH_READ)
         {
             auto depthStencil = g_depthStencil;
             auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -1082,8 +1123,8 @@ void D3D12Backend::D3D12BackendCommandList::TextureBarrier(TextureHandle handle,
     }
 }
 
-void D3D12Backend::D3D12BackendCommandList::BufferBarrier(BufferHandle handle, ResourceState before,
-	ResourceState after)
+void D3D12Backend::D3D12BackendCommandList::BufferBarrier(BufferHandle handle, RHIResourceState before,
+	RHIResourceState after)
 {
 
 	auto stateBefore = ConvertResourceState(before);
@@ -1138,7 +1179,7 @@ static CD3DX12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(TextureHandle textureHandle)
     return CD3DX12_CPU_DESCRIPTOR_HANDLE (g_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
-void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::span<TextureHandle> colorTargets,
+void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::vector<TextureHandle> colorTargets,
                                                            TextureHandle depthTarget)
 {
     if (colorTargets.empty() && depthTarget == g_invalidTextureHandle)
@@ -1193,9 +1234,6 @@ void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::span<Textu
             dsvHandle
         );
     }
-
-    TextureBarrier(g_invalidTextureHandle, ResourceState::PRESENT, ResourceState::RENDER_TARGET);
-    TextureBarrier(g_invalidTextureHandle, ResourceState::DEPTH_READ, ResourceState::DEPTH_WRITE);
 }
 
 void D3D12Backend::D3D12BackendCommandList::EndRendering()
@@ -1203,13 +1241,11 @@ void D3D12Backend::D3D12BackendCommandList::EndRendering()
     // dont ever convert to write states before the end of frame
 	// Impilict resource decay mentions that read states decay to common state always
 	// but not write states, doing this will stop the decay and cause issues furhter
-    TextureBarrier(g_invalidTextureHandle, ResourceState::RENDER_TARGET, ResourceState::PRESENT);
+    TextureBarrier(g_invalidTextureHandle, RHIResourceState::RENDER_TARGET, RHIResourceState::PRESENT);
 }
 
 void D3D12Backend::D3D12BackendCommandList::SetViewport(const RHIViewPort& viewPort)
 {
-
-
     if (viewPort.width <= 0.0f || viewPort.height <= 0.0f)
     {
         cmdLists[g_frameIndex]->RSSetViewports(1, &g_viewport);
@@ -1267,21 +1303,40 @@ void D3D12Backend::D3D12BackendCommandList::BindIndexBuffer(BufferHandle handle)
     cmdLists[g_frameIndex]->IASetIndexBuffer(&bufferResource->AsIndexBuffer()->view);
 }
 
-D3D12Backend::D3D12BackendCommandList* D3D12Backend::CreateCommandList()
+D3D12Backend::D3D12BackendCommandList* D3D12Backend::CreateCommandList(bool isImmediate)
 {
     D3D12BackendCommandList* commandList = new D3D12BackendCommandList();
 
-    for (u32 i = 0; i < frameCount; i++)
+    if (isImmediate)
     {
-        RHI_ASSERT(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, 
-            IID_PPV_ARGS(&commandList->commandAllocators[i])));
+        // use the immediate command list
+        commandList->isImmediate = true;
+
+        RHI_ASSERT(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+            IID_PPV_ARGS(&g_immediateContext.cmdAllocator)));
 
         RHI_ASSERT(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-            commandList->commandAllocators[i].Get(),
+            g_immediateContext.cmdAllocator.Get(),
             nullptr,
-            IID_PPV_ARGS(&commandList->cmdLists[i])));
+            IID_PPV_ARGS(&g_immediateContext.commandList)));
 
-        RHI_ASSERT(commandList->cmdLists[i]->Close());
+        RHI_ASSERT(g_immediateContext.commandList->Close());
+    }
+
+    else
+    {
+        for (u32 i = 0; i < frameCount; i++)
+        {
+            RHI_ASSERT(g_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                IID_PPV_ARGS(&commandList->commandAllocators[i])));
+
+            RHI_ASSERT(g_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+                commandList->commandAllocators[i].Get(),
+                nullptr,
+                IID_PPV_ARGS(&commandList->cmdLists[i])));
+
+            RHI_ASSERT(commandList->cmdLists[i]->Close());
+        }
     }
     return commandList;
 }
@@ -1352,41 +1407,41 @@ DXGI_FORMAT D3D12Backend::ConvertFormat(RHIFormat format)
     }
 }
 
-D3D12_RESOURCE_STATES D3D12Backend::ConvertResourceState(ResourceState state)
+D3D12_RESOURCE_STATES D3D12Backend::ConvertResourceState(RHIResourceState state)
 {
 	switch (state)
 	{
-	case ResourceState::COMMON:
+	case RHIResourceState::COMMON:
         return D3D12_RESOURCE_STATE_COMMON;
 		break;
-	case ResourceState::VERTEX_BUFFER:
+	case RHIResourceState::VERTEX_BUFFER:
         return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 		break;
-	case ResourceState::INDEX_BUFFER:
+	case RHIResourceState::INDEX_BUFFER:
         return D3D12_RESOURCE_STATE_INDEX_BUFFER;
 		break;
-	case ResourceState::RENDER_TARGET:
+	case RHIResourceState::RENDER_TARGET:
         return D3D12_RESOURCE_STATE_RENDER_TARGET;
 		break;
-	case ResourceState::DEPTH_WRITE:
+	case RHIResourceState::DEPTH_WRITE:
         return D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		break;
-	case ResourceState::DEPTH_READ:
+	case RHIResourceState::DEPTH_READ:
         return D3D12_RESOURCE_STATE_DEPTH_READ;
 		break;
-	case ResourceState::UNORDERED_ACCESS:
+	case RHIResourceState::UNORDERED_ACCESS:
         return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		break;
-	case ResourceState::SHADER_RESOURCE:
+	case RHIResourceState::SHADER_RESOURCE:
         return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 		break;
-	case ResourceState::COPY_DEST:
+	case RHIResourceState::COPY_DEST:
         return D3D12_RESOURCE_STATE_COPY_DEST;
 		break;
-	case ResourceState::COPY_SOURCE:
+	case RHIResourceState::COPY_SOURCE:
         return D3D12_RESOURCE_STATE_COPY_SOURCE;
 		break;
-	case ResourceState::PRESENT:
+	case RHIResourceState::PRESENT:
         return D3D12_RESOURCE_STATE_PRESENT;
 		break;
 	default:
@@ -1695,7 +1750,8 @@ static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& d
 
 static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
     const RHITextureDesc& desc,
-    const RHIMemoryeUsage usage)
+    const RHIMemoryeUsage usage,
+    const void* initialData)
 {
     auto heapProps = CD3DX12_HEAP_PROPERTIES((usage == RHIMemoryeUsage::UPLOAD) ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_GPU_UPLOAD);
 
@@ -1717,10 +1773,10 @@ static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
             IID_PPV_ARGS(&textureUploadHeapResource)));
 
 
-        if (desc.initialData)
+        if (initialData)
         {
             std::vector<D3D12_SUBRESOURCE_DATA> subresources(subresourceCount);
-            const uint8_t* pData = static_cast<const uint8_t*>(desc.initialData);
+            const uint8_t* pData = static_cast<const uint8_t*>(initialData);
 
             UINT64 sliceSize = desc.width * desc.height * 4; // TODO: remove the hard coded impl
 
@@ -1752,7 +1808,10 @@ static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
     }
 }
 
-static D3D12Internal::TextureResource CreateTextureResource(D3D12MA::Allocator* allocator, const D3D12_RESOURCE_FLAGS resourceFlags, const RHITextureDesc& desc)
+static TextureResource CreateTextureResource(D3D12MA::Allocator* allocator,
+    const D3D12_RESOURCE_FLAGS resourceFlags, 
+    const RHITextureDesc& desc, 
+    const void* initialData)
 {
 
     TextureResource textureRes{};
@@ -1805,9 +1864,9 @@ static D3D12Internal::TextureResource CreateTextureResource(D3D12MA::Allocator* 
         IID_PPV_ARGS(&resource)));
 
     textureRes.resource = textureRes.allocation->GetResource();
-    if (desc.initialData && (desc.usage == RHIMemoryeUsage::UPLOAD || desc.usage == RHIMemoryeUsage::GPU_UPLOAD))
+    if (initialData && (desc.usage == RHIMemoryeUsage::UPLOAD || desc.usage == RHIMemoryeUsage::GPU_UPLOAD))
     {
-        UploadTextureData(resource, desc, desc.usage);
+        UploadTextureData(resource, desc, desc.usage, initialData);
     }
 
     if (desc.debugName)
@@ -1823,9 +1882,7 @@ static u32 CreateTextureSRV(
     const ComPtr<ID3D12Resource>& resource,
     const RHITextureDesc& desc)
 {
-
     u32 index = (*nextIndex)++;
-
     CD3DX12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
     auto format = D3D12Backend::ConvertFormat(desc.format);
