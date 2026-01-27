@@ -60,8 +60,8 @@ void Model::Load(const std::string& path)
     {
         globalVertexBuffer = RHI::CreateBuffer(
         {
-            .createInfo = RHIVertexBufferCreateInfo {.vertices = allVertices.data(), .vertexCount = u32(allVertices.size()), .vertexStride = sizeof(allVertices[0]) * 3},
-            .usage = RHIMemoryeUsage::DEFAULT,
+            .createInfo = RHIVertexBufferCreateInfo {.vertices = allVertices.data(), .vertexCount = u32(allVertices.size()), .vertexStride = sizeof(allVertices[0])},
+            .usage = RHIMemoryeUsage::UPLOAD,
             .view = RHIResourceView::LOAD,
             .debugName = L"VertexBuffer"
         },
@@ -70,7 +70,7 @@ void Model::Load(const std::string& path)
         globalIndexBuffer = RHI::CreateBuffer(
         {
             .createInfo = RHIIndexBufferCreateInfo{.indices = allIndices.data(), .indexCount = u32(allIndices.size()), .format = RHIFormat::R32_UINT},
-            .usage = RHIMemoryeUsage::DEFAULT,
+            .usage = RHIMemoryeUsage::UPLOAD,
             .view = RHIResourceView::LOAD,
             .debugName = L"IndexBuffer"
         },
@@ -259,16 +259,15 @@ TextureHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRGB
 
     TextureHandle handle = RHI::CreateTexture(
         {
-        .width = 1920,
-        .height = 1080,
+        .width = (u32)w,
+        .height = u32(h),
         .depth = 0,
         .mips = 1,
         .arraySize = 1,
-        .format = RHIFormat::R32G32B32A32_FLOAT,
+        .format = RHIFormat::R8G8B8A8_UNORM,
         .usage = RHIMemoryeUsage::UPLOAD,
         .view = RHIResourceView::LOAD,
         .createPerMipViews = false,
-        .initialData = nullptr,
         .debugName = debugName.c_str() }
     , nullptr);
 
