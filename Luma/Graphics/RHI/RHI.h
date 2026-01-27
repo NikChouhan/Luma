@@ -93,7 +93,7 @@ struct RHI
     struct CommandList
     {
     public:
-        CommandList() : backendData(RHIBackend::CreateCommandList()) {}
+        CommandList(bool isImmediate) : backendData(RHIBackend::CreateCommandList(isImmediate)) {}
         ~CommandList() { RHIBackend::DestroyCommandList(static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)); }
 
         void Begin()
@@ -108,11 +108,11 @@ struct RHI
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->Submit();
         }
-        void TextureBarrier(TextureHandle handle, ResourceState before, ResourceState after)
+        void TextureBarrier(TextureHandle handle, RHIResourceState before, RHIResourceState after)
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->TextureBarrier(handle, before, after);
         }
-        void BufferBarrier(BufferHandle handle, ResourceState before, ResourceState after)
+        void BufferBarrier(BufferHandle handle, RHIResourceState before, RHIResourceState after)
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BufferBarrier(handle, before, after);
         }
@@ -124,7 +124,7 @@ struct RHI
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetGraphicsPushConstants(data, size, offset);
         }
-        void BeginRendering(const std::span<TextureHandle> colorTargets, TextureHandle depthTarget)
+        void BeginRendering(const std::vector<TextureHandle> colorTargets, TextureHandle depthTarget)
         {
             return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BeginRendering(colorTargets, depthTarget);
         }
@@ -176,17 +176,17 @@ struct RHI
         RHIBackend::EndFrame();
     }
 
-    static CommandList* CreateCommandList() { return new CommandList(); }
+    static CommandList* CreateCommandList(bool isImmediate = false) { return new CommandList(isImmediate); }
     static void DestroyCommandList(CommandList* cl) { delete cl; }
 
     template<typename Func>
     static void ImmediateSubmit(Func&& callback) {
-        auto cl = CreateCommandList();
+        auto cl = CreateCommandList(true);
         cl->Begin();
         callback();
         cl->End();
         cl->Submit();
-        DestroyCommandList(cl);
+        //DestroyCommandList(cl);
     }
     
 

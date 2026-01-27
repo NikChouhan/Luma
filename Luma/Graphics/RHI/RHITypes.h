@@ -9,7 +9,7 @@ struct Vertex
 	DirectX::XMFLOAT3 position;
 	DirectX::XMFLOAT2 texCoord;
 	DirectX::XMFLOAT3 normal;
-	DirectX::XMFLOAT4 tangent;
+	//DirectX::XMFLOAT4 tangent;
 };
 
 template<typename T>
@@ -148,8 +148,6 @@ struct RHITextureDesc
 	// create UAV per mip level (for mip generation)
 	// TODO: Do 
 	bool createPerMipViews;
-	void* initialData = nullptr;
-
 	const wchar_t* debugName = nullptr;
 };
 
@@ -194,11 +192,12 @@ struct RHIInputAttributeDesc
 
 inline std::vector<RHIInputBindingDesc> kBindingdescs =
 { {.binding = 0, .stride = sizeof(Vertex), .inputRate = RHIInputRate::PerVertex } };
+
 inline std::vector<RHIInputAttributeDesc> kInputAttributes = {
 	{.location = 0, .binding = 0, .format = RHIFormat::R32G32B32_FLOAT, .offset = offsetof(Vertex, position), .semanticName = "POSITION" },
 	{.location = 1, .binding = 0, .format = RHIFormat::R32G32_FLOAT, .offset = offsetof(Vertex, texCoord), .semanticName = "TEXCOORD" },
 	{.location = 2, .binding = 0, .format = RHIFormat::R32G32B32_FLOAT, .offset = offsetof(Vertex, normal), .semanticName = "NORMAL" },
-	{.location = 3, .binding = 0, .format = RHIFormat::R32G32B32A32_FLOAT, .offset = offsetof(Vertex, tangent), .semanticName = "TANGENT" }
+	//{.location = 3, .binding = 0, .format = RHIFormat::R32G32B32A32_FLOAT, .offset = offsetof(Vertex, tangent), .semanticName = "TANGENT" }
 };
 struct RHIGraphicsPipelineDesc 
 {
@@ -218,7 +217,7 @@ struct RHIGraphicsPipelineDesc
 };
 
 // for barriers/resource transition
-enum class ResourceState : u8 
+enum class RHIResourceState : u8 
 {
 	COMMON, VERTEX_BUFFER, INDEX_BUFFER,
 	RENDER_TARGET, DEPTH_WRITE, DEPTH_READ,
