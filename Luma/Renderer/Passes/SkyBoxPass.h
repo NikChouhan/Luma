@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/RHITypes.h"
 #include "Renderer/Core/RenderPass.h"
 
 struct SkyBoxConstants
@@ -15,10 +16,10 @@ struct SkyBoxPass : public RenderPass
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
-	PipelineHandle SkyBoxPipelineHandle = g_invalidPipelineHandle;
+	PipelineHandle skyBoxPipelineHandle = g_invalidPipelineHandle;
 
 	BufferHandle skyboxVertexBufferHandle = g_invalidBufferHandle;
 	BufferHandle skyboxIndexBufferHandle = g_invalidBufferHandle;
-	BufferHandle skyboxCubemapHandle = g_invalidBufferHandle;
+	TextureHandle skyboxCubemapHandle = g_invalidTextureHandle;
 	// texture for skybox
 };

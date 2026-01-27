@@ -45,6 +45,8 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 	// supply the render targets here. I will be using directly from the backend so pass empty for now
 	cmdList->BeginRendering({}, g_invalidTextureHandle);
 
+	//cmdList->TextureBarrier(g_invalidTextureHandle, RHIResourceState::DEPTH_READ, RHIResourceState::DEPTH_WRITE);
+
 	const Camera& cam = scene.GetCamera();
 
 	DirectX::XMMATRIX viewProj = cam.view * cam.projection;
@@ -69,5 +71,4 @@ void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
 			cmdList->DrawIndexed(mesh.indexCount, 1, mesh.startIndex, mesh.baseVertex, 0);
 		}
 	}
-	cmdList->TextureBarrier(g_invalidTextureHandle, ResourceState::DEPTH_WRITE, ResourceState::DEPTH_READ);
 }

@@ -1,5 +1,9 @@
 #pragma once
+#include "External/SimpleMath/SimpleMath.h"
+#include "Graphics/RHI/RHITypes.h"
 #include "Renderer/Core/RenderPass.h"
+
+namespace SM = DirectX::SimpleMath;
 
 struct RasterPassRootConstants
 {
@@ -11,7 +15,7 @@ struct RasterPassRootConstants
     u32 metallicRoughnessIndex;
     u32 emissiveIndex;
 
-    SM::Vector2 ScreenResolution;
+    SM::Vector2 screenResolution;
     u32 clusterIndex;
     u32 depthSRVIndex;
 
@@ -24,7 +28,7 @@ struct RasterPassRootConstants
     float nearZ;
     SM::Vector2 padding;
 
-    SM::Vector3 cameraPosition;
+    DirectX::SimpleMath::Vector3 cameraPosition;
     float padding2;
 };
 
@@ -35,7 +39,7 @@ struct RasterPass : RenderPass
 	void Execute(RenderContext& ctx, const Scene& scene) override;
 
 private:
-	PipelineHandle RasterPipelineHandle_ = g_invalidPipelineHandle;
+	PipelineHandle rasterPipelineHandle = g_invalidPipelineHandle;
 
     RasterPassRootConstants pushConstants{};
 

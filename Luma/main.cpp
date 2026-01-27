@@ -19,6 +19,8 @@
 #include "Core/Window.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Passes/GeometryPass.h"
+#include "Renderer/Passes/SkyBoxPass.h"
+#include "Renderer/Passes/TrianglePass.h"
 #include "Renderer/Passes/Clustered/RasterPass.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -79,9 +81,8 @@ int WINAPI wWinMain(
 	////renderer.AddPass<RenderClusterVis>();
 	////renderer.AddPass<MarkActiveClusters>();
 	////renderer.AddPass<LightAssignClusterPass>();
-	//renderer.AddPass<RasterPass>();
-	//renderer.AddPass<SkyBoxPass>();
-	//renderer.AddPass<TrianglePass>();
+	renderer.AddPass<RasterPass>();
+	renderer.AddPass<SkyBoxPass>();
 
 	renderer.Init();
 
