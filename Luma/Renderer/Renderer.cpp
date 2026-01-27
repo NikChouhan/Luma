@@ -5,7 +5,7 @@
 
 Renderer::Renderer()
 {
-	cl = RHI::CreateCommandList();
+	cl = RHI::CreateCommandList(false);
 }
 
 void Renderer::Init()
