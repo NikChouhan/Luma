@@ -68,10 +68,11 @@ enum class RHIMemoryeUsage
 // buffers
 enum class RHIResourceView : u8
 {
-	LOAD,
-	STORE,
-	RENDER_TARGET,
-	DEPTH_STENCIL
+	NONE = 0,
+	LOAD = 1 << 0,
+	STORE = 1 << 1,
+	RENDER_TARGET = 1<< 2,
+	DEPTH_STENCIL = 1 << 3
 };
 inline RHIResourceView operator|(RHIResourceView a, RHIResourceView b)
 {
@@ -79,7 +80,7 @@ inline RHIResourceView operator|(RHIResourceView a, RHIResourceView b)
 }
 inline bool HasFlag(RHIResourceView flags, RHIResourceView check)
 {
-	return (static_cast<u32>(flags) & static_cast<u32>(check)) != 0;
+	return ((static_cast<u32>(flags) & static_cast<u32>(check)) !=0);
 }
 
 struct RHIVertexBufferCreateInfo
