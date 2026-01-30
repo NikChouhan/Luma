@@ -1,9 +1,11 @@
 #include "D3D12Backend.h"
 
+#include <dxgi1_6.h>
 #include <d3dx12/d3dx12.h>
 
 #include "Core/Common.h"
 #include "Graphics/RHI/RHI.h"
+#include <SDL_syswm.h>
 
 using namespace D3D12Internal;
 
@@ -347,9 +349,10 @@ struct BufferViewCreator
     }
 };
 
-void D3D12Backend::Init(void* windowHandle, u32 width, u32 height)
+void D3D12Backend::Init(SDL_Window* window, u32 width, u32 height)
 {
-    g_hwnd = static_cast<HWND>(windowHandle);
+    SDL_SysWMinfo wmInfo; SDL_GetWindowWMInfo(window, &wmInfo); 
+    g_hwnd = wmInfo.info.win.window;
     g_width = width;
     g_height = height;
     g_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0., 1.);
@@ -1675,10 +1678,10 @@ static bool IsPipelineHandleValid(PipelineHandle handle)
         g_generationsPipelines[handle.index] == handle.generation;
 }
 
-static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& desc)
+static BufferResource CreateBufferResource(const RHIBufferDesc& desc)
 {
-    D3D12Internal::BufferResource bufferRes{};
-    u32 bufferSize = D3D12Internal::GetBufferSize(desc.createInfo);
+    BufferResource bufferRes{};
+    u32 bufferSize = GetBufferSize(desc.createInfo);
     D3D12_HEAP_TYPE heapType{};
     D3D12_RESOURCE_STATES initialState{};
 
@@ -1719,7 +1722,7 @@ static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& d
     allocDesc.HeapType = heapType;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 
-    auto allocator = D3D12Internal::g_allocator.Get();
+    auto allocator = g_allocator.Get();
     RHI_ASSERT(allocator->CreateResource(
         &allocDesc,
         &bufferDesc,
@@ -1737,7 +1740,7 @@ static D3D12Internal::BufferResource CreateBufferResource(const RHIBufferDesc& d
         void* pMappedData;
         CD3DX12_RANGE readRange(0, 0);
         RHI_ASSERT(bufferRes.resource->Map(0, &readRange, &pMappedData));
-        std::visit(D3D12Internal::BufferUpdateVisitor{ pMappedData }, desc.createInfo);
+        std::visit(BufferUpdateVisitor{ pMappedData }, desc.createInfo);
 
         // prolly wont unmap buffers
         //if (!createInfo.keepMapped) {

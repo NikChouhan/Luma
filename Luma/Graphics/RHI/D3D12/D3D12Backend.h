@@ -1,9 +1,11 @@
 #pragma once
 #include <array>
+#include <d3d12.h>
 #include <span>
 #include <D3D12MemAlloc.h>
 #include <dxcapi.h>
 #include <optional>
+#include <SDL_video.h>
 #include <wrl/client.h>
 
 #include "Core/Common.h"
@@ -185,6 +187,7 @@ namespace D3D12Internal
     };
     // bindless slots per views start index
     // allocate atleast 1.5M heap size (1M will do for now)
+    // TODO: actually use this shit dont write and forget
     constexpr u32 kMaxPerCategory = 250000;
 
     constexpr u32 kSampledTextureStart = 0;
@@ -222,7 +225,7 @@ namespace D3D12Internal
 
 struct D3D12Backend
 {
-    static void Init(void* windowHandle, u32 width, u32 height);
+    static void Init(SDL_Window* window, u32 width, u32 height);
     static void Shutdown();
 
     static void BeginFrame();
