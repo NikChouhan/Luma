@@ -269,7 +269,7 @@ TextureHandle Model::LoadTexture(const cgltf_texture_view* view, const bool sRGB
         .view = RHIResourceView::LOAD,
         .createPerMipViews = false,
         .debugName = debugName.c_str() }
-    , nullptr);
+    , data);
 
     textureCache[key] = handle;
 

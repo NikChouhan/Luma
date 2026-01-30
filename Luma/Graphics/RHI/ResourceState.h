@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-enum class ResourceState : u32
+enum class RHIResourceState : u32
 {
     Common = 0,
     VertexAndConstantBuffer = 0x1,
@@ -21,12 +21,12 @@ enum class ResourceState : u32
     Unknown = 0xFFFFFFFF
 };
 
-inline bool IsReadState(ResourceState state) 
+inline bool IsReadState(RHIResourceState state) 
 {
-    return (static_cast<u32>(state) & (static_cast<u32>(ResourceState::GenericRead) | static_cast<u32>(ResourceState::DepthRead))) != 0;
+    return (static_cast<u32>(state) & (static_cast<u32>(RHIResourceState::GenericRead) | static_cast<u32>(RHIResourceState::DepthRead))) != 0;
 }
 
-inline bool IsWriteState(ResourceState state) 
+inline bool IsWriteState(RHIResourceState state) 
 {
     return !IsReadState(state);
 }
