@@ -1,6 +1,7 @@
 #include "scene.h"
 
 #include "Graphics/Globals.h"
+#include <SDL_scancode.h>
 
 static void HandleCamera(Camera& camera, f32 deltaTime);
 
@@ -91,12 +92,18 @@ void HandleCamera(Camera& camera, f32 deltaTime)
 	right.Normalize();
 
 	SM::Vector3 movement(0.0f, 0.0f, 0.0f);
-	if (IGS::keys['W']) movement += forward * moveSpeed * deltaTime;
-	if (IGS::keys['A']) movement += right * moveSpeed * deltaTime;
-	if (IGS::keys['S']) movement -= forward * moveSpeed * deltaTime;
-	if (IGS::keys['D']) movement -= right * moveSpeed * deltaTime;
-	if (IGS::keys['Q']) movement -= up * moveSpeed * deltaTime;
-	if (IGS::keys['E']) movement += up * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_W])
+		movement += forward * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_A])
+		movement += right * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_S])
+		movement -= forward * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_D])
+		movement -= right * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_Q])
+		movement -= up * moveSpeed * deltaTime;
+	if (IGS::keys[SDL_SCANCODE_E])
+		movement += up * moveSpeed * deltaTime;
 
 	Translate(camera, movement);
 }

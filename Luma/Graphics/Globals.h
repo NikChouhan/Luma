@@ -3,6 +3,7 @@
 
 #include <DirectXMath.h>
 #include "External/SimpleMath/SimpleMath.h"
+#include "SDL_scancode.h"
 
 #include <StandardTypes.h>
 
@@ -96,7 +97,7 @@ inline void SetupLightSettingsHandler()
 
 struct InputGlobalState
 {
-	inline static bool keys[256];
+	inline static bool keys[SDL_NUM_SCANCODES];
     inline static int lastMouseX;
     inline static int lastMouseY;
     inline static int currentMouseX;

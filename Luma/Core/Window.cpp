@@ -1,166 +1,160 @@
 #include "Window.h"
 
+#if defined(RHI_BACKEND_VULKAN)
 #include <imgui.h>
-#include <windowsx.h>
-
+#include <imgui_impl_sdl2.h>
+#elif RHI_BACKEND_D3D12
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#endif
+#include "Log.h"
 #include "Graphics/Globals.h"
 #include "Graphics/RHI/RHI.h"
 
-static const wchar_t* CLASS_NAME = L"LumaEngineWindowClass";
-extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-
+// TODO: verify with the docs
+//extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplSDL2_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 Window::Window(const WindowDesc& desc)
+    : width(desc.width)
+    , height(desc.height)
+    , title(desc.title)
 {
-	hInstance_ = GetModuleHandle(nullptr);
-
-    WNDCLASSEX wc = {};
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance_;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.lpszClassName = CLASS_NAME;
-
-    RegisterClassEx(&wc);
-
-    hwnd_ = CreateWindowEx(
-        0,
-        CLASS_NAME,
+    // Initialize SDL video subsystem
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
+        assert(false && "Failed to initialize SDL");
+        return;
+    }
+    u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+#if defined(RHI_BACKEND_VULKAN)
+    flags |= SDL_WINDOW_VULKAN;
+#endif
+    window = SDL_CreateWindow(
         desc.title.c_str(),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        nullptr,
-        nullptr,
-        hInstance_,
-        this
-    );
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        desc.width,
+        desc.height,
+        flags);
 
-    assert(hwnd_ && "Failed to create window");
-
-    ShowWindow(hwnd_, SW_SHOW);
+    if (!window)
+        printl(Log::LogLevel::Error, "[Core] Failed to create window");
 }
 
 Window::~Window()
 {
-    if (hwnd_)
+    if (window)
     {
-        DestroyWindow(hwnd_);
-        UnregisterClass(CLASS_NAME, hInstance_);
+        SDL_DestroyWindow(window);
+        window = nullptr;
     }
+    SDL_Quit();
 }
 
 bool Window::PollEvents()
 {
-    MSG msg = {};
+    SDL_Event event;
 
-    while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+    while (SDL_PollEvent(&event))
     {
-        if (msg.message == WM_QUIT)
+        //ImGui_ImplSDL2_ProcessEvent(&event);
+
+        HandleEvent(event);
+
+        if (event.type == SDL_QUIT)
         {
-            isClosed_ = true;
+            isClosed = true;
             return false;
         }
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
     }
-    return !isClosed_;
+
+    return !isClosed;
 }
 
-void Window::SetTitle(const std::wstring& title)
+void Window::SetTitle(const std::string& title)
 {
-    title_ = title;
-    SetWindowText(hwnd_, title.c_str());
+    this->title = title;
+    SDL_SetWindowTitle(window, title.c_str());
 }
 
-LRESULT Window::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+void Window::HandleEvent(const SDL_Event& event)
 {
-    Window* pThis = nullptr;
-
-    if (msg == WM_NCCREATE) // before window creation, WM_NCCREATE is passed
+    switch (event.type)
     {
-        CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-        pThis = reinterpret_cast<Window*>(pCreate->lpCreateParams);
-
-        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pThis));
-    }
-    else
-    {
-        pThis = reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-    }
-
-    if (pThis)
-    {
-        return pThis->HandleMsg(hwnd, msg, wParam, lParam);
-    }
-
-    return DefWindowProc(hwnd, msg, wParam, lParam);
-}
-
-LRESULT Window::HandleMsg(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
-    {
-        return true;
-    }
-
-    switch (uMsg)
-    {
-    case WM_DESTROY:
-        isClosed_ = true;
+    case SDL_QUIT:
+        isClosed = true;
         RHI::WaitIdle();
-        // DestroyDevice();
-        PostQuitMessage(0);
-        return 0;
-    case WM_KEYDOWN:
-        if (wParam < 256) IGS::keys[wParam] = true;
-        return 0;
-    case WM_KEYUP:
-        if (wParam < 256) IGS::keys[wParam] = false;
+        break;
 
-        if (wParam == VK_ESCAPE)
+    case SDL_KEYDOWN:
+    {
+        SDL_Scancode scancode = event.key.keysym.scancode;
+        if (scancode < 256)
+        {
+            IGS::keys[scancode] = true;
+        }
+
+        if (event.key.keysym.sym == SDLK_ESCAPE)
         {
             RHI::WaitIdle();
-            // DestroyDevice();
-            PostQuitMessage(0);
+            SDL_Event quitEvent;
+            quitEvent.type = SDL_QUIT;
+            SDL_PushEvent(&quitEvent);
         }
-        if (wParam == 'M')
+
+        if (event.key.keysym.sym == SDLK_m)
         {
             IGS::isMouseCaptured = !IGS::isMouseCaptured;
-            ShowCursor(!IGS::isMouseCaptured);
-
-            RECT rect;
-            GetClientRect(hwnd, &rect);
-            ClientToScreen(hwnd, (POINT*)&rect.left);
-            ClientToScreen(hwnd, (POINT*)&rect.right);
 
             if (IGS::isMouseCaptured)
             {
-                ClipCursor(&rect);
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+                SDL_ShowCursor(SDL_DISABLE);
             }
             else
             {
-                ClipCursor(NULL);
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+                SDL_ShowCursor(SDL_ENABLE);
             }
-            POINT center = { rect.right / 2, rect.bottom / 2 };
-            SetCursorPos(center.x, center.y);
-            IGS::lastMouseX = IGS::currentMouseX = center.x;
-            IGS::lastMouseY = IGS::currentMouseY = center.y;
+
+            int windowWidth, windowHeight;
+            SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+            IGS::lastMouseX = IGS::currentMouseX = windowWidth / 2;
+            IGS::lastMouseY = IGS::currentMouseY = windowHeight / 2;
+
+            SDL_WarpMouseInWindow(window, windowWidth / 2, windowHeight / 2);
         }
-        return 0;
-    case WM_MOUSEMOVE:
+        break;
+    }
+
+    case SDL_KEYUP:
+    {
+        SDL_Scancode scancode = event.key.keysym.scancode;
+        if (scancode < 256)
+        {
+            IGS::keys[scancode] = false;
+        }
+        break;
+    }
+
+    case SDL_MOUSEMOTION:
         IGS::lastMouseX = IGS::currentMouseX;
         IGS::lastMouseY = IGS::currentMouseY;
-        IGS::currentMouseX = GET_X_LPARAM(lParam);
-        IGS::currentMouseY = GET_Y_LPARAM(lParam);
-        return 0;
-        // Will resolve resizing later when the architecture is fixed
+        IGS::currentMouseX = event.motion.x;
+        IGS::currentMouseY = event.motion.y;
+        break;
+
+    case SDL_WINDOWEVENT:
+        if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+        {
+            width = event.window.data1;
+            height = event.window.data2;
+            // TODO: Handle window resize for your RHI
+        }
+        break;
 
     default:
-        return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+        break;
     }
 }
-
-
