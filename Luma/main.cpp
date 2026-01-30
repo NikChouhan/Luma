@@ -20,8 +20,9 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Passes/GeometryPass.h"
 #include "Renderer/Passes/SkyBoxPass.h"
-#include "Renderer/Passes/TrianglePass.h"
 #include "Renderer/Passes/Clustered/RasterPass.h"
+
+#include "Graphics/RHI/RHI.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -63,7 +64,7 @@ int WINAPI wWinMain(
 	Window window({
 		.width = 1920,
 		.height = 1080,
-		.title = L"Luma" });
+		.title = "Luma" });
 	Timer timer{};
 	RHI::Init(window.GetHandle(), 1920, 1080);
 	//SetupLightSettingsHandler();
@@ -96,7 +97,7 @@ int WINAPI wWinMain(
 		scene.Update(dt);
 		renderer.RenderFrame(scene);
 
-		window.SetTitle(std::to_wstring(1./dt));
+		window.SetTitle(std::to_string(1./dt));
 	}
 	return 0;
 }

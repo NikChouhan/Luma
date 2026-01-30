@@ -9,6 +9,36 @@ add_defines("UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "NOMINMAX")
 set_languages("cxx23", "c17")
 add_syslinks("user32.lib", "kernel32.lib", "shell32.lib", "comctl32.lib", "d3d12.lib", "dxgi.lib", "dxguid.lib")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
+
+--set_config("rhi_backend", "dx12")
+
+option("rhi_backend")
+    set_default("dx12")
+    set_showmenu(true)
+    set_description("RHI Backend (vulkan, dx12 supported!)")
+    set_values("vulkan", "dx12")
+option_end()
+
+if has_config("rhi_backend") then
+    local backend = get_config("rhi_backend")
+    if backend == "vulkan" then
+        add_defines("RHI_BACKEND_VULKAN")
+    elseif backend == "dx12" then
+        add_defines("RHI_BACKEND_D3D12")
+    end
+end
+
+if has_config("rhi_backend") then
+    local backend = get_config("rhi_backend")
+    if backend == "vulkan" then
+        add_requires("spirv-reflect")
+        add_requires("imgui docking", {config = { sdl2 = true, vulkan = true}})
+    elseif backend == "dx12" then
+        add_requires("d3d12-memory-allocator")
+        add_requires("imgui docking", {config = { win32 = true, dx12 = true}})
+    end
+end
+
 if (is_mode("debug")) then
     set_symbols("debug")
     add_defines("DEBUG")
@@ -23,7 +53,7 @@ elseif(is_mode("release")) then
     set_runtimes("MD")
 end
 
-add_includedirs("Luma", "D3D12/include")
+add_includedirs("Luma", "Luma/External/D3D12Ext/include", "Luma/External/VulkanExt")
 
 target("game")
     set_default(true)
