@@ -1,30 +1,25 @@
 #pragma once
 #include <type_traits>
 
+#include "RHITypes.h"
 #include "Graphics/Globals.h"
 
-#ifdef _WIN32
-#define RHI_BACKEND_D3D12
-#elif LINUX
-#define RHI_BACKEND_VULKAN
-#endif
 
 #if defined(RHI_BACKEND_D3D12)
 #include "Graphics/RHI/D3D12/D3D12Backend.h"
 using RHIBackend = D3D12Backend;
+using BackendCommandList = D3D12Backend::D3D12BackendCommandList;
 #elif RHI_BACKEND_VULKAN
-#include "Vulkan/VulkanBackend.h"
+#include "Graphics/RHI/Vulkan/VulkanBackend.h"
 using RHIBackend = VulkanBackend;
-using RhiViewPort = 
-#else
-#error "No RHI backend defined"
+using BackendCommandList = VulkanBackend::VulkanBackendCommandList;
 #endif
 
 struct RHI
 {
-    static void Init(void* windowHandle, u32 width, u32 height)
+    static void Init(SDL_Window* window, u32 width, u32 height)
     {
-        RHIBackend::Init(windowHandle, width, height);
+        RHIBackend::Init(window, width, height);
     }
     static void Shutdown()
     {
@@ -94,79 +89,79 @@ struct RHI
     {
     public:
         CommandList(bool isImmediate) : backendData(RHIBackend::CreateCommandList(isImmediate)) {}
-        ~CommandList() { RHIBackend::DestroyCommandList(static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)); }
+        ~CommandList() { RHIBackend::DestroyCommandList(static_cast<BackendCommandList*>(backendData)); }
 
         void Begin()
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->Begin();
+            return static_cast<BackendCommandList*>(backendData)->Begin();
         }
         void End()
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->End();
+            return static_cast<BackendCommandList*>(backendData)->End();
         }
         void Submit()
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->Submit();
+            return static_cast<BackendCommandList*>(backendData)->Submit();
         }
         void TextureBarrier(TextureHandle handle, RHIResourceState before, RHIResourceState after)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->TextureBarrier(handle, before, after);
+            return static_cast<BackendCommandList*>(backendData)->TextureBarrier(handle, before, after);
         }
         void BufferBarrier(BufferHandle handle, RHIResourceState before, RHIResourceState after)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BufferBarrier(handle, before, after);
+            return static_cast<BackendCommandList*>(backendData)->BufferBarrier(handle, before, after);
         }
         void SetPipeline(PipelineHandle handle)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetPipeline(handle);
+            return static_cast<BackendCommandList*>(backendData)->SetPipeline(handle);
         }
         void SetGraphicsPushConstants(const void* data, u32 size, u32 offset)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetGraphicsPushConstants(data, size, offset);
+            return static_cast<BackendCommandList*>(backendData)->SetGraphicsPushConstants(data, size, offset);
         }
         void BeginRendering(const std::vector<TextureHandle> colorTargets, TextureHandle depthTarget)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BeginRendering(colorTargets, depthTarget);
+            return static_cast<BackendCommandList*>(backendData)->BeginRendering(colorTargets, depthTarget);
         }
         void EndRendering()
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->EndRendering();
+            return static_cast<BackendCommandList*>(backendData)->EndRendering();
         }
         void SetViewport(const RHIViewPort& viewPort)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetViewport(viewPort);
+            return static_cast<BackendCommandList*>(backendData)->SetViewport(viewPort);
         }
         void SetScissor(const RHIScissor& scissor)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->SetScissor(scissor);
+            return static_cast<BackendCommandList*>(backendData)->SetScissor(scissor);
         }
         void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->Draw(vertexCount, instanceCount, firstVertex, firstInstance);
+            return static_cast<BackendCommandList*>(backendData)->Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
         void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset, u32 firstInstance)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+            return static_cast<BackendCommandList*>(backendData)->DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         }
         void Dispatch(u32 x, u32 y, u32 z)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->Dispatch(x, y, z);
+            return static_cast<BackendCommandList*>(backendData)->Dispatch(x, y, z);
         }
         void CopyBufferToTexture(BufferHandle src, TextureHandle dst)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->CopyBufferToTexture(src, dst);
+            return static_cast<BackendCommandList*>(backendData)->CopyBufferToTexture(src, dst);
         }
         void CopyBuffer(BufferHandle src, BufferHandle dst, u64 size, u64 srcOffset, u64 dstOffset)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->CopyBuffer(src, dst, size, srcOffset, dstOffset);
+            return static_cast<BackendCommandList*>(backendData)->CopyBuffer(src, dst, size, srcOffset, dstOffset);
         }
         void BindVertexBuffer(BufferHandle handle)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BindVertexBuffer(handle);
+            return static_cast<BackendCommandList*>(backendData)->BindVertexBuffer(handle);
         }
         void BindIndexBuffer(BufferHandle handle)
         {
-            return static_cast<RHIBackend::D3D12BackendCommandList*>(backendData)->BindIndexBuffer(handle);
+            return static_cast<BackendCommandList*>(backendData)->BindIndexBuffer(handle);
         }
     private:
         void* backendData = nullptr;
