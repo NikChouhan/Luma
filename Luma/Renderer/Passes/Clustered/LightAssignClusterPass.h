@@ -36,7 +36,7 @@ struct LightIndexList
 struct LightAssignClusterPass : public RenderPass
 {
 	auto Init() -> void override;
-	void Execute(RenderContext& ctx, const Scene& scene) override;
+	void Execute(RenderCtx& ctx, const Scene& scene) override;
 
 private:
 	PipelineHandle LightAssignClusterPipeline = g_invalidPipelineHandle;

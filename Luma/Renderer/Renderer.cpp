@@ -18,7 +18,7 @@ void Renderer::Init()
 
 void Renderer::RenderFrame(const Scene& scene) const
 {
-	RenderContext ctx = BeginFrame();
+	RenderCtx ctx = BeginFrame();
 
 	for (auto& pass : passes_)
 	{
@@ -27,14 +27,14 @@ void Renderer::RenderFrame(const Scene& scene) const
 	EndFrame(ctx);
 }
 
-RenderContext Renderer::BeginFrame() const
+RenderCtx Renderer::BeginFrame() const
 {
 	RHI::BeginFrame();
 	cl->Begin();
-	return RenderContext{ cl };
+	return RenderCtx{ cl };
 }
 
-void Renderer::EndFrame(const RenderContext& ctx) const
+void Renderer::EndFrame(const RenderCtx& ctx) const
 {
 	// rhi impl
 	cl->EndRendering();

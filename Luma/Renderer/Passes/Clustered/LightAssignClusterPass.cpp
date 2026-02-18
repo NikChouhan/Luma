@@ -3,7 +3,7 @@
 //#include "GenerateLights.h"
 //#include "scene.h"
 //#include "Core/Camera.h"
-//#include "Renderer/Core/RenderContext.h"
+//#include "Renderer/Core/RenderCtx.h"
 //
 //
 //void LightAssignClusterPass::Init(ResourceManager* resourceManager, PipelineCache* pipelineCache)
@@ -121,7 +121,7 @@
 //	pushConstants.globalLightStructuredBufferUAVIndex = globalLightStructuredBufferUAVIndex;
 //}
 //
-//void LightAssignClusterPass::Execute(RenderContext& ctx, const Scene& scene)
+//void LightAssignClusterPass::Execute(RenderCtx& ctx, const Scene& scene)
 //{
 //	auto cmdList = ctx.cmdList_;
 //

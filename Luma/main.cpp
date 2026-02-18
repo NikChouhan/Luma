@@ -20,9 +20,9 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Passes/GeometryPass.h"
 #include "Renderer/Passes/SkyBoxPass.h"
-#include "Renderer/Passes/Clustered/RasterPass.h"
 
 #include "Graphics/RHI/RHI.h"
+#include "Renderer/Passes/Forward/ForwardPBRPass.h"
 
 extern "C++" IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -77,12 +77,7 @@ int WINAPI wWinMain(
 	GlobalStorage::depthSRVIndex = CreateDepthSRV();
 	// Add passes
 	renderer.AddPass<GeometryPass>();
-
-	////renderer.AddPass<ComputeAABBPass>();
-	////renderer.AddPass<RenderClusterVis>();
-	////renderer.AddPass<MarkActiveClusters>();
-	////renderer.AddPass<LightAssignClusterPass>();
-	renderer.AddPass<RasterPass>();
+	renderer.AddPass<ForwardPBRPass>();
 	renderer.AddPass<SkyBoxPass>();
 
 	renderer.Init();

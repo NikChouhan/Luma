@@ -2,7 +2,7 @@
 //
 //#include "scene.h"
 //#include "Core/Camera.h"
-//#include "Renderer/Core/RenderContext.h"
+//#include "Renderer/Core/RenderCtx.h"
 //
 //void RenderClusterVis::Init()
 //{
@@ -36,7 +36,7 @@
 //	pushConstants.clusterGeometryStructuredBufferSRVIndex = clusterGeometrySRVIndex;
 //}
 //
-//void RenderClusterVis::Execute(RenderContext& ctx, const Scene& scene)
+//void RenderClusterVis::Execute(RenderCtx& ctx, const Scene& scene)
 //{
 //	auto cmdList = ctx.cmdList_;
 //

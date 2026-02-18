@@ -2,6 +2,7 @@
 
 #include "Graphics/RHI/RHI.h"
 #include "Graphics/RHI/RHITypes.h"
+#include "Renderer/Core/RenderCtx.h"
 
 static float vertices[] = {
      0.5f,  0.5f, 0.0f,  // top right
@@ -17,7 +18,7 @@ static unsigned int indices[] = {  // note that we start from 0!
 
 void TrianglePass::Init()
 {
-    BufferHandle vbHandle = RHI::CreateBuffer(
+    vbHandle = RHI::CreateBuffer(
         {
         	.createInfo = RHIVertexBufferCreateInfo {.vertices = vertices, .vertexCount = _countof(vertices), .vertexStride = sizeof(vertices[0]) * 3},
             .usage = RHIMemoryeUsage::DEFAULT,
@@ -26,7 +27,7 @@ void TrianglePass::Init()
         },
         nullptr);
 
-    BufferHandle ibHandle = RHI::CreateBuffer(
+    ibHandle = RHI::CreateBuffer(
         {
             .createInfo = RHIIndexBufferCreateInfo{.indices = indices, .indexCount = _countof(indices), .format = RHIFormat::R32_UINT},
             .usage = RHIMemoryeUsage::DEFAULT,
@@ -54,14 +55,28 @@ void TrianglePass::Init()
         .ps = pixelHandle,
         .blend = RHIBlendMode::ADDITIVE,
         .depthFunc = RHIDepthFunc::GEQUAL,
+        .depthMode = RHIDepthMode::WRITE,
         .rasterMode = RHIRasterMode::NONE,
         .topology = RHITopology::TRIANGLE_LIST,
         .colorFormats = {RHIFormat::R8G8B8A8_UNORM},
         .depthFormat = RHIFormat::D32_FLOAT
     };
+    pipelineHandle = RHI::CreateGraphicsPipeline(pipelineDesc);
 }
 
-void TrianglePass::Execute(RenderContext& ctx, const Scene& scene)
+void TrianglePass::Execute(RenderCtx& ctx, const Scene& scene)
 {
+    auto cmdList = ctx.cl;
 
+    cmdList->SetPipeline(pipelineHandle);
+    cmdList->SetViewport({});
+    cmdList->SetScissor({});
+    cmdList->BeginRendering({}, g_invalidTextureHandle);
+
+    cmdList->BindVertexBuffer(vbHandle);
+    cmdList->BindIndexBuffer(ibHandle);
+
+    cmdList->DrawIndexed(6, 1, 0, 0, 0);
+
+    cmdList->EndRendering();
 }

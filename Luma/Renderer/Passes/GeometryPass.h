@@ -12,7 +12,7 @@ struct DepthPassRootConstants
 struct GeometryPass : public RenderPass
 {
 	void Init() override;
-	void Execute(RenderContext& ctx, const Scene& scene) override;
+	void Execute(RenderCtx& ctx, const Scene& scene) override;
 
 private:
 	PipelineHandle pipelineHandle = g_invalidPipelineHandle;

@@ -29,7 +29,7 @@
 //struct ComputeAABBPass : RenderPass
 //{
 //	void Init() override;
-//	void Execute(RenderContext& ctx, const Scene& scene) override;
+//	void Execute(RenderCtx& ctx, const Scene& scene) override;
 //
 //private:
 //	PipelineHandle ComputeAABBPipeline = g_invalidPipelineHandle;

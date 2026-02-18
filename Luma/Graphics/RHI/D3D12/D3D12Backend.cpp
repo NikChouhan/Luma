@@ -1185,6 +1185,7 @@ static CD3DX12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(TextureHandle textureHandle)
 void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::vector<TextureHandle> colorTargets,
                                                            TextureHandle depthTarget)
 {
+    // early z pass
     if (colorTargets.empty() && depthTarget == g_invalidTextureHandle)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(g_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -1196,6 +1197,7 @@ void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::vector<Tex
             &dsvHandle
         );
     }
+    // when swapchain is used as render targets (like PBR pass)
     else if (colorTargets[0] == g_invalidTextureHandle && depthTarget == g_invalidTextureHandle)
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(g_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -1208,6 +1210,7 @@ void D3D12Backend::D3D12BackendCommandList::BeginRendering(const std::vector<Tex
             &dsvHandle
         );
     }
+    // this is when other resources are used as render targets
     else
     {
         std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles;
@@ -1807,7 +1810,7 @@ static void UploadTextureData(const ComPtr<ID3D12Resource>& resource,
     }
     else if (usage == RHIMemoryeUsage::GPU_UPLOAD)
     {
-
+        // TODO: implement GPU upload texture data
     }
 }
 

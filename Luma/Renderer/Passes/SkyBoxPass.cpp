@@ -4,7 +4,7 @@
 
 #include "scene.h"
 #include "Core/Camera.h"
-#include "Renderer/Core/RenderContext.h"
+#include "Renderer/Core/RenderCtx.h"
 
 void SkyBoxPass::Init()
 {
@@ -131,14 +131,14 @@ void SkyBoxPass::Init()
         };
 
         ShaderHandle vertexShader = RHI::CreateShader({
-            .path = L"../../../../shaders/Skybox.hlsl",
+            .path = L"../../../../shaders/Skybox/Skybox.hlsl",
             .entryPoint = L"VSMain",
             .target = L"vs_6_7",
             .stage = RHIShaderStage::VERTEX
             });
 
         ShaderHandle pixelShader = RHI::CreateShader({
-            .path = L"../../../../shaders/Skybox.hlsl",
+            .path = L"../../../../shaders/Skybox/Skybox.hlsl",
             .entryPoint = L"PSMain",
             .target = L"ps_6_7",
             .stage = RHIShaderStage::PIXEL
@@ -159,7 +159,7 @@ void SkyBoxPass::Init()
             });
     }
 }
-void SkyBoxPass::Execute(RenderContext& ctx, const Scene& scene)
+void SkyBoxPass::Execute(RenderCtx& ctx, const Scene& scene)
 {
 	// the usual execute pipeline stuff
     const auto cmdList = ctx.cl;

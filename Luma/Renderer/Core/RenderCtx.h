@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RHI/RHI.h"
 
-struct RenderContext
+struct RenderCtx
 {
     RHI::CommandList* cl;
     std::vector<TextureHandle> colorTargets;

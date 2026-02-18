@@ -3,7 +3,7 @@
 #include "scene.h"
 #include "Core/Camera.h"
 #include "Graphics/PushConstants.h"
-#include "Renderer/Core/RenderContext.h"
+#include "Renderer/Core/RenderCtx.h"
 #include "Graphics/RHI/RHI.h"
 
 void GeometryPass::Init()
@@ -14,7 +14,7 @@ void GeometryPass::Init()
 	RHIShaderDesc vsDesc;
 	ShaderHandle vsHandle = RHI::CreateShader(
 		{
-		.path = L"../../../../shaders/depth_pass.hlsl",
+		.path = L"../../../../shaders/Geometry/DepthPrePass.hlsl",
 		.entryPoint = L"DepthVS",
 		.target = L"vs_6_7",
 		.stage = RHIShaderStage::VERTEX }
@@ -35,7 +35,7 @@ void GeometryPass::Init()
 		);
 }
 
-void GeometryPass::Execute(RenderContext& ctx, const Scene& scene)
+void GeometryPass::Execute(RenderCtx& ctx, const Scene& scene)
 {
 	auto cmdList = ctx.cl;
 	// setup frame state

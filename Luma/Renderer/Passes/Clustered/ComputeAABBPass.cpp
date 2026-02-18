@@ -2,7 +2,7 @@
 
 #include "scene.h"
 #include "Core/Camera.h"
-#include "Renderer/Core/RenderContext.h"
+#include "Renderer/Core/RenderCtx.h"
 
 //void ComputeAABBPass::Init()
 //{
@@ -59,7 +59,7 @@
 //	pushConstants.screenDimensions[1] = GlobalStorage::g_LumaConstants.height;
 //}
 //
-//void ComputeAABBPass::Execute(RenderContext& ctx, const Scene& scene)
+//void ComputeAABBPass::Execute(RenderCtx& ctx, const Scene& scene)
 //{
 //	auto cmdList = ctx.cmdList_;
 //

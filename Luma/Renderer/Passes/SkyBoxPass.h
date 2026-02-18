@@ -13,7 +13,7 @@ struct SkyBoxConstants
 struct SkyBoxPass : public RenderPass
 {
 	void Init() override;
-	void Execute(RenderContext& ctx, const Scene& scene) override;
+	void Execute(RenderCtx& ctx, const Scene& scene) override;
 
 private:
 	PipelineHandle skyBoxPipelineHandle = g_invalidPipelineHandle;

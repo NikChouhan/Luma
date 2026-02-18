@@ -60,7 +60,7 @@ float3 RandomInUnitSphere(inout float seed)
 float3 RandomOnHemisphere(inout float seed, float3 normal)
 {
 	float3 randomDir = RandomInUnitSphere(seed);
-	// Ensure the direction is in the same hemisphere as the normal
+	// Ensure the direction is in the same hemisphere as the norm(al)
 	if (dot(randomDir, normal) < 0.0f) 
 	{
 		randomDir = -randomDir;
@@ -68,3 +68,4 @@ float3 RandomOnHemisphere(inout float seed, float3 normal)
 	return normalize(randomDir);
 }
 
+#define UINT_MAX_VALUE 4294967295

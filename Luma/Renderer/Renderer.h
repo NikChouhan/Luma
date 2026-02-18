@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/RenderContext.h"
+#include "Core/RenderCtx.h"
 #include "Renderer/Core/RenderPass.h"
 
 struct Swapchain;
@@ -19,8 +19,8 @@ struct Renderer
 private:
 	std::vector<std::unique_ptr<RenderPass>> passes_;
 	RHI::CommandList* cl;
-	RenderContext BeginFrame() const;
-	void EndFrame(const RenderContext& ctx) const;
+	RenderCtx BeginFrame() const;
+	void EndFrame(const RenderCtx& ctx) const;
 };
 
 template <typename T>

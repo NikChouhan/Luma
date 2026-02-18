@@ -1,13 +1,13 @@
 
-#include "RasterPass.h"
+#include "ForwardPBRPass.h"
 
 #include "scene.h"
 #include "Core/Camera.h"
 #include "Graphics/PushConstants.h"
-#include "Renderer/Core/RenderContext.h"
+#include "Renderer/Core/RenderCtx.h"
 #include "Graphics/RHI/RHI.h"
 
-void RasterPass::Init()
+void ForwardPBRPass::Init()
 {
 	/* it will be a simple pixel shading pass that first colors the pixel with the textures
 	 * and then depending on the cluster its present in, adds the lights
@@ -17,14 +17,14 @@ void RasterPass::Init()
 	// raster pipeline and the shaders
 	{
 		ShaderHandle vsHandle = RHI::CreateShader({
-			.path = L"../../../../shaders/model.hlsl",
+			.path = L"../../../../shaders/Forward/ForwardPBR.hlsl",
 			.entryPoint = L"VSMain",
 			.target = L"vs_6_7",
 			.stage = RHIShaderStage::VERTEX
 			});
 
 		ShaderHandle psHandle = RHI::CreateShader({
-			.path = L"../../../../shaders/model.hlsl",
+			.path = L"../../../../shaders/Forward/ForwardPBR.hlsl",
 			.entryPoint = L"PSMain",
 			.target = L"ps_6_7",
 			.stage = RHIShaderStage::PIXEL
@@ -71,14 +71,14 @@ void RasterPass::Init()
 
 
 		// TODO: Get actual screen resolution
-		pushConstants.screenResolution = DirectX::XMFLOAT2(1920.0f, 1080.0f);
+		//pushConstants.screenResolution = DirectX::XMFLOAT2(1920.0f, 1080.0f);
 
 		//TextureHandle depthTextureHandle = g_invalidTextureHandle; // TODO: Get from resource manager
 		//pushConstants.depthSRVIndex = RHI::GetBindlessReadIndex(depthTextureHandle);
 	}
 }
 
-void RasterPass::Execute(RenderContext& ctx, const Scene& scene)
+void ForwardPBRPass::Execute(RenderCtx& ctx, const Scene& scene)
 {
 	auto cmdList = ctx.cl;
 
@@ -94,7 +94,7 @@ void RasterPass::Execute(RenderContext& ctx, const Scene& scene)
 	DirectX::XMMATRIX viewProj = cam.view * cam.projection;
 	DirectX::XMMATRIX invViewProj = DirectX::XMMatrixInverse(nullptr, viewProj);
 
-	pushConstants.cameraPosition = cam.pos;
+	//pushConstants.cameraPosition = cam.pos;
 
 	//pushConstants.clusterIndex = RHI::GetBindlessReadIndex(clusterBufferHandle);
 
@@ -131,14 +131,14 @@ void RasterPass::Execute(RenderContext& ctx, const Scene& scene)
 			DirectX::XMMATRIX wvp = world * viewProj;
 
 			pushConstants.worldViewProj = wvp;
-			pushConstants.inverseViewProj = invViewProj;
+			//pushConstants.inverseViewProj = invViewProj;
 
 			pushConstants.albedoIndex = albedoIndex;
 			pushConstants.normalIndex = normalIndex;
 			pushConstants.metallicRoughnessIndex = metallicRoughnessIndex;
 			pushConstants.emissiveIndex = emissiveIndex;
 
-			cmdList->SetGraphicsPushConstants(&pushConstants, sizeof(RasterPassRootConstants) / 4, 0);
+			cmdList->SetGraphicsPushConstants(&pushConstants, sizeof(ForwardPBRPassRootConstants) / 4, 0);
 			cmdList->DrawIndexed(mesh.indexCount, 1, mesh.startIndex, mesh.baseVertex, 0);
 		}
 	}

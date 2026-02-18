@@ -2,25 +2,27 @@ target("Luma")
     set_kind("static")
     set_pcxxheader("pch.h", {public = true})
     add_headerfiles(
-     "Core/*.h",
-     "External/SimpleMath/SimpleMath.h",
-     "External/sol/sol.hpp",
-     "Graphics/*.h",
-     "Graphics/RHI/*.h",
-     "Renderer/*.h",
-     "Renderer/Core/*.h",
-     "Renderer/Passes/*.h",
-     "Renderer/Passes/Clustered/*.h",
-     "RenderGraph/*.h", {public = true})
+    "Core/*.h",
+    "External/SimpleMath/SimpleMath.h",
+    "External/sol/sol.hpp",
+    "Graphics/*.h",
+    "Graphics/RHI/*.h",
+    "Renderer/*.h",
+    "Renderer/Core/*.h",
+    "Renderer/Passes/*.h",
+    "Renderer/Passes/Clustered/*.h",
+    "Renderer/Passes/Forward/*.h",
+    "RenderGraph/*.h", {public = true})
      
     add_files(
-     "Core/*.cpp",
-     "External/SimpleMath/SimpleMath.cpp",
-     "Renderer/*.cpp",
-     "Renderer/Core/*cpp",
-     "Renderer/Passes/*cpp",
-     "Renderer/Passes/Clustered/*.cpp",
-     "RenderGraph/*.cpp"
+    "Core/*.cpp",
+    "External/SimpleMath/SimpleMath.cpp",
+    "Renderer/*.cpp",
+    "Renderer/Core/*cpp",
+    "Renderer/Passes/*cpp",
+    "Renderer/Passes/Clustered/*.cpp",
+    "Renderer/Passes/Forward/*.cpp",
+    "RenderGraph/*.cpp"
     )
     add_rules("c++.unity_build")
 
@@ -33,9 +35,9 @@ target("Luma")
         
             add_files("Graphics/RHI/D3D12/*.cpp")
         elseif backend == "vulkan" then
-            add_headerfiles("Graphics/RHI/Vulkan/*.h")
+            add_headerfiles("Graphics/RHI/Vulkan/*.h", "External/VulkanExt/volk/*.h", "External/VulkanExt/VMA/*.h", {public = true})
             add_packages("spirv-reflect") -- so i am thinking if i should wtite slang or hlsl??)
-            add_files("Graphics/RHI/Vulkan/*.cpp", "External/VulkanExt/vk-bootstrap/*.cpp", "External/VulkanExt/VMA/*.cpp")
+            add_files("Graphics/RHI/Vulkan/*.cpp", "External/VulkanExt/vk-bootstrap/*.cpp", "External/VulkanExt/VMA/*.cpp", "External/VulkanExt/volk/*.cpp")
         end
     end
     add_packages(
@@ -48,4 +50,5 @@ target("Luma")
      "libsdl2",
      {public = true}
     )
+    add_rules("plugin.compile_commands.autoupdate", {outputdir = "$(projectdir)"})
 target_end()
