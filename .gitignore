@@ -14,3 +14,7 @@ tempData
 compile_commands.json
 .zed
 assets/models/bistro3
+assets/models/bistro
+assets/models/bistroWithEmissive
+assets/models/sponzaBanner
+assets/models/sponzaJeremiah
